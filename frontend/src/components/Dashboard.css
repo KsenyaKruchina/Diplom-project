@@ -1,0 +1,296 @@
+/* Dashboard.css - стили ТОЛЬКО для страницы Dashboard */
+
+.dashboard-screen {
+    background-color: #2c2c2c;
+    height: 1024px;
+    min-width: 1440px;
+    position: relative;
+    width: 100%;
+  }
+  
+  .dashboard-main-content {
+    position: relative;
+    height: 100vh;
+    overflow: auto;
+  }
+  
+  /* 1. ЗАГОЛОВОК "ДЭШБОРД" */
+  .dashboard-text-wrapper {
+    color: #ffffff;
+    font-family: "Roboto-Medium", Helvetica;
+    font-size: 48px;
+    font-weight: 500;
+    left: 329px;
+    letter-spacing: 0;
+    line-height: 20px;
+    position: absolute;
+    top: 87px;
+    white-space: nowrap;
+  }
+  
+  /* 2. КАРТОЧКА ВЛАЖНОСТИ (левая) */
+  .dashboard-rectangle-2 {
+    background-color: #414141;
+    border: 1px solid #6d6d6d;
+    border-radius: 10px;
+    box-shadow: inset 4px 4px 4px #ffffff29;
+    height: 199px;
+    left: 329px;
+    position: absolute;
+    top: 163px;
+    width: 425px;
+  }
+  
+  /* 3. КАРТОЧКА ТЕМПЕРАТУРЫ (правая) */
+  .dashboard-rectangle-3 {
+    background-color: #414141;
+    border: 1px solid #6d6d6d;
+    border-radius: 10px;
+    box-shadow: inset 4px 4px 4px #ffffff29;
+    height: 199px;
+    left: 774px;
+    position: absolute;
+    top: 163px;
+    width: 447px;
+  }
+  
+  /* 4. ТЕКСТ "ВЛАЖНОСТЬ" */
+  .dashboard-text-wrapper-3 {
+    color: #ffffff;
+    font-family: "Inter-Regular", Helvetica;
+    font-size: 20px;
+    font-weight: 400;
+    left: 353px;
+    letter-spacing: -0.20px;
+    line-height: normal;
+    position: absolute;
+    top: 179px;
+    white-space: nowrap;
+  }
+  
+  /* 5. ТЕКСТ "ТЕМПЕРАТУРА" */
+  .dashboard-text-wrapper-8 {
+    color: #ffffff;
+    font-family: "Inter-Regular", Helvetica;
+    font-size: 20px;
+    font-weight: 400;
+    left: 807px;
+    letter-spacing: -0.20px;
+    line-height: normal;
+    position: absolute;
+    top: 179px;
+    white-space: nowrap;
+  }
+  
+  /* 6. БОЛЬШИЕ ЦИФРЫ (75.7 и 18.4) */
+  .dashboard-big-number {
+    align-items: baseline;
+    display: inline-flex;
+    gap: 8px;
+    left: 351px;
+    position: absolute;
+    top: 260px;
+  }
+  
+  .dashboard-div-wrapper {
+    align-items: baseline;
+    display: inline-flex;
+    gap: 8px;
+    left: 805px;
+    position: absolute;
+    top: 260px;
+  }
+  
+  .dashboard-text-wrapper-7 {
+    color: #ffffff;
+    font-family: "Inter-Medium", Helvetica;
+    font-size: 48px;
+    font-weight: 500;
+    letter-spacing: -2.00px;
+    line-height: normal;
+    margin-top: -1.00px;
+    position: relative;
+    width: fit-content;
+  }
+  
+  /* 7. ЗНАЧКИ % и °C */
+  .dashboard-text-wrapper-6 {
+    color: #ffffff;
+    font-family: "Inter-ExtraLight", Helvetica;
+    font-size: 24px;
+    font-weight: 200;
+    left: 470px;
+    letter-spacing: -0.30px;
+    line-height: normal;
+    position: absolute;
+    top: 282px;
+    width: 49px;
+  }
+  
+  .dashboard-text-wrapper-10 {
+    color: #ffffff;
+    font-family: "Inter-ExtraLight", Helvetica;
+    font-size: 24px;
+    font-weight: 200;
+    left: 900px;
+    letter-spacing: -0.30px;
+    line-height: normal;
+    position: absolute;
+    top: 282px;
+    width: 49px;
+  }
+  
+  /* 8. ИЗМЕНЕНИЯ В ПРОЦЕНТАХ */
+  .dashboard-text-wrapper-5 {
+    color: #25cc25;
+    font-family: "Inter-Regular", Helvetica;
+    font-size: 14px;
+    font-weight: 400;
+    left: 353px;
+    letter-spacing: -0.30px;
+    line-height: normal;
+    position: absolute;
+    top: 315px;
+  }
+  
+  .dashboard-text-wrapper-9 {
+    color: #ff9d00;
+    font-family: "Inter-Regular", Helvetica;
+    font-size: 14px;
+    font-weight: 400;
+    left: 807px;
+    letter-spacing: -0.30px;
+    line-height: normal;
+    position: absolute;
+    top: 315px;
+  }
+  
+  /* 9. КРУГЛЫЕ ГРАФИКИ */
+  .dashboard-humidity-graph {
+    position: absolute;
+    left: 590px;
+    top: 202px;
+  }
+  
+  .dashboard-temperature-graph {
+    position: absolute;
+    left: 1054px;
+    top: 202px;
+  }
+  
+  .dashboard-humidity-percent {
+    color: #ffffff;
+    font-family: "Inter-ExtraLight", Helvetica;
+    font-size: 20px;
+    font-weight: 200;
+    position: absolute;
+    left: 622px;
+    top: 253px;
+  }
+  
+  .dashboard-temperature-value {
+    color: #ffffff;
+    font-family: "Inter-ExtraLight", Helvetica;
+    font-size: 20px;
+    font-weight: 200;
+    position: absolute;
+    left: 1082px;
+    top: 253px;
+  }
+  
+  /* 10. БЛОК "ИИ-УВЕДОМЛЕНИЯ" */
+  .dashboard-text-wrapper-4 {
+    color: #ffffff;
+    font-family: "Inter-SemiBold", Helvetica;
+    font-size: 28px;
+    font-weight: 600;
+    left: 329px;
+    letter-spacing: -0.20px;
+    line-height: normal;
+    position: absolute;
+    top: 402px;
+  }
+  
+  .dashboard-notifications-container {
+    position: absolute;
+    left: 324px;
+    top: 449px;
+    width: 1045px;
+    height: 260px;
+    background-color: #414141;
+    border: 1px solid #6d6d6d;
+    border-radius: 16px;
+    box-shadow: inset 3px 4px 4px #ffffff40;
+    padding: 20px;
+    overflow-y: auto;
+  }
+  
+  /* 11. КНОПКИ "ВЫПОЛНЕНО" / "ОЖИДАЕТ" */
+  .dashboard-notification-status {
+    all: unset;
+    position: absolute !important;
+    right: 20px !important;
+    top: 10px !important;
+    padding: 6px 16px !important;
+    border-radius: 25px !important;
+    font-family: "Inter-Regular", Helvetica !important;
+    font-size: 22px !important;
+    font-weight: 400 !important;
+    display: flex !important;
+    align-items: center !important;
+    gap: 15px !important;
+    width: 180px !important;
+    height: 33px !important;
+    justify-content: center !important;
+    box-sizing: border-box !important;
+  }
+  
+  .dashboard-notification-status.completed {
+    background-color: #8234f7 !important;
+    color: #ffffff !important;
+  }
+  
+  .dashboard-notification-status.pending {
+    background-color: #656565 !important;
+    color: #ffffff !important;
+  }
+  
+  .dashboard-status-icon {
+    width: 20px !important;
+    height: 20px !important;
+    flex-shrink: 0 !important;
+  }
+  
+  /* 12. ТЕКСТ УВЕДОМЛЕНИЙ */
+  .dashboard-notification-card {
+    position: relative;
+    margin-bottom: 20px;
+    padding-bottom: 20px;
+  }
+  
+  .dashboard-notification-title {
+    color: #ffffff;
+    font-family: "Inter-Medium", Helvetica;
+    font-size: 24px;
+    font-weight: 500;
+    margin-bottom: 8px;
+  }
+  
+  .dashboard-notification-message {
+    color: #bababa;
+    font-family: "Inter-Regular", Helvetica;
+    font-size: 16px;
+    font-weight: 400;
+    line-height: 1.4;
+    margin-bottom: 15px;
+    width: 719px;
+  }
+  
+  .dashboard-notification-divider {
+    height: 1px;
+    background-color: #6d6d6d;
+    width: 100%;
+    position: absolute;
+    bottom: 0;
+    left: 0;
+  }

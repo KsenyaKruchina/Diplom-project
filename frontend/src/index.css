@@ -1,0 +1,230 @@
+/* Переменные для Цветовой Схемы */
+:root {
+  --color-dark-bg: #212121; /* Основной темно-серый фон */
+  --color-sidebar-bg: #292929; /* Фон сайдбара, чуть светлее основного */
+  --color-card-bg: #363636; /* Фон карточек статистики */
+  --color-text-primary: #ffffff; /* Белый текст */
+  --color-text-secondary: #cccccc; /* Светло-серый текст */
+  --color-purple: #8A2BE2; /* Фиолетовый акцент (для активного элемента, кнопки) */
+  --color-green-positive: #7CFC00; /* Ярко-зеленый для положительных изменений */
+  --color-red-negative: #ff4d4d; /* Красный для отрицательных изменений */
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Inter', sans-serif; /* Или любой другой шрифт, который вы предпочитаете */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: var(--color-dark-bg);
+  color: var(--color-text-primary);
+}
+
+.container.dark-theme {
+  display: flex;
+  min-height: 100vh;
+  background-color: var(--color-dark-bg);
+}
+
+/* --- Боковая Панель (Sidebar) --- */
+.sidebar {
+  width: 250px;
+  background: var(--color-sidebar-bg);
+  color: var(--color-text-primary);
+  /* На скриншоте нет явной тени, но можно добавить легкую, если хочется */
+  /* box-shadow: 2px 0 10px rgba(0,0,0,0.3); */
+  padding: 0;
+  border-right: 1px solid #444; /* Тонкая полоска справа */
+}
+
+.sidebar-header {
+  padding: 20px 25px; /* Отступы для "Дэшборд" в сайдбаре */
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  border-bottom: 1px solid #444; /* Разделитель */
+}
+
+.sidebar-nav {
+  padding: 10px 0;
+}
+
+.sidebar ul {
+  list-style: none;
+}
+
+.sidebar li {
+  padding: 12px 25px; /* Меньшие отступы для пунктов меню */
+  margin: 0;
+  cursor: pointer;
+  transition: background-color 0.2s ease, color 0.2s ease;
+  font-size: 15px;
+  color: var(--color-text-secondary); /* Светло-серый для неактивных */
+}
+
+.sidebar li:hover {
+  background-color: #3a3a3a; /* Чуть светлее при наведении */
+}
+
+/* Активный пункт меню (ДЭШБОРД) */
+.sidebar li.active {
+  background-color: var(--color-purple); /* Фиолетовый фон */
+  color: white;
+  font-weight: 600;
+  border-radius: 0; /* Убираем закругления, на скриншоте их нет */
+}
+
+/* --- Основной Контент --- */
+.main-content {
+  flex: 1;
+  padding: 0;
+  overflow-y: auto;
+  display: flex; /* Для центрирования заголовка */
+  flex-direction: column; /* Для центрирования заголовка */
+  align-items: center; /* Центрирование по горизонтали */
+}
+
+.content-body {
+  padding: 40px; /* Увеличиваем отступы */
+  max-width: 800px; /* Ограничиваем ширину контента */
+  width: 100%;
+}
+
+.dashboard-title-centered {
+    font-size: 2.5rem;
+    font-weight: 700;
+    margin-bottom: 40px; /* Отступ от заголовка до карточек */
+    color: var(--color-text-primary);
+    text-align: center; /* Центрируем заголовок */
+    width: 100%; /* Заголовок занимает всю ширину для центрирования */
+}
+
+/* --- Сетка Статистики --- */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 25px;
+  margin-bottom: 40px; /* Отступ от карточек до уведомлений */
+  justify-content: center; /* Центрируем карточки в сетке */
+}
+
+/* --- Карточка Статистики (Stat Card) --- */
+.stat-card {
+  background: var(--color-card-bg); /* Темный фон карточки */
+  border-radius: 12px; /* Меньший радиус скругления */
+  padding: 25px;
+  box-shadow: none; /* Убираем тени */
+  border: none; /* Убираем рамку */
+  text-align: center; /* Центрируем содержимое */
+}
+
+.stat-header {
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  margin-bottom: 10px; /* Отступ от заголовка до значения */
+  display: block; /* Убираем flex, если не нужны иконки */
+}
+
+.stat-value-large {
+  font-size: 2rem; /* Меньше размер шрифта для значения */
+  font-weight: 700;
+  color: var(--color-text-primary);
+  margin-bottom: 5px; /* Отступ до изменения */
+}
+
+.stat-value-large .unit {
+    font-size: 1.2rem;
+    color: var(--color-text-secondary);
+}
+
+.stat-change {
+  font-size: 14px;
+  font-weight: 500;
+  padding: 0; /* Убираем паддинг */
+  background-color: transparent; /* Прозрачный фон */
+  border-radius: 0; /* Убираем скругления */
+  display: inline; /* Изменяем на inline, т.к. фон убрали */
+}
+
+.stat-change.positive {
+  color: var(--color-green-positive);
+}
+
+.stat-change.negative {
+  color: var(--color-red-negative);
+}
+
+/* --- Карточки Уведомлений (Notifications Card) --- */
+.card.notification-list-card {
+  background: transparent; /* Уведомления без общего фона */
+  backdrop-filter: none;
+  border: none;
+  border-radius: 0;
+  padding: 0; /* Убираем общий паддинг */
+  box-shadow: none;
+}
+
+.notification-section-title {
+  font-size: 1.8rem; /* Более крупный заголовок секции */
+  font-weight: 600;
+  color: var(--color-text-primary);
+  margin-bottom: 25px; /* Отступ до первого уведомления */
+  padding-bottom: 0;
+  border-bottom: none;
+  text-align: center; /* Центрируем заголовок секции */
+}
+
+.notification-item {
+  display: flex;
+  flex-direction: column;
+  background: var(--color-card-bg); /* Фон каждого уведомления */
+  border-radius: 12px;
+  padding: 20px 25px; /* Отступы внутри уведомления */
+  margin-bottom: 20px;
+}
+
+.notification-item:last-child {
+  margin-bottom: 0;
+}
+
+.notification-title {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  margin-bottom: 8px;
+}
+
+.notification-message {
+  color: var(--color-text-secondary);
+  line-height: 1.5;
+  margin-bottom: 0; /* Убираем нижний отступ, так как статус внутри */
+  display: flex; /* Делаем flex для выравнивания статуса */
+  flex-direction: column;
+}
+
+.notification-status {
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--color-purple); /* Фиолетовый цвет для статуса "Выполнено" */
+    display: inline-block; /* Отображаем как блочный элемент для контроля */
+    background-color: #3a3a3a; /* Темный фон под "Выполнено" */
+    padding: 3px 8px; /* Небольшой паддинг */
+    border-radius: 5px; /* Закругленные края */
+    margin-top: 10px; /* Отступ от текста сообщения */
+    align-self: flex-end; /* Выравнивание по правому краю внутри flex-контейнера */
+}
+
+/* Удаляем стили для кнопок, так как они не используются */
+/* .btn-completed больше не нужен */
+
+/* Загрузка */
+.loading {
+  color: var(--color-text-primary);
+  text-align: center;
+  width: 100%;
+}

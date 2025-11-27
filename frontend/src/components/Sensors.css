@@ -1,0 +1,777 @@
+/* Sensors.css - стили ТОЛЬКО для страницы Sensors */
+
+.sensors-screen {
+    background-color: #2c2c2c;
+    min-height: 1024px;
+    min-width: 1440px;
+    position: relative;
+    width: 100%;
+  }
+  
+  .sensors-text-wrapper {
+    color: #ffffff;
+    font-family: "Roboto-Medium", Helvetica;
+    font-size: 48px;
+    font-weight: 500;
+    left: 329px;
+    letter-spacing: 0;
+    line-height: 20px;
+    position: absolute;
+    top: 87px;
+    white-space: nowrap;
+  }
+  
+  .sensors-text-wrapper-9 {
+    color: #ffffff;
+    font-family: "Inter-Medium", Helvetica;
+    font-size: 28px;
+    font-weight: 500;
+    left: 329px;
+    letter-spacing: -0.20px;
+    line-height: normal;
+    position: absolute;
+    top: 136px;
+  }
+  
+  /* Стили для отключенного состояния */
+  .sensors-disabled {
+    opacity: 0.5;
+    filter: grayscale(0.7);
+  }
+  
+  .sensors-disabled-text {
+    color: #8b8b8b !important;
+  }
+  
+  .sensors-disabled-toggle {
+    opacity: 0.5 !important;
+    filter: grayscale(1) !important;
+  }
+  
+  /* Карточка регулирования температуры */
+  .sensors-rectangle-2 {
+    background-color: #414141;
+    border: 1px solid;
+    border-color: #6d6d6d;
+    border-radius: 10px;
+    box-shadow: inset 4px 4px 4px #ffffff29;
+    height: 466px;
+    left: 329px;
+    position: absolute;
+    top: 186px;
+    width: 447px;
+    transition: all 0.3s ease;
+  }
+  
+  .sensors-text-wrapper-3 {
+    color: #ffffff;
+    font-family: "Inter-Regular", Helvetica;
+    font-size: 24px;
+    font-weight: 400;
+    left: 381px;
+    letter-spacing: -0.20px;
+    line-height: normal;
+    position: absolute;
+    top: 209px;
+    transition: color 0.3s ease;
+  }
+  
+  .sensors-text-wrapper-4 {
+    color: #ffffff;
+    font-family: "Inter-Regular", Helvetica;
+    font-size: 14px;
+    font-weight: 400;
+    left: 367px;
+    letter-spacing: -0.30px;
+    line-height: normal;
+    position: absolute;
+    top: 422px;
+    transition: color 0.3s ease;
+  }
+  
+  .sensors-text-wrapper-8 {
+    color: #ffffff;
+    font-family: "Inter-Medium", Helvetica;
+    font-size: 96px;
+    font-weight: 500;
+    left: 359px;
+    letter-spacing: -2.00px;
+    line-height: normal;
+    position: absolute;
+    top: 315px;
+    transition: color 0.3s ease;
+  }
+  
+  .sensors-text-wrapper-7 {
+    color: #ffffff;
+    font-family: "Inter-ExtraLight", Helvetica;
+    font-size: 48px;
+    font-weight: 200;
+    left: 553px;
+    letter-spacing: -0.30px;
+    line-height: normal;
+    position: absolute;
+    top: 362px;
+    width: 105px;
+    transition: color 0.3s ease;
+  }
+  
+  /* Переключатель температуры */
+  .sensors-text-wrapper-6 {
+    color: #ffffff;
+    font-family: "Inter-Regular", Helvetica;
+    font-size: 14px;
+    font-weight: 400;
+    left: 385px;
+    letter-spacing: -0.30px;
+    line-height: normal;
+    position: absolute;
+    top: 258px;
+    cursor: pointer;
+    transition: color 0.3s ease;
+  }
+  
+  .sensors-text-wrapper-6.sensors-active {
+    color: #66b740 !important;
+  }
+  
+  .sensors-ellipse {
+    background-color: #8b8b8b;
+    border-radius: 5px;
+    height: 10px;
+    left: 370px;
+    position: absolute;
+    top: 262px;
+    width: 10px;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+  }
+  
+  .sensors-ellipse.sensors-active {
+    background-color: #66b740 !important;
+  }
+  
+  .sensors-text-wrapper-10 {
+    color: #ffffff;
+    font-family: "Inter-Regular", Helvetica;
+    font-size: 14px;
+    font-weight: 400;
+    left: 492px;
+    letter-spacing: -0.30px;
+    line-height: normal;
+    position: absolute;
+    top: 258px;
+    cursor: pointer;
+    transition: color 0.3s ease;
+  }
+  
+  .sensors-text-wrapper-10.sensors-active {
+    color: #ff9d00 !important;
+  }
+  
+  .sensors-ellipse-2 {
+    background-color: #8b8b8b;
+    border-radius: 5px;
+    height: 10px;
+    left: 477px;
+    position: absolute;
+    top: 262px;
+    width: 10px;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+  }
+  
+  .sensors-ellipse-2.sensors-active {
+    background-color: #ff9d00 !important;
+  }
+  
+  /* Ползунок температуры */
+  .sensors-slider-container {
+    position: relative;
+  }
+  
+  .sensors-rectangle-3 {
+    background-color: #d9d9d9;
+    border-radius: 4.5px;
+    height: 9px;
+    left: 369px;
+    position: absolute;
+    top: 527px;
+    width: 351px;
+    transition: all 0.3s ease;
+  }
+  
+  .sensors-rectangle-4 {
+    background-color: #b7a2ee;
+    border-radius: 4.5px;
+    height: 9px;
+    left: 369px;
+    position: absolute;
+    top: 527px;
+    transition: all 0.3s ease;
+  }
+  
+  .sensors-ellipse-3 {
+    background-color: #b7a2ee;
+    border-radius: 15px;
+    height: 30px;
+    position: absolute;
+    top: 517px;
+    width: 30px;
+    transition: all 0.3s ease;
+  }
+  
+  /* Стили для ползунка */
+  .sensors-slider-input {
+    position: absolute;
+    width: 351px;
+    height: 30px;
+    opacity: 0;
+    cursor: pointer;
+    z-index: 10;
+  }
+  
+  .sensors-slider-input:disabled {
+    cursor: not-allowed;
+  }
+  
+  /* Шкала ползунка */
+  .sensors-slider-scale {
+    position: absolute;
+    width: 351px;
+    display: flex;
+    justify-content: space-between;
+    color: #ffffff;
+    font-family: "Inter-Regular", Helvetica;
+    font-size: 12px;
+    font-weight: 400;
+  }
+  
+  /* Подсказка ползунка */
+  .sensors-slider-tooltip {
+    position: absolute;
+    background-color: #8234f7;
+    color: white;
+    padding: 5px 10px;
+    border-radius: 4px;
+    font-family: "Inter-Regular", Helvetica;
+    font-size: 14px;
+    font-weight: 400;
+    white-space: nowrap;
+    z-index: 100;
+    transform: translateX(-50%);
+  }
+  
+  .sensors-slider-tooltip::after {
+    content: '';
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    border-width: 5px;
+    border-style: solid;
+    border-color: #8234f7 transparent transparent transparent;
+  }
+  
+  /* Позиционирование для ползунков */
+  .sensors-temp-slider {
+    position: absolute;
+    width: 351px;
+    height: 30px;
+    opacity: 0;
+    cursor: pointer;
+    z-index: 10;
+    left: 369px !important;
+    top: 517px !important;
+  }
+  
+  .sensors-humidity-slider {
+    position: absolute;
+    width: 351px;
+    height: 30px;
+    opacity: 0;
+    cursor: pointer;
+    z-index: 10;
+    left: 846px !important;
+    top: 517px !important;
+  }
+  
+  /* Подсказки с правильным позиционированием */
+  .sensors-temp-tooltip {
+    position: absolute;
+    background-color: #8234f7;
+    color: white;
+    padding: 5px 10px;
+    border-radius: 4px;
+    font-family: "Inter-Regular", Helvetica;
+    font-size: 14px;
+    font-weight: 400;
+    white-space: nowrap;
+    z-index: 100;
+    transform: translateX(-50%);
+    top: 490px !important;
+  }
+  
+  .sensors-humidity-tooltip {
+    position: absolute;
+    background-color: #8234f7;
+    color: white;
+    padding: 5px 10px;
+    border-radius: 4px;
+    font-family: "Inter-Regular", Helvetica;
+    font-size: 14px;
+    font-weight: 400;
+    white-space: nowrap;
+    z-index: 100;
+    transform: translateX(-50%);
+    top: 490px !important;
+  }
+  
+  /* Карточка регулирования влажности */
+  .sensors-rectangle-5 {
+    background-color: #414141;
+    border: 1px solid;
+    border-color: #6d6d6d;
+    border-radius: 10px;
+    box-shadow: inset 4px 4px 4px #ffffff29;
+    height: 466px;
+    left: 806px;
+    position: absolute;
+    top: 186px;
+    width: 447px;
+    transition: all 0.3s ease;
+  }
+  
+  .sensors-text-wrapper-11 {
+    color: #ffffff;
+    font-family: "Inter-Regular", Helvetica;
+    font-size: 24px;
+    font-weight: 400;
+    left: 858px;
+    letter-spacing: -0.20px;
+    line-height: normal;
+    position: absolute;
+    top: 209px;
+    transition: color 0.3s ease;
+  }
+  
+  .sensors-text-wrapper-12 {
+    color: #ffffff;
+    font-family: "Inter-Regular", Helvetica;
+    font-size: 14px;
+    font-weight: 400;
+    left: 844px;
+    letter-spacing: -0.30px;
+    line-height: normal;
+    position: absolute;
+    top: 422px;
+    transition: color 0.3s ease;
+  }
+  
+  .sensors-text-wrapper-17 {
+    color: #ffffff;
+    font-family: "Inter-Medium", Helvetica;
+    font-size: 96px;
+    font-weight: 500;
+    left: 836px;
+    letter-spacing: -2.00px;
+    line-height: normal;
+    position: absolute;
+    top: 315px;
+    transition: color 0.3s ease;
+  }
+  
+  .sensors-text-wrapper-16 {
+    color: #ffffff;
+    font-family: "Inter-ExtraLight", Helvetica;
+    font-size: 48px;
+    font-weight: 200;
+    left: 1030px;
+    letter-spacing: -0.30px;
+    line-height: normal;
+    position: absolute;
+    top: 362px;
+    width: 105px;
+    transition: color 0.3s ease;
+  }
+  
+  /* Переключатель влажности */
+  .sensors-text-wrapper-15 {
+    color: #ffffff;
+    font-family: "Inter-Regular", Helvetica;
+    font-size: 14px;
+    font-weight: 400;
+    left: 862px;
+    letter-spacing: -0.30px;
+    line-height: normal;
+    position: absolute;
+    top: 258px;
+    cursor: pointer;
+    transition: color 0.3s ease;
+  }
+  
+  .sensors-text-wrapper-15.sensors-active {
+    color: #66b740 !important;
+  }
+  
+  .sensors-ellipse-4 {
+    background-color: #8b8b8b;
+    border-radius: 5px;
+    height: 10px;
+    left: 847px;
+    position: absolute;
+    top: 262px;
+    width: 10px;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+  }
+  
+  .sensors-ellipse-4.sensors-active {
+    background-color: #66b740 !important;
+  }
+  
+  .sensors-text-wrapper-18 {
+    color: #ffffff;
+    font-family: "Inter-Regular", Helvetica;
+    font-size: 14px;
+    font-weight: 400;
+    left: 969px;
+    letter-spacing: -0.30px;
+    line-height: normal;
+    position: absolute;
+    top: 258px;
+    cursor: pointer;
+    transition: color 0.3s ease;
+  }
+  
+  .sensors-text-wrapper-18.sensors-active {
+    color: #ff9d00 !important;
+  }
+  
+  .sensors-ellipse-5 {
+    background-color: #8b8b8b;
+    border-radius: 5px;
+    height: 10px;
+    left: 954px;
+    position: absolute;
+    top: 262px;
+    width: 10px;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+  }
+  
+  .sensors-ellipse-5.sensors-active {
+    background-color: #ff9d00 !important;
+  }
+  
+  /* Ползунок влажности */
+  .sensors-rectangle-6 {
+    background-color: #d9d9d9;
+    border-radius: 4.5px;
+    height: 9px;
+    left: 846px;
+    position: absolute;
+    top: 527px;
+    width: 351px;
+    transition: all 0.3s ease;
+  }
+  
+  .sensors-rectangle-7 {
+    background-color: #b7a2ee;
+    border-radius: 4.5px;
+    height: 9px;
+    left: 846px;
+    position: absolute;
+    top: 527px;
+    transition: all 0.3s ease;
+  }
+  
+  .sensors-ellipse-6 {
+    background-color: #b7a2ee;
+    border-radius: 15px;
+    height: 30px;
+    position: absolute;
+    top: 517px;
+    width: 30px;
+    transition: all 0.3s ease;
+  }
+  
+  /* Карточка управления температурой */
+  .sensors-rectangle-8 {
+    background-color: #414141;
+    border: 1px solid;
+    border-color: #6d6d6d;
+    border-radius: 10px;
+    box-shadow: inset 4px 4px 4px #ffffff29;
+    height: 288px;
+    left: 332px;
+    position: absolute;
+    top: 681px;
+    width: 444px;
+  }
+  
+  .sensors-text-wrapper-21 {
+    color: #ffffff;
+    font-family: "Inter-Regular", Helvetica;
+    font-size: 24px;
+    font-weight: 400;
+    left: 385px;
+    letter-spacing: -0.20px;
+    line-height: normal;
+    position: absolute;
+    top: 699px;
+  }
+  
+  .sensors-text-wrapper-23 {
+    color: #ffffff;
+    font-family: "Inter-Medium", Helvetica;
+    font-size: 64px;
+    font-weight: 500;
+    left: 381px;
+    letter-spacing: -2.00px;
+    line-height: normal;
+    position: absolute;
+    top: 737px;
+    width: 197px;
+  }
+  
+  .sensors-text-wrapper-22 {
+    color: #ffffff;
+    font-family: "Inter-ExtraLight", Helvetica;
+    font-size: 48px;
+    font-weight: 200;
+    left: 509px;
+    letter-spacing: -0.30px;
+    line-height: normal;
+    position: absolute;
+    top: 755px;
+    width: 111px;
+  }
+  
+  /* Переключатель температуры 2 */
+  .sensors-text-wrapper-19 {
+    color: #ffffff;
+    font-family: "Inter-Regular", Helvetica;
+    font-size: 14px;
+    font-weight: 400;
+    left: 396px;
+    letter-spacing: -0.30px;
+    line-height: normal;
+    position: absolute;
+    top: 834px;
+    cursor: pointer;
+  }
+  
+  .sensors-text-wrapper-19.sensors-active {
+    color: #66b740 !important;
+  }
+  
+  .sensors-ellipse-7 {
+    background-color: #8b8b8b;
+    border-radius: 5px;
+    height: 10px;
+    left: 381px;
+    position: absolute;
+    top: 838px;
+    width: 10px;
+    cursor: pointer;
+  }
+  
+  .sensors-ellipse-7.sensors-active {
+    background-color: #66b740 !important;
+  }
+  
+  .sensors-text-wrapper-20 {
+    color: #ffffff;
+    font-family: "Inter-Regular", Helvetica;
+    font-size: 14px;
+    font-weight: 400;
+    left: 503px;
+    letter-spacing: -0.30px;
+    line-height: normal;
+    position: absolute;
+    top: 834px;
+    cursor: pointer;
+  }
+  
+  .sensors-text-wrapper-20.sensors-active {
+    color: #ff9d00 !important;
+  }
+  
+  .sensors-ellipse-8 {
+    background-color: #8b8b8b;
+    border-radius: 5px;
+    height: 10px;
+    left: 488px;
+    position: absolute;
+    top: 838px;
+    width: 10px;
+    cursor: pointer;
+  }
+  
+  .sensors-ellipse-8.sensors-active {
+    background-color: #ff9d00 !important;
+  }
+  
+  /* Toggle switch температура */
+  .sensors-rectangle-9 {
+    background-color: #b7a2ee;
+    border-radius: 34.5px;
+    height: 69px;
+    left: 379px;
+    position: absolute;
+    top: 878px;
+    width: 142px;
+    cursor: pointer;
+  }
+  
+  .sensors-ellipse-9 {
+    background-color: #8234f7;
+    border-radius: 28.5px;
+    height: 57px;
+    position: absolute;
+    top: 883px;
+    width: 57px;
+    cursor: pointer;
+    transition: left 0.3s ease;
+  }
+  
+  /* Карточка управления влажностью */
+  .sensors-rectangle-10 {
+    background-color: #414141;
+    border: 1px solid;
+    border-color: #6d6d6d;
+    border-radius: 10px;
+    box-shadow: inset 4px 4px 4px #ffffff29;
+    height: 288px;
+    left: 806px;
+    position: absolute;
+    top: 681px;
+    width: 444px;
+  }
+  
+  .sensors-text-wrapper-26 {
+    color: #ffffff;
+    font-family: "Inter-Regular", Helvetica;
+    font-size: 24px;
+    font-weight: 400;
+    left: 859px;
+    letter-spacing: -0.20px;
+    line-height: normal;
+    position: absolute;
+    top: 699px;
+  }
+  
+  .sensors-text-wrapper-28 {
+    color: #ffffff;
+    font-family: "Inter-Medium", Helvetica;
+    font-size: 64px;
+    font-weight: 500;
+    left: 855px;
+    letter-spacing: -2.00px;
+    line-height: normal;
+    position: absolute;
+    top: 737px;
+    width: 197px;
+  }
+  
+  .sensors-text-wrapper-27 {
+    color: #ffffff;
+    font-family: "Inter-ExtraLight", Helvetica;
+    font-size: 48px;
+    font-weight: 200;
+    left: 983px;
+    letter-spacing: -0.30px;
+    line-height: normal;
+    position: absolute;
+    top: 755px;
+    width: 111px;
+  }
+  
+  /* Переключатель влажности 2 */
+  .sensors-text-wrapper-24 {
+    color: #ffffff;
+    font-family: "Inter-Regular", Helvetica;
+    font-size: 14px;
+    font-weight: 400;
+    left: 870px;
+    letter-spacing: -0.30px;
+    line-height: normal;
+    position: absolute;
+    top: 834px;
+    cursor: pointer;
+  }
+  
+  .sensors-text-wrapper-24.sensors-active {
+    color: #66b740 !important;
+  }
+  
+  .sensors-ellipse-10 {
+    background-color: #8b8b8b;
+    border-radius: 5px;
+    height: 10px;
+    left: 855px;
+    position: absolute;
+    top: 838px;
+    width: 10px;
+    cursor: pointer;
+  }
+  
+  .sensors-ellipse-10.sensors-active {
+    background-color: #66b740 !important;
+  }
+  
+  .sensors-text-wrapper-25 {
+    color: #ffffff;
+    font-family: "Inter-Regular", Helvetica;
+    font-size: 14px;
+    font-weight: 400;
+    left: 977px;
+    letter-spacing: -0.30px;
+    line-height: normal;
+    position: absolute;
+    top: 834px;
+    cursor: pointer;
+  }
+  
+  .sensors-text-wrapper-25.sensors-active {
+    color: #ff9d00 !important;
+  }
+  
+  .sensors-ellipse-11 {
+    background-color: #8b8b8b;
+    border-radius: 5px;
+    height: 10px;
+    left: 962px;
+    position: absolute;
+    top: 838px;
+    width: 10px;
+    cursor: pointer;
+  }
+  
+  .sensors-ellipse-11.sensors-active {
+    background-color: #ff9d00 !important;
+  }
+  
+  /* Toggle switch влажность */
+  .sensors-rectangle-11 {
+    background-color: #b7a2ee;
+    border-radius: 34.5px;
+    height: 69px;
+    left: 853px;
+    position: absolute;
+    top: 878px;
+    width: 142px;
+    cursor: pointer;
+  }
+  
+  .sensors-ellipse-12 {
+    background-color: #8234f7;
+    border-radius: 28.5px;
+    height: 57px;
+    position: absolute;
+    top: 884px;
+    width: 57px;
+    cursor: pointer;
+    transition: left 0.3s ease;
+  }
