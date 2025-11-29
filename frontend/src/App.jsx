@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import Dashboard from './components/Dashboard';
 import Analytics from './components/Analytics';
 import Sensors from './components/Sensors';
-import Users from './components/Users';
+import { Users } from './components/Users';
 import { GridFour01 } from './components/icons/GridFour01';
 import { StyleLine } from './components/icons/StyleLine';
 import { User } from './components/icons/User';

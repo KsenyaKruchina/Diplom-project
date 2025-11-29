@@ -1,0 +1,302 @@
+/* Analytics.css - стили ТОЛЬКО для страницы Analytics */
+
+.analytics-screen {
+    background-color: #2c2c2c;
+    height: 1024px;
+    min-width: 1440px;
+    position: relative;
+    width: 100%;
+}
+
+.analytics-main-content {
+    position: relative;
+    height: 100vh;
+    overflow: auto;
+}
+
+/* 1. ЗАГОЛОВОК "ОТЧЕТЫ" */
+.analytics-title {
+    color: #ffffff;
+    font-family: "Roboto-Medium", Helvetica;
+    font-size: 48px;
+    font-weight: 500;
+    left: 329px;
+    letter-spacing: 0;
+    line-height: 20px;
+    position: absolute;
+    top: 87px;
+    white-space: nowrap;
+}
+
+/* 2. КОНТЕЙНЕР ДЛЯ КАРТОЧЕК ОТЧЕТОВ */
+.analytics-cards-container {
+    position: absolute;
+    left: 329px;
+    top: 163px;
+    display: flex;
+    gap: 30px;
+}
+
+/* 3. КАРТОЧКИ ОТЧЕТОВ */
+.analytics-card {
+    background-color: #414141;
+    border: 1px solid #6d6d6d;
+    border-radius: 10px;
+    box-shadow: inset 4px 4px 4px #ffffff29;
+    height: 199px;
+    width: 239px;
+    position: relative;
+}
+
+.analytics-card-content {
+    padding: 20px;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+}
+
+.analytics-card-icon {
+    height: 37px !important;
+    width: 37px !important;
+    position: absolute;
+    top: 17px;
+    left: 11px;
+}
+
+.analytics-card-title {
+    color: #ffffff;
+    font-family: "Inter-Medium", Helvetica;
+    font-size: 24px;
+    font-weight: 500;
+    left: 18px;
+    letter-spacing: -0.20px;
+    line-height: normal;
+    position: absolute;
+    top: 71px;
+}
+
+.analytics-card-divider {
+    height: 1px;
+    background: #6d6d6d;
+    position: absolute;
+    bottom: 45px;
+    left: 18px;
+    width: 205px;
+}
+
+.analytics-download-icon {
+    height: 15px !important;
+    width: 15px !important;
+    position: absolute;
+    bottom: 18px;
+    right: 22px;
+    cursor: pointer;
+}
+
+.analytics-download-icon:hover {
+    color: #8234f7 !important;
+}
+
+/* 4. КОНТЕЙНЕР ДЛЯ СПИСКА ФАЙЛОВ */
+.analytics-files-container {
+    background-color: #414141;
+    border: 1px solid #6d6d6d;
+    border-radius: 16px;
+    box-shadow: inset 3px 4px 4px #ffffff40;
+    height: 559px;
+    left: 329px;
+    position: absolute;
+    top: 405px;
+    width: 1027px;
+    padding: 30px;
+    box-sizing: border-box;
+}
+
+.analytics-files-title {
+    color: #ffffff;
+    font-family: "Inter-Medium", Helvetica;
+    font-size: 38px;
+    font-weight: 500;
+    left: 30px;
+    letter-spacing: -0.30px;
+    line-height: normal;
+    position: absolute;
+    top: 20px;
+    white-space: nowrap;
+    width: 178px;
+}
+
+/* 5. СПИСОК ФАЙЛОВ */
+.analytics-files-list {
+    position: absolute;
+    top: 80px;
+    left: 0;
+    right: 0;
+    padding: 0 30px;
+}
+
+.analytics-file-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px 0;
+    position: relative;
+    height: 77px;
+}
+
+.analytics-file-content {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.analytics-file-icon {
+    height: 37px !important;
+    width: 37px !important;
+    flex-shrink: 0;
+}
+
+.analytics-file-info {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.analytics-file-name {
+    color: #ffffff;
+    font-family: "Inter-Medium", Helvetica;
+    font-size: 24px;
+    font-weight: 500;
+    letter-spacing: -0.20px;
+    line-height: normal;
+}
+
+.analytics-file-date {
+    color: #bababa;
+    font-family: "Inter-Regular", Helvetica;
+    font-size: 16px;
+    font-weight: 400;
+    letter-spacing: -0.30px;
+    line-height: normal;
+}
+
+.analytics-download-btn {
+    background-color: #8234f7;
+    border: none;
+    border-radius: 16.5px;
+    color: #ffffff;
+    cursor: pointer;
+    font-family: "Inter-Regular", Helvetica;
+    font-size: 20px;
+    font-weight: 400;
+    height: 37px;
+    letter-spacing: -0.30px;
+    line-height: normal;
+    padding: 0 20px;
+    white-space: nowrap;
+    width: 131px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.analytics-download-btn:hover {
+    background-color: #7229e0;
+}
+
+.analytics-file-divider {
+    height: 1px;
+    background: #6d6d6d;
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+}
+
+/* 6. РАЗДЕЛИТЕЛЬНЫЕ ЛИНИИ МЕЖДУ ФАЙЛАМИ */
+.analytics-line-1 {
+    height: 1px;
+    background: #6d6d6d;
+    position: absolute;
+    top: 472px;
+    left: 353px;
+    width: 971px;
+}
+
+.analytics-line-2 {
+    height: 1px;
+    background: #6d6d6d;
+    position: absolute;
+    top: 567px;
+    left: 351px;
+    width: 971px;
+}
+
+.analytics-line-3 {
+    height: 1px;
+    background: #6d6d6d;
+    position: absolute;
+    top: 659px;
+    left: 353px;
+    width: 971px;
+}
+
+.analytics-line-4 {
+    height: 1px;
+    background: #6d6d6d;
+    position: absolute;
+    top: 755px;
+    left: 350px;
+    width: 971px;
+}
+
+.analytics-line-5 {
+    height: 1px;
+    background: #6d6d6d;
+    position: absolute;
+    top: 852px;
+    left: 350px;
+    width: 971px;
+}
+
+.analytics-line-6 {
+    height: 1px;
+    background: #6d6d6d;
+    position: absolute;
+    top: 941px;
+    left: 350px;
+    width: 971px;
+}
+
+/* Адаптивность */
+@media (max-width: 768px) {
+    .analytics-screen {
+        min-width: 100%;
+        height: auto;
+    }
+    
+    .analytics-cards-container {
+        flex-direction: column;
+        align-items: center;
+    }
+    
+    .analytics-title {
+        font-size: 36px;
+        text-align: center;
+        left: 20px;
+        right: 20px;
+    }
+    
+    .analytics-file-item {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 15px;
+        height: auto;
+        padding: 15px 0;
+    }
+    
+    .analytics-download-btn {
+        align-self: flex-end;
+    }
+}
