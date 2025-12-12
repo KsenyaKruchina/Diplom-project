@@ -1,317 +1,343 @@
-// components/Sensors.js
-import React, { useState } from 'react';
+// components/Sensors.jsx
+import React, { useState, useEffect } from 'react';
 import "./Sensors.css";
 
-const Sensors = ({ 
-  sensorData, 
-  updateTemperature, 
-  updateHumidity, 
-  toggleTemperature, 
-  toggleHumidity 
+const Sensors = ({
+  sensorData,
+  updateTemperature,
+  updateHumidity,
+  toggleTemperature,
+  toggleHumidity,
+  logActivity // Функция для логгирования действий
 }) => {
-  const [tempSwitch, setTempSwitch] = useState(sensorData.tempEnabled);
-  const [humiditySwitch, setHumiditySwitch] = useState(sensorData.humidityEnabled);
-  const [tempTooltip, setTempTooltip] = useState({ show: false, value: 0, position: 0 });
-  const [humidityTooltip, setHumidityTooltip] = useState({ show: false, value: 0, position: 0 });
+  const [selectedRoom, setSelectedRoom] = useState('Кабинет 2');
+  const [rooms, setRooms] = useState([
+    { id: 1, name: 'Кабинет 1', temperature: 22.5, humidity: 45.0 },
+    { id: 2, name: 'Кабинет 2', temperature: 20.2, humidity: 43.8 },
+    { id: 3, name: 'Конференц-зал', temperature: 21.8, humidity: 50.2 },
+    { id: 4, name: 'Кухня', temperature: 23.5, humidity: 38.5 },
+  ]);
 
-  // Обработчик изменения температуры
+  const [tempTarget, setTempTarget] = useState(29.0);
+  const [humidityTarget, setHumidityTarget] = useState(23.0);
+  const [tempSliderValue, setTempSliderValue] = useState(20.2);
+  const [humiditySliderValue, setHumiditySliderValue] = useState(43.8);
+  const [showTempConfirm, setShowTempConfirm] = useState(false);
+  const [showHumidityConfirm, setShowHumidityConfirm] = useState(false);
+  const [previousTempValue, setPreviousTempValue] = useState(20.2);
+  const [previousHumidityValue, setPreviousHumidityValue] = useState(43.8);
+
+  // Получаем данные текущей комнаты
+  const currentRoom = rooms.find(room => room.name === selectedRoom) || rooms[1];
+
+  // Имитация постепенного изменения температуры к целевой
+  useEffect(() => {
+    const tempInterval = setInterval(() => {
+      if (Math.abs(currentRoom.temperature - tempTarget) > 0.1) {
+        const newTemp = currentRoom.temperature + (tempTarget > currentRoom.temperature ? 0.1 : -0.1);
+        updateRoomTemperature(selectedRoom, newTemp);
+      }
+    }, 1000);
+
+    return () => clearInterval(tempInterval);
+  }, [currentRoom.temperature, tempTarget, selectedRoom]);
+
+  // Имитация постепенного изменения влажности к целевой
+  useEffect(() => {
+    const humidityInterval = setInterval(() => {
+      if (Math.abs(currentRoom.humidity - humidityTarget) > 0.1) {
+        const newHumidity = currentRoom.humidity + (humidityTarget > currentRoom.humidity ? 0.1 : -0.1);
+        updateRoomHumidity(selectedRoom, newHumidity);
+      }
+    }, 1000);
+
+    return () => clearInterval(humidityInterval);
+  }, [currentRoom.humidity, humidityTarget, selectedRoom]);
+
+  // Функция обновления температуры комнаты
+  const updateRoomTemperature = (roomName, newTemp) => {
+    setRooms(prev => prev.map(room => 
+      room.name === roomName ? { ...room, temperature: parseFloat(newTemp.toFixed(1)) } : room
+    ));
+  };
+
+  // Функция обновления влажности комнаты
+  const updateRoomHumidity = (roomName, newHumidity) => {
+    setRooms(prev => prev.map(room => 
+      room.name === roomName ? { ...room, humidity: parseFloat(newHumidity.toFixed(1)) } : room
+    ));
+  };
+
+  // Обработчик изменения температуры через ползунок
   const handleTempChange = (e) => {
     const newValue = parseFloat(e.target.value);
-    updateTemperature(newValue);
+    setTempSliderValue(newValue);
+    setShowTempConfirm(true);
   };
 
-  // Обработчик изменения влажности
+  // Подтверждение изменения температуры
+  const confirmTempChange = () => {
+    // Логируем изменение только при подтверждении
+    if (logActivity) {
+      const change = (tempSliderValue - previousTempValue).toFixed(1);
+      const changeText = change > 0 ? `увеличил на +${change}°C` : `уменьшил на ${change}°C`;
+      logActivity(`Установил температуру в ${selectedRoom}: ${tempSliderValue}°C (${changeText})`, selectedRoom);
+    }
+    
+    setPreviousTempValue(tempSliderValue);
+    setTempTarget(tempSliderValue);
+    updateRoomTemperature(selectedRoom, tempSliderValue);
+    setShowTempConfirm(false);
+  };
+
+  // Обработчик изменения влажности через ползунок
   const handleHumidityChange = (e) => {
     const newValue = parseFloat(e.target.value);
-    updateHumidity(newValue);
+    setHumiditySliderValue(newValue);
+    setShowHumidityConfirm(true);
   };
 
-  // Показать подсказку температуры
-  const showTempTooltip = (e) => {
-    const rect = e.target.getBoundingClientRect();
-    const position = e.clientX - rect.left;
-    setTempTooltip({
-      show: true,
-      value: sensorData.temperature,
-      position: position
-    });
+  // Подтверждение изменения влажности
+  const confirmHumidityChange = () => {
+    // Логируем изменение только при подтверждении
+    if (logActivity) {
+      const change = (humiditySliderValue - previousHumidityValue).toFixed(1);
+      const changeText = change > 0 ? `увеличил на +${change}%` : `уменьшил на ${change}%`;
+      logActivity(`Установил влажность в ${selectedRoom}: ${humiditySliderValue}% (${changeText})`, selectedRoom);
+    }
+    
+    setPreviousHumidityValue(humiditySliderValue);
+    setHumidityTarget(humiditySliderValue);
+    updateRoomHumidity(selectedRoom, humiditySliderValue);
+    setShowHumidityConfirm(false);
   };
 
-  // Показать подсказку влажности
-  const showHumidityTooltip = (e) => {
-    const rect = e.target.getBoundingClientRect();
-    const position = e.clientX - rect.left;
-    setHumidityTooltip({
-      show: true,
-      value: sensorData.humidity,
-      position: position
-    });
-  };
-
-  // Скрыть подсказки
-  const hideTempTooltip = () => {
-    setTempTooltip({ show: false, value: 0, position: 0 });
-  };
-
-  const hideHumidityTooltip = () => {
-    setHumidityTooltip({ show: false, value: 0, position: 0 });
-  };
-
-  // Синхронизация переключателей
-  const handleTempToggle = (enabled) => {
+  // Переключение кондиционера
+  const handleACtoggle = (enabled) => {
     toggleTemperature(enabled);
-    setTempSwitch(enabled);
+    setShowTempConfirm(false);
+    
+    // Логируем действие
+    if (logActivity) {
+      logActivity(`${enabled ? 'Включил' : 'Выключил'} кондиционер в ${selectedRoom}`, selectedRoom);
+    }
   };
 
+  // Переключение увлажнителя
   const handleHumidityToggle = (enabled) => {
     toggleHumidity(enabled);
-    setHumiditySwitch(enabled);
+    setShowHumidityConfirm(false);
+    
+    // Логируем действие
+    if (logActivity) {
+      logActivity(`${enabled ? 'Включил' : 'Выключил'} увлажнитель в ${selectedRoom}`, selectedRoom);
+    }
+  };
+
+  // Смена комнаты
+  const handleRoomChange = (roomName) => {
+    setSelectedRoom(roomName);
+    const room = rooms.find(r => r.name === roomName);
+    if (room) {
+      setTempSliderValue(room.temperature);
+      setHumiditySliderValue(room.humidity);
+      setTempTarget(room.temperature);
+      setHumidityTarget(room.humidity);
+      setPreviousTempValue(room.temperature);
+      setPreviousHumidityValue(room.humidity);
+    }
+    
+    // Логируем действие
+    if (logActivity) {
+      logActivity(`Переключился на комнату: ${roomName}`, 'Навигация');
+    }
   };
 
   return (
     <div className="sensors-screen">
       <div className="sensors-text-wrapper">Датчики</div>
-      <div className="sensors-text-wrapper-9">Настройка датчиков</div>
-
-      {/* Карточка регулирования температуры */}
-      <div className={`sensors-rectangle-2 ${!sensorData.tempEnabled ? 'sensors-disabled' : ''}`} />
-      <div className={`sensors-text-wrapper-3 ${!sensorData.tempEnabled ? 'sensors-disabled-text' : ''}`}>Регулирование температуры</div>
-      <div className={`sensors-text-wrapper-4 ${!sensorData.tempEnabled ? 'sensors-disabled-text' : ''}`}>Средняя температура: 20 °C</div>
       
-      {/* Большие цифры температуры */}
-      <div className={`sensors-text-wrapper-8 ${!sensorData.tempEnabled ? 'sensors-disabled-text' : ''}`}>{sensorData.temperature.toFixed(1)}</div>
-      <div className={`sensors-text-wrapper-7 ${!sensorData.tempEnabled ? 'sensors-disabled-text' : ''}`}>°C</div>
-
-      {/* Переключатель температуры */}
-      <div 
-        className={`sensors-text-wrapper-6 ${sensorData.tempEnabled ? 'sensors-active' : ''}`}
-        onClick={() => handleTempToggle(true)}
-      >
-        Включено
+      {/* Выбор комнаты */}
+      <div className="sensors-room-selector">
+        <div className="sensors-room-title">Выбор комнаты:</div>
+        <div className="sensors-room-buttons">
+          {rooms.map(room => (
+            <button
+              key={room.id}
+              className={`sensors-room-btn ${selectedRoom === room.name ? 'active' : ''}`}
+              onClick={() => handleRoomChange(room.name)}
+            >
+              {room.name}
+            </button>
+          ))}
+        </div>
       </div>
-      <div 
-        className={`sensors-ellipse ${sensorData.tempEnabled ? 'sensors-active' : ''}`}
-        onClick={() => handleTempToggle(true)}
-      />
-      
-      <div 
-        className={`sensors-text-wrapper-10 ${!sensorData.tempEnabled ? 'sensors-active' : ''}`}
-        onClick={() => handleTempToggle(false)}
-      >
-        Выключено
-      </div>
-      <div 
-        className={`sensors-ellipse-2 ${!sensorData.tempEnabled ? 'sensors-active' : ''}`}
-        onClick={() => handleTempToggle(false)}
-      />
 
-      {/* Ползунок температуры */}
-      <div className="sensors-slider-container">
-        <div className={`sensors-rectangle-3 ${!sensorData.tempEnabled ? 'sensors-disabled' : ''}`} />
-        <div 
-          className={`sensors-rectangle-4 ${!sensorData.tempEnabled ? 'sensors-disabled' : ''}`}
-          style={{ width: `${((sensorData.temperature - 10) / 30) * 351}px` }}
-        />
+      {/* Контейнер для двух колонок */}
+      <div className="sensors-container">
         
-        <input
-          type="range"
-          min="10"
-          max="40"
-          step="0.1"
-          value={sensorData.temperature}
-          onChange={handleTempChange}
-          onMouseMove={showTempTooltip}
-          onMouseLeave={hideTempTooltip}
-          disabled={!sensorData.tempEnabled}
-          className="sensors-slider-input sensors-temp-slider"
-        />
-        
-        <div 
-          className={`sensors-ellipse-3 ${!sensorData.tempEnabled ? 'sensors-disabled' : ''}`}
-          style={{ left: `${369 + ((sensorData.temperature - 10) / 30) * 351 - 15}px` }}
-        />
+        {/* Левая колонка - Кондиционер */}
+        <div className="sensors-column">
+          <div className={`sensors-device-card ${!sensorData.tempEnabled ? 'disabled' : ''}`}>
+            
+            {/* Заголовок блока */}
+            <div className="sensors-device-header">
+              <div className="sensors-device-title">
+                <span className="sensors-room-name">{selectedRoom}</span>
+                <h3>Кондиционер 2</h3>
+              </div>
+              <div className="sensors-device-status">
+                <div 
+                  className={`sensors-status-toggle ${sensorData.tempEnabled ? 'enabled' : 'disabled'}`}
+                  onClick={() => handleACtoggle(!sensorData.tempEnabled)}
+                >
+                  <div className="sensors-status-text">
+                    {sensorData.tempEnabled ? 'Включено' : 'Выключено'}
+                  </div>
+                  <div className="sensors-status-dot"></div>
+                </div>
+              </div>
+            </div>
 
-        {/* Шкала температуры */}
-        <div className={`sensors-slider-scale ${!sensorData.tempEnabled ? 'sensors-disabled-text' : ''}`} style={{ left: '369px', top: '545px' }}>
-          <span>10°C</span>
-          <span>25°C</span>
-          <span>40°C</span>
+            {/* Текущая температура */}
+            <div className="sensors-current-value">
+              <div className="sensors-value-large">{currentRoom.temperature}°C</div>
+              <div className="sensors-target-value">
+                Текущая цель: <span>{tempTarget}°C</span>
+              </div>
+            </div>
+
+            {/* Ползунок регулировки */}
+            <div className="sensors-slider-section">
+              <div className="sensors-slider-title">Регулировка целевого значения:</div>
+              <div className="sensors-slider-container">
+                <input
+                  type="range"
+                  min="0"
+                  max="40"
+                  step="0.1"
+                  value={tempSliderValue}
+                  onChange={handleTempChange}
+                  disabled={!sensorData.tempEnabled}
+                  className="sensors-slider"
+                />
+                <div className="sensors-slider-labels">
+                  <span>0°C</span>
+                  <span>20°C</span>
+                  <span>40°C</span>
+                </div>
+                <div className="sensors-slider-value">
+                  Установлено: {tempSliderValue}°C
+                </div>
+              </div>
+            </div>
+
+            {/* Кнопка подтверждения */}
+            {showTempConfirm && (
+              <div className="sensors-confirm-section">
+                <button 
+                  className="sensors-confirm-btn"
+                  onClick={confirmTempChange}
+                  disabled={!sensorData.tempEnabled}
+                >
+                  Подтвердить изменение температуры
+                </button>
+              </div>
+            )}
+
+            {/* Питание */}
+            <div className="sensors-power-section">
+              <div className="sensors-power-label">Питание</div>
+              <div className="sensors-power-status">
+                {sensorData.tempEnabled ? '● Включено' : '○ Выключено'}
+              </div>
+            </div>
+
+          </div>
         </div>
 
-        {/* Подсказка ползунка температуры */}
-        {tempTooltip.show && (
-          <div 
-            className="sensors-slider-tooltip sensors-temp-tooltip"
-            style={{ 
-              left: `${369 + tempTooltip.position - 25}px`,
-            }}
-          >
-            {tempTooltip.value.toFixed(1)}°C
+        {/* Правая колонка - Увлажнитель */}
+        <div className="sensors-column">
+          <div className={`sensors-device-card ${!sensorData.humidityEnabled ? 'disabled' : ''}`}>
+            
+            {/* Заголовок блока */}
+            <div className="sensors-device-header">
+              <div className="sensors-device-title">
+                <span className="sensors-room-name">{selectedRoom}</span>
+                <h3>Увлажнитель 2</h3>
+              </div>
+              <div className="sensors-device-status">
+                <div 
+                  className={`sensors-status-toggle ${sensorData.humidityEnabled ? 'enabled' : 'disabled'}`}
+                  onClick={() => handleHumidityToggle(!sensorData.humidityEnabled)}
+                >
+                  <div className="sensors-status-text">
+                    {sensorData.humidityEnabled ? 'Включено' : 'Выключено'}
+                  </div>
+                  <div className="sensors-status-dot"></div>
+                </div>
+              </div>
+            </div>
+
+            {/* Текущая влажность */}
+            <div className="sensors-current-value">
+              <div className="sensors-value-large">{currentRoom.humidity}%</div>
+              <div className="sensors-target-value">
+                Текущая цель: <span>{humidityTarget}%</span>
+              </div>
+            </div>
+
+            {/* Ползунок регулировки */}
+            <div className="sensors-slider-section">
+              <div className="sensors-slider-title">Регулировка целевого значения:</div>
+              <div className="sensors-slider-container">
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  step="0.1"
+                  value={humiditySliderValue}
+                  onChange={handleHumidityChange}
+                  disabled={!sensorData.humidityEnabled}
+                  className="sensors-slider"
+                />
+                <div className="sensors-slider-labels">
+                  <span>0%</span>
+                  <span>50%</span>
+                  <span>100%</span>
+                </div>
+                <div className="sensors-slider-value">
+                  Установлено: {humiditySliderValue}%
+                </div>
+              </div>
+            </div>
+
+            {/* Кнопка подтверждения */}
+            {showHumidityConfirm && (
+              <div className="sensors-confirm-section">
+                <button 
+                  className="sensors-confirm-btn"
+                  onClick={confirmHumidityChange}
+                  disabled={!sensorData.humidityEnabled}
+                >
+                  Подтвердить изменение влажности
+                </button>
+              </div>
+            )}
+
+            {/* Питание */}
+            <div className="sensors-power-section">
+              <div className="sensors-power-label">Питание</div>
+              <div className="sensors-power-status">
+                {sensorData.humidityEnabled ? '● Включено' : '○ Выключено'}
+              </div>
+            </div>
+
           </div>
-        )}
-      </div>
-
-      {/* Карточка регулирования влажности */}
-      <div className={`sensors-rectangle-5 ${!sensorData.humidityEnabled ? 'sensors-disabled' : ''}`} />
-      <div className={`sensors-text-wrapper-11 ${!sensorData.humidityEnabled ? 'sensors-disabled-text' : ''}`}>Регулирование влажности</div>
-      <div className={`sensors-text-wrapper-12 ${!sensorData.humidityEnabled ? 'sensors-disabled-text' : ''}`}>Средняя влажность: 80 %</div>
-      
-      {/* Большие цифры влажности */}
-      <div className={`sensors-text-wrapper-17 ${!sensorData.humidityEnabled ? 'sensors-disabled-text' : ''}`}>{sensorData.humidity.toFixed(1)}</div>
-      <div className={`sensors-text-wrapper-16 ${!sensorData.humidityEnabled ? 'sensors-disabled-text' : ''}`}>%</div>
-
-      {/* Переключатель влажности */}
-      <div 
-        className={`sensors-text-wrapper-15 ${sensorData.humidityEnabled ? 'sensors-active' : ''}`}
-        onClick={() => handleHumidityToggle(true)}
-      >
-        Включено
-      </div>
-      <div 
-        className={`sensors-ellipse-4 ${sensorData.humidityEnabled ? 'sensors-active' : ''}`}
-        onClick={() => handleHumidityToggle(true)}
-      />
-      
-      <div 
-        className={`sensors-text-wrapper-18 ${!sensorData.humidityEnabled ? 'sensors-active' : ''}`}
-        onClick={() => handleHumidityToggle(false)}
-      >
-        Выключено
-      </div>
-      <div 
-        className={`sensors-ellipse-5 ${!sensorData.humidityEnabled ? 'sensors-active' : ''}`}
-        onClick={() => handleHumidityToggle(false)}
-      />
-
-      {/* Ползунок влажности */}
-      <div className="sensors-slider-container">
-        <div className={`sensors-rectangle-6 ${!sensorData.humidityEnabled ? 'sensors-disabled' : ''}`} />
-        <div 
-          className={`sensors-rectangle-7 ${!sensorData.humidityEnabled ? 'sensors-disabled' : ''}`}
-          style={{ width: `${((sensorData.humidity - 30) / 70) * 351}px` }}
-        />
-        
-        <input
-          type="range"
-          min="30"
-          max="100"
-          step="0.1"
-          value={sensorData.humidity}
-          onChange={handleHumidityChange}
-          onMouseMove={showHumidityTooltip}
-          onMouseLeave={hideHumidityTooltip}
-          disabled={!sensorData.humidityEnabled}
-          className="sensors-slider-input sensors-humidity-slider"
-        />
-        
-        <div 
-          className={`sensors-ellipse-6 ${!sensorData.humidityEnabled ? 'sensors-disabled' : ''}`}
-          style={{ left: `${846 + ((sensorData.humidity - 30) / 70) * 351 - 15}px` }}
-        />
-
-        {/* Шкала влажности */}
-        <div className={`sensors-slider-scale ${!sensorData.humidityEnabled ? 'sensors-disabled-text' : ''}`} style={{ left: '846px', top: '545px' }}>
-          <span>30%</span>
-          <span>65%</span>
-          <span>100%</span>
         </div>
 
-        {/* Подсказка ползунка влажности */}
-        {humidityTooltip.show && (
-          <div 
-            className="sensors-slider-tooltip sensors-humidity-tooltip"
-            style={{ 
-              left: `${846 + humidityTooltip.position - 25}px`,
-            }}
-          >
-            {humidityTooltip.value.toFixed(1)}%
-          </div>
-        )}
       </div>
 
-      {/* Карточка управления температурой */}
-      <div className="sensors-rectangle-8" />
-      <div className="sensors-text-wrapper-21">Температура</div>
-      <div className="sensors-text-wrapper-23">{sensorData.temperature.toFixed(1)}</div>
-      <div className="sensors-text-wrapper-22">°C</div>
-
-      {/* Переключатель температуры 2 */}
-      <div 
-        className={`sensors-text-wrapper-19 ${tempSwitch ? 'sensors-active' : ''}`}
-        onClick={() => handleTempToggle(true)}
-      >
-        Включено
-      </div>
-      <div 
-        className={`sensors-ellipse-7 ${tempSwitch ? 'sensors-active' : ''}`}
-        onClick={() => handleTempToggle(true)}
-      />
-      
-      <div 
-        className={`sensors-text-wrapper-20 ${!tempSwitch ? 'sensors-active' : ''}`}
-        onClick={() => handleTempToggle(false)}
-      >
-        Выключено
-      </div>
-      <div 
-        className={`sensors-ellipse-8 ${!tempSwitch ? 'sensors-active' : ''}`}
-        onClick={() => handleTempToggle(false)}
-      />
-
-      {/* Toggle switch температура */}
-      <div 
-        className={`sensors-rectangle-9 ${!sensorData.tempEnabled ? 'sensors-disabled-toggle' : ''}`}
-        onClick={() => handleTempToggle(!tempSwitch)}
-      />
-      <div 
-        className={`sensors-ellipse-9 ${!sensorData.tempEnabled ? 'sensors-disabled-toggle' : ''}`}
-        onClick={() => handleTempToggle(!tempSwitch)}
-        style={{ 
-          left: tempSwitch ? '386px' : '450px'
-        }}
-      />
-
-      {/* Карточка управления влажностью */}
-      <div className="sensors-rectangle-10" />
-      <div className="sensors-text-wrapper-26">Влажность</div>
-      <div className="sensors-text-wrapper-28">{sensorData.humidity.toFixed(1)}</div>
-      <div className="sensors-text-wrapper-27">%</div>
-
-      {/* Переключатель влажности 2 */}
-      <div 
-        className={`sensors-text-wrapper-24 ${humiditySwitch ? 'sensors-active' : ''}`}
-        onClick={() => handleHumidityToggle(true)}
-      >
-        Включено
-      </div>
-      <div 
-        className={`sensors-ellipse-10 ${humiditySwitch ? 'sensors-active' : ''}`}
-        onClick={() => handleHumidityToggle(true)}
-      />
-      
-      <div 
-        className={`sensors-text-wrapper-25 ${!humiditySwitch ? 'sensors-active' : ''}`}
-        onClick={() => handleHumidityToggle(false)}
-      >
-        Выключено
-      </div>
-      <div 
-        className={`sensors-ellipse-11 ${!humiditySwitch ? 'sensors-active' : ''}`}
-        onClick={() => handleHumidityToggle(false)}
-      />
-
-      {/* Toggle switch влажность */}
-      <div 
-        className={`sensors-rectangle-11 ${!sensorData.humidityEnabled ? 'sensors-disabled-toggle' : ''}`}
-        onClick={() => handleHumidityToggle(!humiditySwitch)}
-      />
-      <div 
-        className={`sensors-ellipse-12 ${!sensorData.humidityEnabled ? 'sensors-disabled-toggle' : ''}`}
-        onClick={() => handleHumidityToggle(!humiditySwitch)}
-        style={{ 
-          left: humiditySwitch ? '860px' : '931px'
-        }}
-      />
     </div>
   );
 };

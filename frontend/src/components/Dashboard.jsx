@@ -1,4 +1,3 @@
-// components/Dashboard.js
 import React, { useState, useEffect } from "react";
 import axios from "axios";
 import { FiRrCheck } from "./icons/FiRrCheck";
@@ -14,12 +13,13 @@ const Dashboard = ({ sensorData, changes }) => {
 
   const fetchDashboardData = async () => {
     try {
+      // ПРОВЕРЬТЕ: Убедитесь, что бэкенд запущен и настроены CORS
       const notificationsRes = await axios.get("http://localhost:8000/notifications");
       setNotifications(notificationsRes.data);
     } catch (error) {
       console.error("Error fetching dashboard data:", error);
 
-      // Mock уведомления
+      // Mock уведомления (для тестирования, если бэкенд недоступен или CORS блокирует)
       setNotifications([
         {
           id: 1,
@@ -39,8 +39,21 @@ const Dashboard = ({ sensorData, changes }) => {
 
   // Форматируем изменения для отображения
   const formatChange = (change) => {
+    // Проверяем, что change — это число.
+    if (typeof change !== 'number' || isNaN(change)) {
+      return 'N/A';
+    }
     return change >= 0 ? `+${change.toFixed(1)}` : change.toFixed(1);
   };
+
+  // Проверка наличия данных перед использованием
+  if (!sensorData || !sensorData.humidity || !sensorData.temperature || !changes) {
+      // Можно вернуть лоадер или пустой div, пока данные не загружены
+      return <div>Загрузка данных...</div>;
+  }
+  
+  // Рассчитываем процент для круговой диаграммы температуры (если 50°C — это 100%)
+  const tempPercentage = Math.min(100, (sensorData.temperature / 50) * 100);
 
   return (
     <>
@@ -74,7 +87,7 @@ const Dashboard = ({ sensorData, changes }) => {
       </div>
       
       <div className="dashboard-temperature-graph">
-        <CircleGraph percentage={(sensorData.temperature / 50) * 100} />
+        <CircleGraph percentage={tempPercentage} />
       </div>
 
       <div className="dashboard-humidity-percent">{sensorData.humidity.toFixed(1)}%</div>
@@ -83,11 +96,10 @@ const Dashboard = ({ sensorData, changes }) => {
       {/* Секция уведомлений */}
       <div className="dashboard-text-wrapper-4">ИИ-уведомления</div>
       <div className="dashboard-notifications-container">
-        {notifications.map((notification, index) => (
+        {notifications.map((notification) => (
           <NotificationCard 
             key={notification.id}
             notification={notification}
-            index={index}
           />
         ))}
       </div>
@@ -96,7 +108,7 @@ const Dashboard = ({ sensorData, changes }) => {
 };
 
 // Компонент карточки уведомления (без изменений)
-const NotificationCard = ({ notification, index }) => {
+const NotificationCard = ({ notification }) => {
   return (
     <div className="dashboard-notification-card">
       <div className="dashboard-notification-title">
@@ -113,8 +125,9 @@ const NotificationCard = ({ notification, index }) => {
         {notification.completed ? "Выполнено" : "Ожидает"}
         {notification.completed && <FiRrCheck className="dashboard-status-icon" />}
       </div>
-
-      {index < 1 && <div className="dashboard-notification-divider" />}
+      
+      {/* Делитель (простой пример, который можно оптимизировать в CSS) */}
+      <div className="dashboard-notification-divider" />
     </div>
   );
 };
