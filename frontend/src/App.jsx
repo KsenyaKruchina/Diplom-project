@@ -8,17 +8,19 @@ import { GridFour01 } from './components/icons/GridFour01';
 import { StyleLine } from './components/icons/StyleLine';
 import { User } from './components/icons/User';
 import { ViewList } from './components/icons/ViewList';
+import { microclimateService } from './services/microclimateService';
 import './App.css';
 
 function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [activities, setActivities] = useState([]);
+  const [loading, setLoading] = useState(true);
   
-  // Начальные значения
+  // Начальные значения для совместимости
   const initialTemperature = 20.2;
   const initialHumidity = 43.8;
 
-  // Общее состояние для данных датчиков
+  // Общее состояние для данных датчиков (для обратной совместимости)
   const [sensorData, setSensorData] = useState({
     temperature: initialTemperature,
     humidity: initialHumidity,
@@ -30,11 +32,7 @@ function App() {
 
   // Загрузка данных при монтировании
   useEffect(() => {
-    // Загружаем историю действий из localStorage
-    const savedActivities = localStorage.getItem('userActivities');
-    if (savedActivities) {
-      setActivities(JSON.parse(savedActivities));
-    }
+    fetchInitialData();
     
     // Логируем вход в систему
     logActivity('Вошла в систему', 'Система');
@@ -44,6 +42,54 @@ function App() {
   useEffect(() => {
     localStorage.setItem('userActivities', JSON.stringify(activities));
   }, [activities]);
+
+  const fetchInitialData = async () => {
+    try {
+      // Загружаем историю действий из localStorage
+      const savedActivities = localStorage.getItem('userActivities');
+      if (savedActivities) {
+        setActivities(JSON.parse(savedActivities));
+      }
+      
+      // Пробуем загрузить данные из микроклимата
+      try {
+        const [stats, logs] = await Promise.all([
+          microclimateService.getDashboardStats(),
+          microclimateService.getLogs(20)
+        ]);
+        
+        // Обновляем sensorData с реальными данными
+        setSensorData(prev => ({
+          ...prev,
+          temperature: stats.avg_temperature || initialTemperature,
+          humidity: stats.avg_humidity || initialHumidity,
+          initialTemperature: stats.avg_temperature || initialTemperature,
+          initialHumidity: stats.avg_humidity || initialHumidity
+        }));
+        
+        // Добавляем логи из микроклимата в activities
+        const microclimateActivities = logs.map(log => ({
+          id: log.id || Date.now(),
+          user_name: log.user_name || 'Пользователь',
+          action: log.action,
+          room: 'Общее',
+          completed: true,
+          timestamp: log.timestamp || new Date().toISOString()
+        }));
+        
+        setActivities(prev => [...microclimateActivities, ...prev]);
+        
+      } catch (error) {
+        console.log('Использую локальные данные:', error.message);
+        // Используем локальные данные если API недоступно
+      }
+      
+    } catch (error) {
+      console.error('Ошибка при загрузке данных:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // Функция для логирования действий
   const logActivity = (action, room = 'Общее') => {
@@ -57,9 +103,17 @@ function App() {
     };
     
     setActivities(prev => [newActivity, ...prev.slice(0, 49)]); // Храним последние 50 действий
+    
+    // Также можно отправлять логи на сервер микроклимата
+    try {
+      // В реальном приложении здесь будет вызов API для сохранения лога
+      // microclimateService.saveLog(action, room);
+    } catch (error) {
+      console.error('Ошибка при сохранении лога на сервере:', error);
+    }
   };
 
-  // Функции для обновления данных
+  // Функции для обновления данных (оставлены для обратной совместимости)
   const updateTemperature = (newTemp) => {
     setSensorData(prev => ({
       ...prev,
@@ -93,20 +147,10 @@ function App() {
     // Логируем скачивание отчета
     logActivity(`Скачала ${reportType} отчет`, 'Отчеты');
     
-    // Здесь будет логика скачивания файла
     console.log(`Скачивание отчета: ${reportType}`);
-    
-    // Временная реализация для демонстрации
-    const element = document.createElement('a');
-    const file = new Blob([`Отчет: ${reportType}\nДата: ${new Date().toLocaleDateString()}\nПользователь: Kseniya Kruchina`], {type: 'text/plain'});
-    element.href = URL.createObjectURL(file);
-    element.download = `${reportType}_отчет_${new Date().toISOString().split('T')[0]}.txt`;
-    document.body.appendChild(element);
-    element.click();
-    document.body.removeChild(element);
   };
 
-  // Функция для расчета изменений
+  // Функция для расчета изменений (оставлена для обратной совместимости с Dashboard)
   const calculateChanges = () => {
     const tempChange = ((sensorData.temperature - sensorData.initialTemperature) / sensorData.initialTemperature) * 100;
     const humidityChange = ((sensorData.humidity - sensorData.initialHumidity) / sensorData.initialHumidity) * 100;
@@ -118,13 +162,22 @@ function App() {
   };
 
   const renderContent = () => {
+    if (loading) {
+      return (
+        <div className="loading-screen">
+          <div className="loading-spinner"></div>
+          <div className="loading-text">Загрузка данных...</div>
+        </div>
+      );
+    }
+
     const changes = calculateChanges();
 
     switch (activeTab) {
       case 'dashboard':
         return <Dashboard sensorData={sensorData} changes={changes} />;
       case 'analytics':
-        return <Analytics onDownloadReport={handleDownloadReport} activities={activities} />;
+        return <Analytics onDownloadReport={handleDownloadReport} />;
       case 'sensors':
         return (
           <Sensors
@@ -170,7 +223,11 @@ function App() {
     fontFamily: '"Inter-SemiBold", Helvetica',
     fontSize: '18px',
     zIndex: 1001,
-    border: '1px solid transparent'
+    border: '1px solid transparent',
+    '&:hover': {
+      backgroundColor: isActive ? '#9548ff' : 'rgba(130, 52, 247, 0.1)',
+      borderColor: '#8234f7'
+    }
   });
 
   return (
@@ -220,12 +277,79 @@ function App() {
           <User color="white" />
           <span>Пользователи</span>
         </div>
+
+        {/* Кнопка для создания тестовых данных */}
+        <div style={{ marginTop: '30px', padding: '20px 0', borderTop: '1px solid #6d6d6d' }}>
+          <button
+            onClick={async () => {
+              try {
+                await microclimateService.seedData();
+                logActivity('Создала тестовые данные', 'Система');
+                alert('Тестовые данные созданы!');
+                fetchInitialData(); // Перезагружаем данные
+              } catch (error) {
+                alert('Ошибка создания данных: ' + error.message);
+              }
+            }}
+            style={{
+              width: '100%',
+              padding: '12px',
+              backgroundColor: 'rgba(102, 183, 64, 0.2)',
+              border: '1px solid #66B740',
+              borderRadius: '8px',
+              color: '#66B740',
+              cursor: 'pointer',
+              fontFamily: '"Inter-Medium", Helvetica',
+              fontSize: '14px',
+              transition: 'all 0.3s ease'
+            }}
+          >
+            Создать тестовые данные
+          </button>
+        </div>
       </div>
 
       {/* Основной контент */}
       <div className="main-content">
         {renderContent()}
       </div>
+
+      {/* Стили для загрузки */}
+      <style>{`
+        .loading-screen {
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          height: 100vh;
+          color: white;
+        }
+        
+        .loading-spinner {
+          width: 50px;
+          height: 50px;
+          border: 4px solid rgba(130, 52, 247, 0.3);
+          border-radius: 50%;
+          border-top-color: #8234f7;
+          animation: spin 1s linear infinite;
+          margin-bottom: 20px;
+        }
+        
+        .loading-text {
+          font-family: "Inter-Regular", Helvetica;
+          font-size: 16px;
+          color: #bababa;
+        }
+        
+        @keyframes spin {
+          to { transform: rotate(360deg); }
+        }
+        
+        div[style*="menuItemStyle"]:hover {
+          background-color: ${menuItemStyle(false)['&:hover'].backgroundColor} !important;
+          border-color: ${menuItemStyle(false)['&:hover'].borderColor} !important;
+        }
+      `}</style>
     </div>
   );
 }

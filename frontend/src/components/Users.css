@@ -128,10 +128,10 @@
   font-weight: 500;
   margin: 20px 0 30px 329px;
   letter-spacing: 0;
-  line-height: normal; /* Исправлено с 20px на normal */
+  line-height: normal;
   white-space: nowrap;
   transition: color 0.3s ease;
-  padding: 10px 0; /* Добавлены вертикальные отступы */
+  padding: 10px 0;
 }
 
 .users-text-wrapper:hover {
@@ -183,24 +183,24 @@
   font-family: "Inter-Medium", Helvetica;
   font-size: 24px;
   font-weight: 500;
-  margin-bottom: 8px; /* Увеличен отступ */
-  padding-top: 5px; /* Добавлен верхний отступ */
+  margin-bottom: 8px;
+  padding-top: 5px;
 }
 
 .users-user-role {
   color: #b7a2ee;
   font-family: "Inter-Regular", Helvetica;
   font-size: 16px;
-  margin-bottom: 12px; /* Увеличен отступ */
+  margin-bottom: 12px;
 }
 
 .users-user-status {
   font-family: "Inter-Regular", Helvetica;
   font-size: 14px;
-  padding: 6px 14px; /* Увеличены отступы */
+  padding: 6px 14px;
   border-radius: 12px;
   display: inline-block;
-  margin-bottom: 8px; /* Добавлен отступ снизу */
+  margin-bottom: 8px;
 }
 
 .users-user-status.online {
@@ -219,7 +219,7 @@
   color: #bababa;
   font-family: "Inter-Regular", Helvetica;
   font-size: 14px;
-  padding-top: 5px; /* Добавлен отступ сверху */
+  padding-top: 5px;
 }
 
 /* Заголовок журнала аудита - исправлены отступы */
@@ -228,11 +228,11 @@
   font-family: "Inter-Medium", Helvetica;
   font-size: 32px;
   font-weight: 500;
-  margin: 20px 329px 20px; /* Добавлен верхний отступ */
+  margin: 20px 329px 20px;
   letter-spacing: -0.30px;
   line-height: normal;
   transition: color 0.3s ease;
-  padding: 10px 0; /* Добавлены вертикальные отступы */
+  padding: 10px 0;
 }
 
 .users-text-wrapper-37:hover {
@@ -280,10 +280,10 @@
 .users-audit-item {
   display: flex;
   align-items: center;
-  padding: 18px 30px; /* Увеличен вертикальный padding */
+  padding: 18px 30px;
   border-bottom: 1px solid #6d6d6d;
   transition: all 0.2s ease;
-  min-height: 70px; /* Минимальная высота для избежания слияния */
+  min-height: 70px;
 }
 
 .users-audit-item:hover {
@@ -299,7 +299,7 @@
   color: #bababa;
   font-family: "Inter-Regular", Helvetica;
   font-size: 12px;
-  margin-bottom: 5px; /* Увеличен отступ */
+  margin-bottom: 5px;
 }
 
 .users-audit-hour {
@@ -307,7 +307,7 @@
   font-family: "Inter-Medium", Helvetica;
   font-size: 14px;
   font-weight: 500;
-  padding-top: 2px; /* Добавлен отступ */
+  padding-top: 2px;
 }
 
 .users-audit-user {
@@ -319,7 +319,7 @@
 }
 
 .users-audit-user-icon {
-  height: 24px !important; /* Увеличен размер */
+  height: 24px !important;
   width: 24px !important;
   transition: transform 0.3s ease !important;
 }
@@ -333,7 +333,7 @@
   color: #ffffff;
   font-family: "Inter-Regular", Helvetica;
   font-size: 15px;
-  padding-top: 2px; /* Добавлен отступ */
+  padding-top: 2px;
 }
 
 .users-audit-action {
@@ -343,7 +343,7 @@
   font-size: 15px;
   padding: 0 10px;
   transition: color 0.2s ease;
-  line-height: 1.4; /* Улучшен межстрочный интервал */
+  line-height: 1.4;
 }
 
 .users-audit-item:hover .users-audit-action {
@@ -357,17 +357,17 @@
   font-size: 14px;
   padding: 0 10px;
   text-align: center;
-  line-height: 1.4; /* Улучшен межстрочный интервал */
+  line-height: 1.4;
 }
 
 .users-audit-status {
   width: 100px;
   font-family: "Inter-Regular", Helvetica;
   font-size: 14px;
-  padding: 8px 12px; /* Увеличены отступы */
+  padding: 8px 12px;
   border-radius: 12px;
   text-align: center;
-  line-height: 1.2; /* Улучшен межстрочный интервал */
+  line-height: 1.2;
 }
 
 .users-audit-status.completed {
@@ -422,10 +422,10 @@
   background-color: #414141;
   border: 1px solid #6d6d6d;
   border-radius: 12px;
-  padding: 25px 20px; /* Увеличен вертикальный padding */
+  padding: 25px 20px;
   text-align: center;
   transition: all 0.3s ease;
-  min-height: 120px; /* Минимальная высота */
+  min-height: 120px;
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -442,7 +442,7 @@
   font-family: "Inter-Medium", Helvetica;
   font-size: 36px;
   font-weight: 500;
-  margin-bottom: 12px; /* Увеличен отступ */
+  margin-bottom: 12px;
   line-height: 1;
 }
 
@@ -453,28 +453,72 @@
   line-height: 1.4;
 }
 
+/* Секция отчета */
+.users-report-section {
+  margin: 20px 0;
+}
+
+.users-report-btn {
+  width: 100%;
+  background-color: #8234f7;
+  color: #ffffff;
+  border: none;
+  border-radius: 10px;
+  padding: 15px;
+  font-family: "Inter-Medium", Helvetica;
+  font-size: 18px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.users-report-btn:hover:not(:disabled) {
+  background-color: #7229e0;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(130, 52, 247, 0.4);
+}
+
+.users-report-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.users-report-hint {
+  display: none; /* Скрываем подсказку, как просили */
+}
+
+/* Индикатор загрузки */
+.users-loading {
+  color: #ffffff;
+  font-family: "Inter-Regular", Helvetica;
+  font-size: 20px;
+  text-align: center;
+  margin-top: 100px;
+}
+
 /* Адаптивность */
 @media (max-width: 1400px) {
   .users-screen {
     min-width: 100%;
   }
-  
+
   .users-temperature-card,
   .users-text-wrapper,
   .users-rectangle-3,
   .users-text-wrapper-37,
   .users-rectangle-2,
-  .users-stats {
+  .users-stats,
+  .users-report-section {
     margin-left: 20px;
     margin-right: 20px;
   }
-  
+
   .users-audit-headers,
   .users-audit-item {
     padding-left: 20px;
     padding-right: 20px;
   }
-  
+
   .users-temperature-content {
     flex-direction: column;
     text-align: center;
@@ -487,22 +531,22 @@
     flex-direction: column;
     text-align: center;
   }
-  
+
   .users-stats {
     flex-direction: column;
   }
-  
+
   .users-audit-headers {
     display: none;
   }
-  
+
   .users-audit-item {
     flex-direction: column;
     align-items: flex-start;
-    gap: 15px; /* Увеличен gap */
+    gap: 15px;
     padding: 20px;
   }
-  
+
   .users-audit-time,
   .users-audit-user,
   .users-audit-action,
@@ -511,7 +555,7 @@
     width: 100%;
     padding: 0;
   }
-  
+
   .users-temperature-header {
     flex-direction: column;
     gap: 10px;

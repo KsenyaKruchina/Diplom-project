@@ -6,12 +6,66 @@
   min-width: 1440px;
   position: relative;
   width: 100%;
+  padding: 20px;
+  box-sizing: border-box;
 }
 
 .dashboard-main-content {
   position: relative;
   height: 100vh;
   overflow: auto;
+}
+
+/* Выбор комнаты - ПЕРЕМЕЩЕН ВЫШЕ */
+.dashboard-room-selector {
+  background-color: #414141;
+  border: 1px solid #6d6d6d;
+  border-radius: 10px;
+  padding: 10px 10px;
+  margin: 120px 309px 20px;
+  box-shadow: inset 4px 4px 4px #ffffff29;
+  position: absolute;
+  top: 20px;
+  left: 20px;
+  right: 310px;
+  z-index: 10;
+}
+
+.dashboard-room-title {
+  color: #ffffff;
+  font-family: "Inter-Medium", Helvetica;
+  font-size: 16px;
+  font-weight: 500;
+  margin-bottom: 10px;
+}
+
+.dashboard-room-buttons {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.dashboard-room-btn {
+  background-color: #363636;
+  border: 1px solid #6d6d6d;
+  border-radius: 8px;
+  color: #bababa;
+  font-family: "Inter-Regular", Helvetica;
+  font-size: 14px;
+  padding: 8px 16px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.dashboard-room-btn:hover {
+  background-color: #454545;
+  border-color: #8234f7;
+}
+
+.dashboard-room-btn.active {
+  background-color: #8234f7;
+  color: #ffffff;
+  border-color: #8234f7;
 }
 
 /* 1. ЗАГОЛОВОК "ДЭШБОРД" */
@@ -28,7 +82,7 @@
   white-space: nowrap;
 }
 
-/* 2. КАРТОЧКА ВЛАЖНОСТИ (левая) */
+/* 2. КАРТОЧКА ВЛАЖНОСТИ (левая) - ПЕРЕМЕЩЕНА НИЖЕ */
 .dashboard-rectangle-2 {
   background-color: #414141;
   border: 1px solid #6d6d6d;
@@ -37,7 +91,7 @@
   height: 199px;
   left: 329px;
   position: absolute;
-  top: 163px;
+  top: 250px;
   width: 425px;
   transition: all 0.3s ease;
 }
@@ -48,7 +102,7 @@
   border-color: #8234f7;
 }
 
-/* 3. КАРТОЧКА ТЕМПЕРАТУРЫ (правая) */
+/* 3. КАРТОЧКА ТЕМПЕРАТУРЫ (правая) - ПЕРЕМЕЩЕНА НИЖЕ */
 .dashboard-rectangle-3 {
   background-color: #414141;
   border: 1px solid #6d6d6d;
@@ -57,7 +111,7 @@
   height: 199px;
   left: 774px;
   position: absolute;
-  top: 163px;
+  top: 250px;
   width: 447px;
   transition: all 0.3s ease;
 }
@@ -78,7 +132,7 @@
   letter-spacing: -0.20px;
   line-height: normal;
   position: absolute;
-  top: 179px;
+  top: 266px;
   white-space: nowrap;
 }
 
@@ -92,7 +146,7 @@
   letter-spacing: -0.20px;
   line-height: normal;
   position: absolute;
-  top: 179px;
+  top: 266px;
   white-space: nowrap;
 }
 
@@ -103,7 +157,7 @@
   gap: 8px;
   left: 351px;
   position: absolute;
-  top: 260px;
+  top: 347px;
 }
 
 .dashboard-div-wrapper {
@@ -112,7 +166,7 @@
   gap: 8px;
   left: 805px;
   position: absolute;
-  top: 260px;
+  top: 347px;
 }
 
 .dashboard-text-wrapper-7 {
@@ -137,7 +191,7 @@
   letter-spacing: -0.30px;
   line-height: normal;
   position: absolute;
-  top: 282px;
+  top: 369px;
   width: 49px;
 }
 
@@ -150,7 +204,7 @@
   letter-spacing: -0.30px;
   line-height: normal;
   position: absolute;
-  top: 282px;
+  top: 369px;
   width: 49px;
 }
 
@@ -164,7 +218,7 @@
   letter-spacing: -0.30px;
   line-height: normal;
   position: absolute;
-  top: 315px;
+  top: 402px;
 }
 
 .dashboard-text-wrapper-9 {
@@ -176,14 +230,14 @@
   letter-spacing: -0.30px;
   line-height: normal;
   position: absolute;
-  top: 315px;
+  top: 402px;
 }
 
 /* 9. КРУГЛЫЕ ГРАФИКИ */
 .dashboard-humidity-graph {
   position: absolute;
   left: 590px;
-  top: 202px;
+  top: 289px;
   transition: transform 0.3s ease;
 }
 
@@ -194,7 +248,7 @@
 .dashboard-temperature-graph {
   position: absolute;
   left: 1054px;
-  top: 202px;
+  top: 289px;
   transition: transform 0.3s ease;
 }
 
@@ -209,7 +263,7 @@
   font-weight: 200;
   position: absolute;
   left: 622px;
-  top: 253px;
+  top: 340px;
 }
 
 .dashboard-temperature-value {
@@ -219,7 +273,7 @@
   font-weight: 200;
   position: absolute;
   left: 1082px;
-  top: 253px;
+  top: 340px;
 }
 
 /* 10. БЛОК "ИИ-УВЕДОМЛЕНИЯ" */
@@ -232,13 +286,13 @@
   letter-spacing: -0.20px;
   line-height: normal;
   position: absolute;
-  top: 402px;
+  top: 490px;
 }
 
 .dashboard-notifications-container {
   position: absolute;
   left: 324px;
-  top: 449px;
+  top: 540px;
   width: 1045px;
   height: 260px;
   background-color: #414141;
@@ -329,6 +383,7 @@
   border-radius: 8px;
   padding: 15px;
   margin: -5px -5px 15px -5px;
+  cursor: pointer;
 }
 
 .dashboard-notification-title {
@@ -373,7 +428,159 @@
   background-color: #8234f7;
 }
 
-/* 13. ДОПОЛНИТЕЛЬНЫЕ ЭФФЕКТЫ */
+/* 13. МОДАЛЬНОЕ ОКНО */
+.dashboard-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.7);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+  animation: fadeIn 0.3s ease;
+}
+
+.dashboard-modal {
+  background-color: #414141;
+  border: 2px solid #8234f7;
+  border-radius: 16px;
+  width: 500px;
+  padding: 30px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  animation: slideIn 0.3s ease;
+}
+
+.dashboard-modal-header {
+  margin-bottom: 20px;
+  text-align: center;
+}
+
+.dashboard-modal-header h3 {
+  color: #ffffff;
+  font-family: "Inter-SemiBold", Helvetica;
+  font-size: 24px;
+  font-weight: 600;
+  margin: 0;
+}
+
+.dashboard-modal-content {
+  margin-bottom: 30px;
+}
+
+.dashboard-modal-content p {
+  color: #bababa;
+  font-family: "Inter-Regular", Helvetica;
+  font-size: 16px;
+  line-height: 1.5;
+  margin-bottom: 20px;
+}
+
+.dashboard-modal-notification {
+  background-color: #363636;
+  border: 1px solid #6d6d6d;
+  border-radius: 10px;
+  padding: 15px;
+  margin-top: 15px;
+}
+
+.dashboard-modal-notification-title {
+  color: #ffffff;
+  font-family: "Inter-Medium", Helvetica;
+  font-size: 18px;
+  font-weight: 500;
+  margin-bottom: 10px;
+}
+
+.dashboard-modal-notification-message {
+  color: #bababa;
+  font-family: "Inter-Regular", Helvetica;
+  font-size: 14px;
+  line-height: 1.4;
+  margin-bottom: 15px;
+}
+
+.dashboard-modal-notification-status {
+  color: #ffffff;
+  font-family: "Inter-Regular", Helvetica;
+  font-size: 14px;
+  margin-bottom: 5px;
+}
+
+.dashboard-modal-notification-status span.completed {
+  color: #66b740;
+  font-weight: 500;
+}
+
+.dashboard-modal-notification-status span.pending {
+  color: #ff9d00;
+  font-weight: 500;
+}
+
+.dashboard-modal-actions {
+  display: flex;
+  justify-content: center;
+  gap: 20px;
+}
+
+.dashboard-modal-btn {
+  padding: 12px 30px;
+  border: none;
+  border-radius: 10px;
+  font-family: "Inter-Medium", Helvetica;
+  font-size: 16px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  min-width: 120px;
+}
+
+.dashboard-modal-btn.confirm {
+  background-color: #8234f7;
+  color: #ffffff;
+}
+
+.dashboard-modal-btn.confirm:hover {
+  background-color: #7229e0;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(130, 52, 247, 0.4);
+}
+
+.dashboard-modal-btn.cancel {
+  background-color: #656565;
+  color: #ffffff;
+}
+
+.dashboard-modal-btn.cancel:hover {
+  background-color: #5a5a5a;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(101, 101, 101, 0.4);
+}
+
+/* 14. АНИМАЦИИ */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 15. ДОПОЛНИТЕЛЬНЫЕ ЭФФЕКТЫ */
 .dashboard-big-number:hover .dashboard-text-wrapper-7 {
   color: #b7a2ee;
   transition: color 0.2s ease;
@@ -382,4 +589,42 @@
 .dashboard-div-wrapper:hover .dashboard-text-wrapper-7 {
   color: #66b740;
   transition: color 0.2s ease;
+}
+
+/* Индикатор загрузки */
+.dashboard-loading {
+  color: #ffffff;
+  font-family: "Inter-Regular", Helvetica;
+  font-size: 20px;
+  text-align: center;
+  margin-top: 200px;
+}
+
+/* Стили для информации о пользователе */
+.dashboard-user-info {
+  position: absolute;
+  right: 329px;
+  top: 87px;
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.dashboard-user-name {
+  color: #ffffff;
+  font-family: "Inter-Medium", Helvetica;
+  font-size: 18px;
+}
+
+.dashboard-user-status {
+  font-family: "Inter-Regular", Helvetica;
+  font-size: 14px;
+  padding: 4px 12px;
+  border-radius: 12px;
+}
+
+.dashboard-user-status.online {
+  background-color: rgba(102, 183, 64, 0.2);
+  color: #66b740;
+  border: 1px solid #66b740;
 }
