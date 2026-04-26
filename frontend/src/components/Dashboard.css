@@ -1,630 +1,377 @@
-/* Dashboard.css - стили ТОЛЬКО для страницы Dashboard */
+:root {
+  --bg:           #0a0a0a;
+  --bg-panel:     rgba(49, 49, 49, 0.30);
+  --bg-card:      #141414;
+  --green:  #01e676;
+  --red:    #ff5b5b;
+  --yellow: #ffd550;
+  --text-primary:   #ffffff;
+  --text-secondary: #929292;
+  --text-muted:     #bfb6b6;
+  --radius-lg: 15px;
+  --radius-md: 10px;
+  --radius-sm: 7px;
+  --panel-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.4),
+    inset 1px 0 0 rgba(255,255,255,0.32),
+    inset 0 -1px 1px rgba(0,0,0,0.13),
+    inset -1px 0 1px rgba(0,0,0,0.11);
+}
 
-.dashboard-screen {
-  background-color: #2c2c2c;
-  height: 1024px;
-  min-width: 1440px;
-  position: relative;
-  width: 100%;
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body { font-family: "Inter", Helvetica, sans-serif; }
+
+/* ── Layout ─────────────────────────────────────────────────────────────── */
+
+.dashboard-container { min-height: 100vh; background-color: var(--bg); }
+
+.dashboard-main {
+  display: flex; flex-direction: column;
+  padding: 32px 28px; gap: 20px; width: 100%;
+}
+
+.dashboard-header {
+  display: flex; align-items: flex-start;
+  justify-content: space-between; gap: 24px; margin-bottom: 4px;
+}
+
+.dashboard-title { font-size: 32px; font-weight: 700; letter-spacing: -0.2px; color: var(--text-primary); line-height: 1.2; }
+.dashboard-subtitle { font-size: 14px; font-weight: 300; color: var(--text-primary); margin-top: 6px; opacity: 0.8; }
+
+.dashboard-top-row    { display: grid; grid-template-columns: 2fr 1fr; gap: 20px; }
+.dashboard-bottom-row { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
+
+/* ── Panel ───────────────────────────────────────────────────────────────── */
+
+.panel {
+  background-color: var(--bg-panel);
+  backdrop-filter: blur(2px);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--panel-shadow);
   padding: 20px;
-  box-sizing: border-box;
+  display: flex; flex-direction: column; gap: 14px;
 }
 
-.dashboard-main-content {
-  position: relative;
-  height: 100vh;
-  overflow: auto;
+.panel-header {
+  display: flex; align-items: center;
+  justify-content: space-between; flex-wrap: wrap; gap: 8px;
 }
 
-/* Выбор комнаты - ПЕРЕМЕЩЕН ВЫШЕ */
-.dashboard-room-selector {
-  background-color: #414141;
-  border: 1px solid #6d6d6d;
-  border-radius: 10px;
-  padding: 10px 10px;
-  margin: 120px 309px 20px;
-  box-shadow: inset 4px 4px 4px #ffffff29;
+.panel-title { font-size: 20px; font-weight: 600; letter-spacing: -0.2px; color: var(--text-primary); }
+
+/* ── Location Tabs ────────────────────────────────────────────────────────── */
+
+.location-tabs {
+  display: flex; gap: 6px; flex-wrap: wrap;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+  padding-bottom: 10px;
+}
+
+.location-tab {
+  padding: 5px 14px; border-radius: 8px;
+  border: 1px solid rgba(255,255,255,0.12);
+  background: transparent; color: var(--text-secondary);
+  cursor: pointer; font-size: 12px; font-weight: 400;
+  font-family: inherit; transition: all 0.15s; white-space: nowrap;
+}
+.location-tab:hover { background: rgba(255,255,255,0.05); color: var(--text-muted); }
+.location-tab.active {
+  background: rgba(255,255,255,0.1);
+  border-color: rgba(255,255,255,0.35);
+  color: var(--text-primary); font-weight: 500;
+}
+
+/* ── Floor Plan ──────────────────────────────────────────────────────────── */
+
+.floor-panel { flex: 1.8; min-width: 0; }
+
+.floor-plan-wrap {
+  height: 320px;
+  display: flex; align-items: center; justify-content: center;
+  position: relative; overflow: hidden;
+  border-radius: var(--radius-md); background: #111;
+}
+
+.floor-svg { width: 100%; height: 100%; }
+
+.floor-image-container { position: relative; width: 100%; height: 100%; }
+
+.floor-image { width: 100%; height: 100%; object-fit: contain; display: block; }
+
+.floor-image-overlay { position: absolute; inset: 0; pointer-events: none; }
+.floor-image-overlay .floor-sensor-pin { pointer-events: all; }
+
+.floor-sensor-pin {
   position: absolute;
-  top: 20px;
-  left: 20px;
-  right: 310px;
-  z-index: 10;
-}
-
-.dashboard-room-title {
-  color: #ffffff;
-  font-family: "Inter-Medium", Helvetica;
-  font-size: 16px;
-  font-weight: 500;
-  margin-bottom: 10px;
-}
-
-.dashboard-room-buttons {
-  display: flex;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-
-.dashboard-room-btn {
-  background-color: #363636;
-  border: 1px solid #6d6d6d;
+  transform: translate(-50%, -50%);
+  border: 1.5px solid;
   border-radius: 8px;
-  color: #bababa;
-  font-family: "Inter-Regular", Helvetica;
-  font-size: 14px;
-  padding: 8px 16px;
-  cursor: pointer;
-  transition: all 0.3s ease;
+  padding: 4px 8px;
+  font-size: 9px; font-weight: 700;
+  line-height: 1.4; text-align: center;
+  cursor: pointer; min-width: 44px;
+  backdrop-filter: blur(6px);
+  transition: box-shadow 0.15s, transform 0.15s;
+  z-index: 5;
+}
+.floor-sensor-pin:hover {
+  box-shadow: 0 0 12px currentColor;
+  transform: translate(-50%, -50%) scale(1.08);
+}
+.floor-sensor-pin-name { font-size: 10px; font-weight: 700; }
+.floor-sensor-pin-vals { font-size: 8px; opacity: 0.9; }
+
+.floor-footer {
+  display: flex; align-items: center;
+  justify-content: space-between; flex-wrap: wrap; gap: 8px;
 }
 
-.dashboard-room-btn:hover {
-  background-color: #454545;
-  border-color: #8234f7;
+/* ── Legend ──────────────────────────────────────────────────────────────── */
+
+.legend { display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--text-primary); flex-wrap: wrap; }
+.legend span { display: flex; align-items: center; gap: 6px; }
+.legend-dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; }
+
+/* ── Buttons ─────────────────────────────────────────────────────────────── */
+
+.floor-actions { display: flex; gap: 8px; }
+
+.btn-sensor {
+  display: flex; align-items: center; gap: 6px;
+  padding: 6px 12px; border-radius: 8px;
+  border: 1px solid rgba(255,255,255,0.15);
+  background: rgba(255,255,255,0.04);
+  color: var(--text-secondary); cursor: pointer;
+  font-size: 12px; font-family: inherit;
+  transition: background 0.15s, color 0.15s;
+}
+.btn-sensor:hover { background: rgba(255,255,255,0.08); color: var(--text-primary); }
+
+.btn-location-name {
+  display: flex; align-items: center; gap: 6px;
+  padding: 6px 14px; border-radius: 8px;
+  border: 1px solid rgba(1,230,118,0.4);
+  background: rgba(1,230,118,0.07);
+  color: var(--green); cursor: pointer;
+  font-size: 12px; font-weight: 500; font-family: inherit;
+  transition: background 0.15s;
+}
+.btn-location-name:hover { background: rgba(1,230,118,0.12); }
+
+.btn-add-location {
+  display: flex; align-items: center; gap: 6px;
+  padding: 6px 14px; border-radius: 8px;
+  border: 1px solid rgba(255,255,255,0.18);
+  background: rgba(255,255,255,0.05);
+  color: var(--text-primary); cursor: pointer;
+  font-size: 13px; font-weight: 500; font-family: inherit;
+  transition: background 0.15s;
+}
+.btn-add-location:hover { background: rgba(255,255,255,0.09); }
+
+/* ── Notifications ───────────────────────────────────────────────────────── */
+
+.notif-panel { flex: 1; min-width: 300px; }
+
+.notif-summary { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-primary); flex-wrap: wrap; }
+
+.dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; }
+.dot--red    { background-color: var(--red); }
+.dot--yellow { background-color: var(--yellow); }
+
+.notif-list { display: flex; flex-direction: column; gap: 8px; overflow-y: auto; max-height: 480px; }
+
+.notif-item {
+  display: flex; align-items: flex-start; gap: 12px;
+  background: var(--bg-card); border: 1px solid transparent;
+  border-left-width: 4px; border-radius: var(--radius-sm); padding: 12px 14px;
 }
 
-.dashboard-room-btn.active {
-  background-color: #8234f7;
-  color: #ffffff;
-  border-color: #8234f7;
+.notif-icon-wrap {
+  width: 34px; height: 34px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
 }
 
-/* 1. ЗАГОЛОВОК "ДЭШБОРД" */
-.dashboard-text-wrapper {
-  color: #ffffff;
-  font-family: "Roboto-Medium", Helvetica;
-  font-size: 48px;
-  font-weight: 500;
-  left: 329px;
-  letter-spacing: 0;
-  line-height: 20px;
+.notif-text { flex: 1; min-width: 0; }
+.notif-title { font-size: 14px; font-weight: 600; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.notif-desc  { font-size: 12px; color: var(--text-secondary); margin-top: 3px; }
+.notif-location { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+
+/* ── Sensor Card ─────────────────────────────────────────────────────────── */
+
+.sensor-card {
+  background-color: var(--bg-panel); backdrop-filter: blur(2px);
+  border-radius: var(--radius-lg); box-shadow: var(--panel-shadow);
+  padding: 16px; display: flex; flex-direction: column; gap: 14px;
+}
+
+.sensor-card-header { display: flex; align-items: center; justify-content: space-between; }
+.sensor-card-title  { font-size: 11px; color: var(--text-secondary); font-weight: 400; }
+
+.sensor-battery { display: flex; align-items: center; gap: 6px; }
+.battery-label  { font-size: 11px; font-weight: 500; }
+
+.sensor-metric { background: #171717; border-radius: 8px; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+
+.sensor-metric-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+.sensor-metric-label { font-size: 10px; color: var(--text-secondary); margin-bottom: 2px; }
+
+.sensor-card-value { display: flex; align-items: baseline; gap: 2px; }
+.sensor-val  { font-size: 28px; font-weight: 500; color: var(--text-primary); line-height: 1; }
+.sensor-unit { font-size: 16px; font-weight: 700; color: var(--text-primary); }
+
+.sensor-badge { border-radius: 4px; padding: 3px 8px; font-size: 10px; font-weight: 400; white-space: nowrap; flex-shrink: 0; margin-top: 2px; }
+
+/* ── Mini Chart ──────────────────────────────────────────────────────────── */
+
+.chart-wrap { display: flex; flex-direction: column; gap: 4px; }
+.chart-svg-area { width: 100%; height: 70px; }
+.chart-stats { display: flex; justify-content: space-between; font-size: 10px; color: var(--text-secondary); padding: 0 2px; }
+.chart-x-axis { display: flex; justify-content: space-between; padding-top: 2px; }
+.chart-x-axis span { font-size: 10px; color: var(--text-muted); text-align: center; flex: 1; }
+
+/* ── Modal overlay ───────────────────────────────────────────────────────── */
+
+.modal-overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.65); backdrop-filter: blur(4px);
+  z-index: 1000; display: flex; align-items: center; justify-content: center;
+  padding: 16px;
+}
+
+.modal-box {
+  background: #1a1a1a; border: 1px solid rgba(255,255,255,0.15);
+  border-radius: 14px; padding: 28px;
+  min-width: 360px; max-width: 500px; width: 100%;
+  box-shadow: 0 24px 60px rgba(0,0,0,0.6);
+  max-height: 92vh; overflow-y: auto;
+}
+
+.modal-title  { font-size: 18px; font-weight: 600; color: var(--text-primary); margin-bottom: 20px; }
+.modal-field  { margin-bottom: 14px; }
+.modal-label  { font-size: 12px; color: var(--text-secondary); margin-bottom: 6px; }
+
+.modal-input {
+  width: 100%; padding: 10px 12px; border-radius: 8px;
+  border: 1px solid rgba(255,255,255,0.15);
+  background: #111; color: var(--text-primary);
+  font-size: 14px; font-family: inherit; outline: none;
+  transition: border-color 0.15s;
+}
+.modal-input:focus { border-color: rgba(1,230,118,0.5); }
+
+.modal-two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+.modal-range {
+  width: 100%; height: 4px; border-radius: 2px;
+  background: #2a2a2a; -webkit-appearance: none; appearance: none;
+  outline: none; cursor: pointer; margin-top: 4px;
+}
+.modal-range::-webkit-slider-thumb {
+  -webkit-appearance: none; width: 16px; height: 16px;
+  border-radius: 50%; background: var(--green); cursor: pointer;
+  box-shadow: 0 0 6px rgba(1,230,118,0.5);
+}
+
+.modal-file-drop {
+  border: 1px dashed rgba(255,255,255,0.2); border-radius: 8px;
+  padding: 20px; text-align: center; cursor: pointer;
+  color: var(--text-secondary); font-size: 13px; font-family: inherit;
+  transition: background 0.2s;
+}
+.modal-file-drop:hover    { background: rgba(255,255,255,0.03); }
+.modal-file-drop.has-file { background: rgba(1,230,118,0.05); }
+.modal-file-drop .file-name { color: var(--green); }
+.modal-file-hint { font-size: 11px; opacity: 0.6; }
+
+.modal-error { font-size: 12px; color: var(--red); margin-top: 4px; }
+
+.modal-btn-row { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; }
+
+.btn-cancel {
+  padding: 8px 18px; border-radius: 8px;
+  border: 1px solid rgba(255,255,255,0.15);
+  background: transparent; color: var(--text-secondary);
+  cursor: pointer; font-size: 13px; font-family: inherit; transition: background 0.15s;
+}
+.btn-cancel:hover { background: rgba(255,255,255,0.05); }
+
+.btn-save {
+  padding: 8px 18px; border-radius: 8px; border: none;
+  background: var(--green); color: #000; cursor: pointer;
+  font-size: 13px; font-weight: 600; font-family: inherit; transition: opacity 0.15s;
+}
+.btn-save:hover { opacity: 0.88; }
+
+/* ── Sensor drag map ─────────────────────────────────────────────────────── */
+
+.sensor-drag-map {
+  position: relative; width: 100%; height: 240px;
+  border-radius: 10px; overflow: hidden;
+  border: 1px solid rgba(255,255,255,0.1);
+  cursor: crosshair; user-select: none;
+  background: #0d0d0d;
+}
+
+/* Real floor image as background of drag area */
+.sensor-drag-bg-image {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%;
+  object-fit: contain;
+  pointer-events: none;
+  user-select: none;
+  /* slight dark overlay so markers are readable */
+  filter: brightness(0.75);
+}
+
+.sensor-drag-bg-svg {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%;
+  pointer-events: none;
+}
+
+/* Ghost markers (other sensors) */
+.sensor-drag-ghost {
   position: absolute;
-  top: 87px;
-  white-space: nowrap;
+  transform: translate(-50%, -50%);
+  border: 1.5px solid;
+  border-radius: 20px;
+  padding: 3px 7px;
+  font-size: 9px; font-weight: 700;
+  text-align: center; white-space: nowrap;
+  pointer-events: none;
+  opacity: 0.6;
+  z-index: 5;
 }
 
-/* 2. КАРТОЧКА ВЛАЖНОСТИ (левая) - ПЕРЕМЕЩЕНА НИЖЕ */
-.dashboard-rectangle-2 {
-  background-color: #414141;
-  border: 1px solid #6d6d6d;
-  border-radius: 10px;
-  box-shadow: inset 4px 4px 4px #ffffff29;
-  height: 199px;
-  left: 329px;
+/* Active draggable marker */
+.sensor-drag-marker {
   position: absolute;
-  top: 250px;
-  width: 425px;
-  transition: all 0.3s ease;
+  width: 36px; height: 36px;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  cursor: grab; z-index: 10;
+  transform: translate(-50%, -50%);
+  transition: box-shadow 0.15s;
+  touch-action: none;
 }
+.sensor-drag-marker:active { cursor: grabbing; }
 
-.dashboard-rectangle-2:hover {
-  transform: translateY(-2px);
-  box-shadow: inset 4px 4px 4px #ffffff29, 0 4px 12px rgba(0, 0, 0, 0.4);
-  border-color: #8234f7;
-}
-
-/* 3. КАРТОЧКА ТЕМПЕРАТУРЫ (правая) - ПЕРЕМЕЩЕНА НИЖЕ */
-.dashboard-rectangle-3 {
-  background-color: #414141;
-  border: 1px solid #6d6d6d;
-  border-radius: 10px;
-  box-shadow: inset 4px 4px 4px #ffffff29;
-  height: 199px;
-  left: 774px;
-  position: absolute;
-  top: 250px;
-  width: 447px;
-  transition: all 0.3s ease;
-}
-
-.dashboard-rectangle-3:hover {
-  transform: translateY(-2px);
-  box-shadow: inset 4px 4px 4px #ffffff29, 0 4px 12px rgba(0, 0, 0, 0.4);
-  border-color: #8234f7;
-}
-
-/* 4. ТЕКСТ "ВЛАЖНОСТЬ" */
-.dashboard-text-wrapper-3 {
-  color: #ffffff;
-  font-family: "Inter-Regular", Helvetica;
-  font-size: 20px;
-  font-weight: 400;
-  left: 353px;
-  letter-spacing: -0.20px;
-  line-height: normal;
-  position: absolute;
-  top: 266px;
-  white-space: nowrap;
-}
-
-/* 5. ТЕКСТ "ТЕМПЕРАТУРА" */
-.dashboard-text-wrapper-8 {
-  color: #ffffff;
-  font-family: "Inter-Regular", Helvetica;
-  font-size: 20px;
-  font-weight: 400;
-  left: 807px;
-  letter-spacing: -0.20px;
-  line-height: normal;
-  position: absolute;
-  top: 266px;
-  white-space: nowrap;
-}
-
-/* 6. БОЛЬШИЕ ЦИФРЫ (75.7 и 18.4) */
-.dashboard-big-number {
-  align-items: baseline;
-  display: inline-flex;
-  gap: 8px;
-  left: 351px;
-  position: absolute;
-  top: 347px;
-}
-
-.dashboard-div-wrapper {
-  align-items: baseline;
-  display: inline-flex;
-  gap: 8px;
-  left: 805px;
-  position: absolute;
-  top: 347px;
-}
-
-.dashboard-text-wrapper-7 {
-  color: #ffffff;
-  font-family: "Inter-Medium", Helvetica;
-  font-size: 48px;
-  font-weight: 500;
-  letter-spacing: -2.00px;
-  line-height: normal;
-  margin-top: -1.00px;
-  position: relative;
-  width: fit-content;
-}
-
-/* 7. ЗНАЧКИ % и °C */
-.dashboard-text-wrapper-6 {
-  color: #ffffff;
-  font-family: "Inter-ExtraLight", Helvetica;
-  font-size: 24px;
-  font-weight: 200;
-  left: 470px;
-  letter-spacing: -0.30px;
-  line-height: normal;
-  position: absolute;
-  top: 369px;
-  width: 49px;
-}
-
-.dashboard-text-wrapper-10 {
-  color: #ffffff;
-  font-family: "Inter-ExtraLight", Helvetica;
-  font-size: 24px;
-  font-weight: 200;
-  left: 900px;
-  letter-spacing: -0.30px;
-  line-height: normal;
-  position: absolute;
-  top: 369px;
-  width: 49px;
-}
-
-/* 8. ИЗМЕНЕНИЯ В ПРОЦЕНТАХ */
-.dashboard-text-wrapper-5 {
-  color: #25cc25;
-  font-family: "Inter-Regular", Helvetica;
-  font-size: 14px;
-  font-weight: 400;
-  left: 353px;
-  letter-spacing: -0.30px;
-  line-height: normal;
-  position: absolute;
-  top: 402px;
-}
-
-.dashboard-text-wrapper-9 {
-  color: #ff9d00;
-  font-family: "Inter-Regular", Helvetica;
-  font-size: 14px;
-  font-weight: 400;
-  left: 807px;
-  letter-spacing: -0.30px;
-  line-height: normal;
-  position: absolute;
-  top: 402px;
-}
-
-/* 9. КРУГЛЫЕ ГРАФИКИ */
-.dashboard-humidity-graph {
-  position: absolute;
-  left: 590px;
-  top: 289px;
-  transition: transform 0.3s ease;
-}
-
-.dashboard-humidity-graph:hover {
-  transform: scale(1.05);
-}
-
-.dashboard-temperature-graph {
-  position: absolute;
-  left: 1054px;
-  top: 289px;
-  transition: transform 0.3s ease;
-}
-
-.dashboard-temperature-graph:hover {
-  transform: scale(1.05);
-}
-
-.dashboard-humidity-percent {
-  color: #ffffff;
-  font-family: "Inter-ExtraLight", Helvetica;
-  font-size: 20px;
-  font-weight: 200;
-  position: absolute;
-  left: 622px;
-  top: 340px;
-}
-
-.dashboard-temperature-value {
-  color: #ffffff;
-  font-family: "Inter-ExtraLight", Helvetica;
-  font-size: 20px;
-  font-weight: 200;
-  position: absolute;
-  left: 1082px;
-  top: 340px;
-}
-
-/* 10. БЛОК "ИИ-УВЕДОМЛЕНИЯ" */
-.dashboard-text-wrapper-4 {
-  color: #ffffff;
-  font-family: "Inter-SemiBold", Helvetica;
-  font-size: 28px;
-  font-weight: 600;
-  left: 329px;
-  letter-spacing: -0.20px;
-  line-height: normal;
-  position: absolute;
-  top: 490px;
-}
-
-.dashboard-notifications-container {
-  position: absolute;
-  left: 324px;
-  top: 540px;
-  width: 1045px;
-  height: 260px;
-  background-color: #414141;
-  border: 1px solid #6d6d6d;
-  border-radius: 16px;
-  box-shadow: inset 3px 4px 4px #ffffff40;
-  padding: 20px;
-  overflow-y: auto;
-  transition: all 0.3s ease;
-}
-
-.dashboard-notifications-container:hover {
-  box-shadow: inset 3px 4px 4px #ffffff40, 0 4px 12px rgba(0, 0, 0, 0.3);
-}
-
-/* 11. КНОПКИ "ВЫПОЛНЕНО" / "ОЖИДАЕТ" */
-.dashboard-notification-status {
-  all: unset;
-  position: absolute !important;
-  right: 25px !important;
-  top: 29px !important;
-  padding: 6px 16px !important;
-  border-radius: 25px !important;
-  font-family: "Inter-Regular", Helvetica !important;
-  font-size: 22px !important;
-  font-weight: 400 !important;
-  display: flex !important;
-  align-items: center !important;
-  gap: 15px !important;
-  width: 180px !important;
-  height: 33px !important;
-  justify-content: center !important;
-  box-sizing: border-box !important;
-  cursor: pointer;
-  transition: all 0.2s ease !important;
-}
-
-.dashboard-notification-status:hover {
-  transform: scale(1.05);
-  filter: brightness(1.1);
-}
-
-.dashboard-notification-status:active {
-  transform: scale(0.95);
-}
-
-.dashboard-notification-status.completed {
-  background-color: #8234f7 !important;
-  color: #ffffff !important;
-}
-
-.dashboard-notification-status.completed:hover {
-  background-color: #7229e0 !important;
-  box-shadow: 0 2px 8px rgba(130, 52, 247, 0.4);
-}
-
-.dashboard-notification-status.pending {
-  background-color: #656565 !important;
-  color: #ffffff !important;
-}
-
-.dashboard-notification-status.pending:hover {
-  background-color: #5a5a5a !important;
-  box-shadow: 0 2px 8px rgba(101, 101, 101, 0.4);
-}
-
-.dashboard-status-icon {
-  width: 20px !important;
-  height: 20px !important;
-  flex-shrink: 0 !important;
-  transition: transform 0.2s ease !important;
-}
-
-.dashboard-notification-status:hover .dashboard-status-icon {
-  transform: scale(1.1);
-}
-
-/* 12. ТЕКСТ УВЕДОМЛЕНИЙ */
-.dashboard-notification-card {
-  position: relative;
-  margin-bottom: 20px;
-  padding-bottom: 20px;
-  transition: all 0.2s ease;
-}
+.drag-marker-label { font-size: 9px; font-weight: 700; pointer-events: none; line-height: 1; }
 
-.dashboard-notification-card:hover {
-  background-color: rgba(255, 255, 255, 0.05);
-  border-radius: 8px;
-  padding: 15px;
-  margin: -5px -5px 15px -5px;
-  cursor: pointer;
-}
-
-.dashboard-notification-title {
-  color: #ffffff;
-  font-family: "Inter-Medium", Helvetica;
-  font-size: 24px;
-  font-weight: 500;
-  margin-bottom: 8px;
-  transition: color 0.2s ease;
-}
-
-.dashboard-notification-card:hover .dashboard-notification-title {
-  color: #b7a2ee;
-}
-
-.dashboard-notification-message {
-  color: #bababa;
-  font-family: "Inter-Regular", Helvetica;
-  font-size: 16px;
-  font-weight: 400;
-  line-height: 1.4;
-  margin-bottom: 15px;
-  width: 719px;
-  transition: color 0.2s ease;
-}
-
-.dashboard-notification-card:hover .dashboard-notification-message {
-  color: #d0d0d0;
-}
-
-.dashboard-notification-divider {
-  height: 1px;
-  background-color: #6d6d6d;
-  width: 100%;
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  transition: background-color 0.2s ease;
-}
-
-.dashboard-notification-card:hover .dashboard-notification-divider {
-  background-color: #8234f7;
-}
-
-/* 13. МОДАЛЬНОЕ ОКНО */
-.dashboard-modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: rgba(0, 0, 0, 0.7);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  z-index: 1000;
-  animation: fadeIn 0.3s ease;
-}
-
-.dashboard-modal {
-  background-color: #414141;
-  border: 2px solid #8234f7;
-  border-radius: 16px;
-  width: 500px;
-  padding: 30px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
-  animation: slideIn 0.3s ease;
-}
-
-.dashboard-modal-header {
-  margin-bottom: 20px;
-  text-align: center;
-}
-
-.dashboard-modal-header h3 {
-  color: #ffffff;
-  font-family: "Inter-SemiBold", Helvetica;
-  font-size: 24px;
-  font-weight: 600;
-  margin: 0;
-}
-
-.dashboard-modal-content {
-  margin-bottom: 30px;
-}
-
-.dashboard-modal-content p {
-  color: #bababa;
-  font-family: "Inter-Regular", Helvetica;
-  font-size: 16px;
-  line-height: 1.5;
-  margin-bottom: 20px;
-}
-
-.dashboard-modal-notification {
-  background-color: #363636;
-  border: 1px solid #6d6d6d;
-  border-radius: 10px;
-  padding: 15px;
-  margin-top: 15px;
-}
-
-.dashboard-modal-notification-title {
-  color: #ffffff;
-  font-family: "Inter-Medium", Helvetica;
-  font-size: 18px;
-  font-weight: 500;
-  margin-bottom: 10px;
-}
-
-.dashboard-modal-notification-message {
-  color: #bababa;
-  font-family: "Inter-Regular", Helvetica;
-  font-size: 14px;
-  line-height: 1.4;
-  margin-bottom: 15px;
-}
+.sensor-drag-hint { font-size: 11px; color: #555; margin-top: 5px; text-align: center; }
 
-.dashboard-modal-notification-status {
-  color: #ffffff;
-  font-family: "Inter-Regular", Helvetica;
-  font-size: 14px;
-  margin-bottom: 5px;
-}
-
-.dashboard-modal-notification-status span.completed {
-  color: #66b740;
-  font-weight: 500;
-}
-
-.dashboard-modal-notification-status span.pending {
-  color: #ff9d00;
-  font-weight: 500;
-}
-
-.dashboard-modal-actions {
-  display: flex;
-  justify-content: center;
-  gap: 20px;
-}
-
-.dashboard-modal-btn {
-  padding: 12px 30px;
-  border: none;
-  border-radius: 10px;
-  font-family: "Inter-Medium", Helvetica;
-  font-size: 16px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  min-width: 120px;
-}
-
-.dashboard-modal-btn.confirm {
-  background-color: #8234f7;
-  color: #ffffff;
-}
-
-.dashboard-modal-btn.confirm:hover {
-  background-color: #7229e0;
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(130, 52, 247, 0.4);
-}
-
-.dashboard-modal-btn.cancel {
-  background-color: #656565;
-  color: #ffffff;
-}
-
-.dashboard-modal-btn.cancel:hover {
-  background-color: #5a5a5a;
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(101, 101, 101, 0.4);
-}
-
-/* 14. АНИМАЦИИ */
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
-
-@keyframes slideIn {
-  from {
-    opacity: 0;
-    transform: translateY(-20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-/* 15. ДОПОЛНИТЕЛЬНЫЕ ЭФФЕКТЫ */
-.dashboard-big-number:hover .dashboard-text-wrapper-7 {
-  color: #b7a2ee;
-  transition: color 0.2s ease;
-}
-
-.dashboard-div-wrapper:hover .dashboard-text-wrapper-7 {
-  color: #66b740;
-  transition: color 0.2s ease;
-}
-
-/* Индикатор загрузки */
-.dashboard-loading {
-  color: #ffffff;
-  font-family: "Inter-Regular", Helvetica;
-  font-size: 20px;
-  text-align: center;
-  margin-top: 200px;
-}
-
-/* Стили для информации о пользователе */
-.dashboard-user-info {
-  position: absolute;
-  right: 329px;
-  top: 87px;
-  display: flex;
-  align-items: center;
-  gap: 15px;
-}
-
-.dashboard-user-name {
-  color: #ffffff;
-  font-family: "Inter-Medium", Helvetica;
-  font-size: 18px;
-}
+/* ── Responsive ──────────────────────────────────────────────────────────── */
 
-.dashboard-user-status {
-  font-family: "Inter-Regular", Helvetica;
-  font-size: 14px;
-  padding: 4px 12px;
-  border-radius: 12px;
+@media (max-width: 1100px) {
+  .dashboard-top-row    { grid-template-columns: 1fr; }
+  .notif-panel          { min-width: unset; }
 }
 
-.dashboard-user-status.online {
-  background-color: rgba(102, 183, 64, 0.2);
-  color: #66b740;
-  border: 1px solid #66b740;
+@media (max-width: 700px) {
+  .dashboard-bottom-row { grid-template-columns: 1fr; }
+  .dashboard-main       { padding: 16px 12px; }
+  .modal-two-col        { grid-template-columns: 1fr; }
+  .modal-box            { min-width: unset; padding: 20px 16px; }
 }

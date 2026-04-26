@@ -1,66 +1,189 @@
-/* App.css - добавьте эти стили */
+/* App.css - точные стили сайдбара из Dashboard.css */
 
-/* Стили для счетчика действий в меню */
-.menu-activity-counter {
-  margin-top: 30px;
-  padding: 15px;
-  background-color: rgba(130, 52, 247, 0.1);
-  border-radius: 10px;
-  border: 1px solid rgba(130, 52, 247, 0.3);
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+/* ============================================================
+   CSS Variables (from styleguide)
+   ============================================================ */
+:root {
+  --x-content-font-family: "Inter", Helvetica;
+  --x-content-font-size: 10px;
+  --x-content-font-style: normal;
+  --x-content-font-weight: 400;
+  --x-content-letter-spacing: 0px;
+  --x-content-line-height: normal;
+
+  --y-content-font-family: "Inter", Helvetica;
+  --y-content-font-size: 12px;
+  --y-content-font-style: normal;
+  --y-content-font-weight: 400;
+  --y-content-letter-spacing: 0px;
+  --y-content-line-height: normal;
+
+  /* Color palette */
+  --bg:           #0a0a0a;
+  --bg-panel:     rgba(49, 49, 49, 0.30);
+  --bg-card:      #141414;
+  --bg-sidebar:   rgba(49, 49, 49, 0.30);
+  --border-panel: rgba(255,255,255,0.18);
+
+  --green:  #01e676;
+  --red:    #ff5b5b;
+  --yellow: #ffd550;
+  --amber:  #ffee07;
+  --gold:   #ffc207;
+
+  --text-primary:   #ffffff;
+  --text-secondary: #929292;
+  --text-muted:     #bfb6b6;
+
+  --radius-lg: 15px;
+  --radius-md: 10px;
+  --radius-sm: 7px;
+
+  --panel-shadow:
+    inset 0 1px 0 rgba(255,255,255,0.4),
+    inset 1px 0 0 rgba(255,255,255,0.32),
+    inset 0 -1px 1px rgba(0,0,0,0.13),
+    inset -1px 0 1px rgba(0,0,0,0.11);
+}
+
+body {
+  font-family: "Inter", Helvetica, sans-serif;
+  background-color: var(--bg);
+  color: var(--text-primary);
+}
+
+/* ============================================================
+   Layout
+   ============================================================ */
+.app-screen {
+  display: flex;
+  min-height: 100vh;
+  min-width: 1200px;
+  background-color: var(--bg);
+}
+
+/* ── Sidebar (точная копия из Dashboard.css) ── */
+.app-sidebar {
+  width: 243px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  background-color: var(--bg-sidebar);
+  backdrop-filter: blur(2px) brightness(100%) saturate(100%);
+  box-shadow: var(--panel-shadow);
+  padding: 36px 0 24px;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+}
+
+.app-sidebar-logo {
+  color: var(--gold);
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.2px;
+  padding: 0 19px 40px;
+}
+
+.app-sidebar-nav {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 0 12px;
+}
+
+.app-nav-item {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
+  padding: 12px 16px;
+  border-radius: var(--radius-md);
+  border: none;
+  background: transparent;
+  color: var(--text-primary);
+  font-family: "Inter", Helvetica;
+  font-size: 18px;
+  font-weight: 500;
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: background 0.18s, color 0.18s;
+  width: 100%;
+  text-align: left;
 }
 
-.menu-activity-counter:hover {
-  background-color: rgba(130, 52, 247, 0.2);
-  transform: translateY(-2px);
+.app-nav-item:hover {
+  background: rgba(255,255,255,0.06);
 }
 
-.menu-activity-icon {
-  font-size: 24px;
-  width: 40px;
-  height: 40px;
+.app-nav-item--active {
+  background: var(--gold);
+  color: #000;
+  box-shadow: 0 4px 4px rgba(0,0,0,0.25);
+}
+
+.app-nav-item--active .app-nav-icon {
+  color: #000;
+}
+
+.app-nav-icon {
   display: flex;
   align-items: center;
-  justify-content: center;
-  background-color: #8234f7;
-  border-radius: 8px;
+  color: #fff;
+  flex-shrink: 0;
 }
 
-.menu-activity-text {
+.app-nav-item--active .app-nav-icon {
+  color: #000;
+}
+
+.app-nav-label {
   flex: 1;
 }
 
-.menu-activity-count {
-  color: #ffffff;
-  font-family: "Inter-Medium", Helvetica;
-  font-size: 20px;
-  font-weight: 500;
-  margin-bottom: 2px;
+.app-sidebar-user {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 28px;
+  color: var(--text-primary);
+  font-size: 18px;
+  font-weight: 400;
+  border-top: 1px solid rgba(255,255,255,0.06);
+  margin-top: auto;
 }
 
-.menu-activity-label {
-  color: #bababa;
-  font-family: "Inter-Regular", Helvetica;
-  font-size: 12px;
+/* ── Main Content ── */
+.app-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: auto;
 }
 
-/* Стили для анимаций */
-@keyframes slideIn {
-  from {
-    opacity: 0;
-    transform: translateX(-20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateX(0);
-  }
+/* ============================================================
+   Scrollbar
+   ============================================================ */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
 }
 
-.sensors-device-card,
-.users-audit-item {
-  animation: slideIn 0.3s ease;
+::-webkit-scrollbar-track {
+  background: #2a2a2a;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #ffc207;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #ffd550;
 }

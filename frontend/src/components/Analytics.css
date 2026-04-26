@@ -1,447 +1,581 @@
-/* Analytics.css - стили ТОЛЬКО для страницы Analytics */
+/* Analytics.css */
 
-/* Основные стили страницы */
-.analytics-screen {
-    background-color: #2c2c2c;
-    height: 1024px;
-    min-width: 1440px;
-    position: relative;
-    width: 100%;
+:root {
+  --bg:         #0a0a0a;
+  --glass:      rgba(49, 49, 49, 0.30);
+  --glass-head: rgba(75, 75, 75, 0.2);
+  --accent:     #ffc207;
+  --text:       #ffffff;
+  --muted:      #929292;
+  --ok:         #01e676;
+  --error:      #ff5252;
+  --blue:       #07bcd4;
+  --border-in:
+    inset 0 1px 0 rgba(255,255,255,0.4),
+    inset 1px 0 0 rgba(255,255,255,0.32),
+    inset 0 -1px 1px rgba(0,0,0,0.13),
+    inset -1px 0 1px rgba(0,0,0,0.11);
 }
 
-.analytics-main-content {
-    position: relative;
-    height: 100%;
-    width: 100%;
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+.an-container {
+  min-height: 100vh;
+  background-color: var(--bg);
+  font-family: "Inter", Helvetica, sans-serif;
+  color: var(--text);
 }
 
-/* 1. ЗАГОЛОВОК "ОТЧЕТЫ" */
-.analytics-title {
-    color: #ffffff;
-    font-family: "Roboto-Medium", Helvetica;
-    font-size: 48px;
-    font-weight: 500;
-    left: 329px;
-    letter-spacing: 0;
-    line-height: 20px;
-    position: absolute;
-    top: 87px;
-    white-space: nowrap;
+.an-main {
+  padding: 32px 28px 40px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  min-width: 0;
 }
 
-/* 2. КОНТЕЙНЕР ДЛЯ КАРТОЧЕК ОТЧЕТОВ */
-.analytics-cards-container {
-    position: absolute;
-    left: 329px;
-    top: 163px;
-    display: flex;
-    gap: 30px;
+/* ── Page header ─────────────────────────────────────────────── */
+.an-page-header { margin-bottom: 2px; }
+
+.an-page-title {
+  font-size: 30px;
+  font-weight: 700;
+  letter-spacing: -0.2px;
+  color: var(--text);
+  margin-bottom: 4px;
 }
 
-/* 3. КАРТОЧКИ ОТЧЕТОВ */
-.analytics-card {
-    background-color: #414141;
-    border: 1px solid #6d6d6d;
-    border-radius: 10px;
-    box-shadow: inset 4px 4px 4px #ffffff29;
-    height: 199px;
-    width: 239px;
-    position: relative;
-    transition: all 0.3s ease;
+.an-page-sub {
+  font-size: 14px;
+  font-weight: 300;
+  color: var(--text);
+  opacity: 0.7;
+  letter-spacing: -0.2px;
 }
 
-.analytics-card:hover {
-    transform: translateY(-2px);
-    box-shadow: inset 4px 4px 4px #ffffff29, 0 4px 12px rgba(0, 0, 0, 0.4);
-    border-color: #8234f7;
+/* ── Filter bar ──────────────────────────────────────────────── */
+.an-filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  background-color: var(--glass);
+  backdrop-filter: blur(2px);
+  border-radius: 12px;
+  box-shadow: var(--border-in);
+  padding: 12px 16px;
+  /* FIX: ensure filter bar sits above chart cards */
+  position: relative;
+  z-index: 200;
 }
 
-.analytics-card-content {
-    padding: 20px;
-    height: 100%;
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-    position: relative;
+.an-filter-label {
+  font-size: 13px;
+  color: var(--muted);
+  font-weight: 500;
+  white-space: nowrap;
+  margin-right: 4px;
 }
 
-.analytics-card-icon {
-    height: 37px !important;
-    width: 37px !important;
-    position: absolute;
-    top: 17px;
-    left: 11px;
+.an-filter-reset {
+  padding: 6px 14px;
+  border-radius: 6px;
+  border: 1px solid rgba(255,255,255,0.12);
+  background: transparent;
+  color: var(--muted);
+  font-size: 13px;
+  font-family: "Inter", Helvetica, sans-serif;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  margin-left: 4px;
 }
 
-.analytics-card-title {
-    color: #ffffff;
-    margin-bottom: 10px; /* Отступ снизу */
-    padding-top: 5px; /* Отступ сверху */
-    font-family: "Inter-Medium", Helvetica;
-    font-size: 24px;
-    font-weight: 500;
-    left: 18px;
-    letter-spacing: -0.20px;
-    line-height: normal;
-    position: absolute;
-    top: 71px;
+.an-filter-reset:hover {
+  background-color: rgba(255,255,255,0.06);
+  color: var(--text);
 }
 
-.analytics-card-description {
-    color: #bababa;
-    font-family: "Inter-Regular", Helvetica;
-    font-size: 12px;
-    position: absolute;
-    left: 18px;
-    top: 132px;
-    max-width: 200px;
-    white-space: normal;
-    line-height: 1.3;
+/* ── Dropdown ────────────────────────────────────────────────── */
+/* FIX: z-index elevated so menu appears above chart cards */
+.an-dropdown {
+  position: relative;
+  min-width: 220px;
+  z-index: 300;
 }
 
-.analytics-card-divider {
-    height: 1px;
-    background: #6d6d6d;
-    position: absolute;
-    bottom: 45px;
-    left: 18px;
-    width: 205px;
+.an-dropdown-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  height: 38px;
+  padding: 0 12px;
+  background-color: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 8px;
+  color: var(--text);
+  font-family: "Inter", Helvetica, sans-serif;
+  font-size: 13px;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+  text-align: left;
 }
 
-.analytics-download-icon {
-    height: 15px !important;
-    width: 15px !important;
-    position: absolute;
-    bottom: 18px;
-    right: 22px;
-    cursor: pointer;
-    transition: all 0.3s ease;
+.an-dropdown-btn:hover {
+  border-color: rgba(255,255,255,0.2);
+  background-color: rgba(255,255,255,0.08);
 }
 
-.analytics-download-icon:hover {
-    color: #8234f7 !important;
-    transform: scale(1.1);
+.an-dropdown-icon { flex-shrink: 0; display: flex; align-items: center; }
+
+.an-dropdown-text {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-/* 4. КОНТЕЙНЕР ДЛЯ СПИСКА ФАЙЛОВ */
-.analytics-files-container {
-    background-color: #414141;
-    border: 1px solid #6d6d6d;
-    border-radius: 16px;
-    box-shadow: inset 3px 4px 4px #ffffff40;
-    height: 559px;
-    left: 329px;
-    position: absolute;
-    top: 405px;
-    width: 1027px;
-    padding: 30px;
-    box-sizing: border-box;
-    transition: all 0.3s ease;
+.an-dropdown-placeholder { color: var(--muted); }
+
+.an-dropdown-clear {
+  display: flex;
+  align-items: center;
+  padding: 2px;
+  border-radius: 4px;
+  opacity: 0.6;
+  transition: opacity 0.15s;
+  border: none;
+  background: none;
+  cursor: pointer;
 }
 
-.analytics-files-container:hover {
-    box-shadow: inset 3px 4px 4px #ffffff40, 0 4px 12px rgba(0, 0, 0, 0.3);
-    border-color: #8234f7;
+.an-dropdown-clear:hover { opacity: 1; }
+
+/* FIX: menu z-index set to 9999 to always float above all content */
+.an-dropdown-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  background-color: #1a1a1a;
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 8px;
+  overflow: hidden;
+  z-index: 9999;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+  max-height: 220px;
+  overflow-y: auto;
 }
 
-.analytics-files-title {
-    color: #ffffff;
-    font-family: "Inter-Medium", Helvetica;
-    font-size: 38px;
-    font-weight: 500;
-    left: 30px;
-    letter-spacing: -0.30px;
-    line-height: normal;
-    position: absolute;
-    top: 20px;
-    white-space: nowrap;
-    width: 178px;
+.an-dropdown-item {
+  display: block;
+  width: 100%;
+  padding: 9px 14px;
+  text-align: left;
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  font-family: "Inter", Helvetica, sans-serif;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background-color 0.12s ease, color 0.12s ease;
 }
 
-/* 5. СПИСОК ФАЙЛОВ */
-.analytics-files-list {
-    position: absolute;
-    top: 80px;
-    left: 0;
-    right: 0;
-    padding: 0 30px;
-    max-height: 450px;
-    overflow-y: auto;
+.an-dropdown-item:hover { background-color: rgba(255,255,255,0.06); color: var(--text); }
+.an-dropdown-item--active { color: var(--accent); background-color: rgba(255,194,7,0.06); }
+
+/* ── Card ────────────────────────────────────────────────────── */
+.an-card {
+  background-color: var(--glass);
+  backdrop-filter: blur(2px);
+  border-radius: 15px;
+  box-shadow: var(--border-in);
+  padding: 20px;
 }
 
-.analytics-file-item {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 20px 0;
-    position: relative;
-    min-height: 77px;
-    transition: all 0.2s ease;
+.an-card-title {
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: -0.2px;
+  color: var(--text);
+  margin: 0;
 }
 
-.analytics-file-item:hover {
-    background-color: rgba(255, 255, 255, 0.05);
-    padding: 20px 10px;
-    margin: 0 -10px;
-    border-radius: 8px;
+/* ── Charts row ──────────────────────────────────────────────── */
+.an-charts-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
 }
 
-.analytics-file-content {
-    display: flex;
-    align-items: center;
-    gap: 15px;
-    flex: 1;
+.an-chart-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 
-.analytics-file-icon {
-    height: 37px !important;
-    width: 37px !important;
-    flex-shrink: 0;
-    transition: transform 0.3s ease;
+.an-chart-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
 }
 
-.analytics-file-item:hover .analytics-file-icon {
-    transform: scale(1.1);
+.an-chart-sub {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 3px;
+  font-weight: 400;
 }
 
-.analytics-file-info {
-    display: flex;
-    flex-direction: column;
-    gap: 5px;
-    min-width: 0;
+/* ── Period bar ──────────────────────────────────────────────── */
+.an-period-bar {
+  display: flex;
+  gap: 3px;
+  flex-shrink: 0;
 }
 
-.analytics-file-name {
-    color: #ffffff;
-    font-family: "Inter-Medium", Helvetica;
-    font-size: 24px;
-    font-weight: 500;
-    letter-spacing: -0.20px;
-    line-height: normal;
-    margin-bottom: 2px;
+.an-period-btn {
+  padding: 5px 11px;
+  border-radius: 6px;
+  border: none;
+  background-color: rgba(255,255,255,0.06);
+  color: var(--muted);
+  font-family: "Inter", Helvetica, sans-serif;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 30px;
 }
 
-.analytics-file-description {
-    color: #8b8b8b;
-    font-family: "Inter-Regular", Helvetica;
-    font-size: 14px;
-    margin-top: 2px;
-    line-height: 1.3;
+.an-period-btn--active {
+  background-color: rgba(255,194,7,0.15);
+  color: var(--accent);
 }
 
-.analytics-file-date {
-    color: #bababa;
-    font-family: "Inter-Regular", Helvetica;
-    font-size: 16px;
-    font-weight: 400;
-    letter-spacing: -0.30px;
-    line-height: normal;
+.an-period-btn:hover:not(.an-period-btn--active) {
+  background-color: rgba(255,255,255,0.1);
+  color: var(--text);
 }
 
-.analytics-download-btn {
-    background-color: #8234f7;
-    border: none;
-    border-radius: 16.5px;
-    color: #ffffff;
-    cursor: pointer;
-    font-family: "Inter-Regular", Helvetica;
-    font-size: 20px;
-    font-weight: 400;
-    height: 37px;
-    letter-spacing: -0.30px;
-    line-height: normal;
-    padding: 0 20px;
-    white-space: nowrap;
-    min-width: 131px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: all 0.3s ease;
+.an-period-btn--cal { padding: 5px 9px; }
+
+.an-chart-labels {
+  display: flex;
+  justify-content: space-between;
 }
 
-.analytics-download-btn:hover {
-    background-color: #7229e0;
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(130, 52, 247, 0.4);
+.an-chart-labels span {
+  font-size: 11px;
+  color: var(--muted);
 }
 
-.analytics-file-divider {
-    height: 1px;
-    background: #6d6d6d;
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    right: 0;
+.an-chart-area {
+  min-height: 130px;
+  background-color: #111;
+  border-radius: 8px;
+  overflow: hidden;
+  padding: 4px 0;
 }
 
-/* Убираем старые разделительные линии, так как они не нужны */
-.analytics-line-1,
-.analytics-line-2,
-.analytics-line-3,
-.analytics-line-4,
-.analytics-line-5,
-.analytics-line-6 {
-    display: none;
+.an-chart-area svg { display: block; width: 100%; }
+
+/* ── Bottom row ──────────────────────────────────────────────── */
+.an-bottom-row {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 20px;
 }
 
-/* Стили для скроллбара в списке файлов */
-.analytics-files-list::-webkit-scrollbar {
-    width: 8px;
+/* ── Export card ─────────────────────────────────────────────── */
+.an-export-card {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
 }
 
-.analytics-files-list::-webkit-scrollbar-track {
-    background: #414141;
-    border-radius: 4px;
+/* Export context summary */
+.an-export-context {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background-color: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 8px;
+  padding: 10px 14px;
 }
 
-.analytics-files-list::-webkit-scrollbar-thumb {
-    background: #6d6d6d;
-    border-radius: 4px;
+.an-export-context-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
-.analytics-files-list::-webkit-scrollbar-thumb:hover {
-    background: #8234f7;
+.an-export-context-key {
+  font-size: 12px;
+  color: var(--muted);
 }
 
-/* Анимации */
-@keyframes fadeIn {
-    from {
-        opacity: 0;
-        transform: translateY(10px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
+.an-export-context-val {
+  font-size: 12px;
+  color: var(--text);
+  font-weight: 500;
 }
 
-.analytics-card,
-.analytics-file-item {
-    animation: fadeIn 0.3s ease;
+.an-format-row {
+  display: flex;
+  gap: 12px;
 }
 
-/* Адаптивность */
-@media (max-width: 1400px) {
-    .analytics-screen {
-        min-width: 100%;
-        height: auto;
-        position: relative;
-        padding-bottom: 40px;
-    }
-    
-    .analytics-main-content {
-        height: auto;
-    }
-    
-    .analytics-title {
-        position: relative;
-        left: 20px;
-        top: 40px;
-        margin: 0;
-    }
-    
-    .analytics-cards-container {
-        position: relative;
-        left: 20px;
-        top: 60px;
-        flex-wrap: wrap;
-        justify-content: flex-start;
-        margin-bottom: 40px;
-    }
-    
-    .analytics-files-container {
-        position: relative;
-        left: 20px;
-        top: 80px;
-        width: calc(100% - 40px);
-        height: auto;
-        min-height: 500px;
-        margin-bottom: 40px;
-    }
-    
-    .analytics-files-list {
-        position: relative;
-        top: 0;
-        max-height: 400px;
-    }
-    
-    .analytics-files-title {
-        position: relative;
-        left: 0;
-        top: 0;
-        margin-bottom: 20px;
-    }
+.an-format-btn {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 16px 10px;
+  border-radius: 12px;
+  border: 1px solid #3a3a3a;
+  background-color: rgba(49,49,49,0.30);
+  cursor: pointer;
+  transition: border-color 0.15s ease, background-color 0.15s ease, color 0.15s ease;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 600;
+  font-family: "Inter", Helvetica, sans-serif;
 }
 
-@media (max-width: 768px) {
-    .analytics-title {
-        font-size: 36px;
-        text-align: center;
-        left: 0;
-        right: 0;
-    }
-    
-    .analytics-cards-container {
-        flex-direction: column;
-        align-items: center;
-        gap: 20px;
-        left: 0;
-        right: 0;
-    }
-    
-    .analytics-card {
-        width: 300px;
-    }
-    
-    .analytics-files-title {
-        font-size: 32px;
-        text-align: center;
-        width: auto;
-        margin: 0 auto 20px;
-        position: relative;
-    }
-    
-    .analytics-file-item {
-        flex-direction: column;
-        align-items: stretch;
-        gap: 15px;
-        padding: 15px 0;
-    }
-    
-    .analytics-file-content {
-        width: 100%;
-    }
-    
-    .analytics-download-btn {
-        align-self: flex-end;
-        width: 100%;
-        max-width: 200px;
-    }
-    
-    .analytics-file-name {
-        font-size: 20px;
-    }
-    
-    .analytics-file-description {
-        font-size: 12px;
-    }
+.an-format-btn:hover:not(.an-format-btn--active) {
+  border-color: #555;
+  background-color: rgba(255,255,255,0.04);
 }
 
-@media (max-width: 480px) {
-    .analytics-title {
-        font-size: 28px;
-    }
-    
-    .analytics-files-title {
-        font-size: 24px;
-    }
-    
-    .analytics-file-name {
-        font-size: 18px;
-    }
-    
-    .analytics-download-btn {
-        font-size: 16px;
-        padding: 0 15px;
-    }
+/* Export button */
+.an-export-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  height: 46px;
+  border: 1px solid;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 15px;
+  font-weight: 600;
+  font-family: "Inter", Helvetica, sans-serif;
+  letter-spacing: -0.2px;
+  transition: opacity 0.15s ease;
+}
+
+.an-export-btn:hover { opacity: 0.85; }
+
+/* ── History card ────────────────────────────────────────────── */
+.an-history-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.an-history-empty {
+  font-size: 13px;
+  color: var(--muted);
+  text-align: center;
+  padding: 20px 0;
+}
+
+.an-history-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+}
+
+.an-history-item {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+}
+
+.an-history-timeline {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-top: 4px;
+  flex-shrink: 0;
+}
+
+.an-history-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.an-history-line {
+  width: 1px;
+  flex: 1;
+  min-height: 24px;
+  background-color: #2e2e2e;
+  margin: 4px 0;
+}
+
+.an-history-text {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding-bottom: 14px;
+}
+
+.an-history-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  letter-spacing: -0.2px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.an-history-badge {
+  display: inline-block;
+  padding: 1px 7px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 600;
+  font-family: "Inter", Helvetica, sans-serif;
+}
+
+.an-history-meta {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+/* ── Modal ───────────────────────────────────────────────────── */
+.an-overlay {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(0,0,0,0.7);
+  backdrop-filter: blur(4px);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.an-modal {
+  background-color: #141414;
+  border-radius: 14px;
+  box-shadow: 0 0 0 1px rgba(255,255,255,0.1), 0 24px 60px rgba(0,0,0,0.6);
+  width: 100%;
+  max-width: 360px;
+  overflow: hidden;
+}
+
+.an-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 20px 14px;
+  border-bottom: 1px solid rgba(255,255,255,0.07);
+}
+
+.an-modal-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.an-modal-close {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  border: none;
+  background-color: rgba(255,255,255,0.06);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.an-modal-close:hover { background-color: rgba(255,255,255,0.12); }
+
+.an-modal-body { padding: 18px 20px; }
+
+.an-modal-fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.an-modal-field { display: flex; flex-direction: column; gap: 6px; }
+
+.an-modal-label { font-size: 12px; color: var(--muted); }
+
+.an-modal-input {
+  background-color: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 8px;
+  padding: 9px 10px;
+  color: var(--text);
+  font-family: "Inter", Helvetica, sans-serif;
+  font-size: 13px;
+  outline: none;
+}
+
+.an-modal-input:focus { border-color: var(--accent); }
+.an-modal-input::-webkit-calendar-picker-indicator { filter: invert(0.6); cursor: pointer; }
+
+.an-modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 14px 20px 18px;
+  border-top: 1px solid rgba(255,255,255,0.07);
+}
+
+.an-btn-cancel {
+  padding: 8px 18px;
+  border-radius: 8px;
+  border: 1px solid rgba(255,255,255,0.1);
+  background: transparent;
+  color: var(--muted);
+  font-family: "Inter", Helvetica, sans-serif;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.an-btn-cancel:hover { background-color: rgba(255,255,255,0.06); color: var(--text); }
+
+.an-btn-save {
+  padding: 8px 20px;
+  border-radius: 8px;
+  border: none;
+  background-color: var(--accent);
+  color: #000;
+  font-family: "Inter", Helvetica, sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.an-btn-save:hover { background-color: #e6ad00; }
+
+/* ── Responsive ──────────────────────────────────────────────── */
+@media (max-width: 1100px) {
+  .an-charts-row { grid-template-columns: 1fr; }
+  .an-bottom-row { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 700px) {
+  .an-format-row { flex-direction: column; }
+  .an-chart-header { flex-direction: column; align-items: flex-start; gap: 10px; }
+  .an-filter-bar { flex-direction: column; align-items: flex-start; }
+  .an-dropdown { min-width: 100%; width: 100%; }
 }

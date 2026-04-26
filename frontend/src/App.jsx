@@ -1,26 +1,59 @@
-// App.jsx
 import React, { useState, useEffect } from 'react';
 import Dashboard from './components/Dashboard';
 import Analytics from './components/Analytics';
 import Sensors from './components/Sensors';
-import Users from './components/Users';
-import { GridFour01 } from './components/icons/GridFour01';
-import { StyleLine } from './components/icons/StyleLine';
-import { User } from './components/icons/User';
-import { ViewList } from './components/icons/ViewList';
+import Users from './components/SystemSettings';
+import Reports from './components/Reports';
 import { microclimateService } from './services/microclimateService';
 import './App.css';
+
+// --- ОРИГИНАЛЬНЫЕ ИКОНКИ ИЗ DASHBOARD.JSX ---
+const IconDashboard = () => (
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+    <path d="M3 3h8v8H3zm10 0h8v8h-8zM3 13h8v8H3zm10 0h8v8h-8z" opacity=".9"/>
+  </svg>
+);
+
+const IconSensors = () => (
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <circle cx="12" cy="12" r="3"/>
+    <path d="M6.3 6.3a8 8 0 0 0 0 11.4M17.7 6.3a8 8 0 0 1 0 11.4M3.5 3.5a14 14 0 0 0 0 17M20.5 3.5a14 14 0 0 1 0 17"/>
+  </svg>
+);
+
+const IconAnalytics = () => (
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+    <path d="M5 3v16h16v2H3V3h2zm14.293 2.293 1.414 1.414L16 11.414l-3-3-4.707 4.707-1.414-1.414L13 5.586l3 3 4.293-4.293z"/>
+  </svg>
+);
+
+const IconReports = () => (
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+    <path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm4 18H6V4h7v5h5v11zM8 15h8v2H8zm0-4h8v2H8z"/>
+  </svg>
+);
+
+const IconSettings = () => (
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+    <path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/>
+  </svg>
+);
+
+const IconPerson = () => (
+  <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+    <path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v2.4h19.2v-2.4c0-3.2-6.4-4.8-9.6-4.8z"/>
+  </svg>
+);
+// --- КОНЕЦ ИКОНОК ---
 
 function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [activities, setActivities] = useState([]);
   const [loading, setLoading] = useState(true);
   
-  // Начальные значения для совместимости
   const initialTemperature = 20.2;
   const initialHumidity = 43.8;
 
-  // Общее состояние для данных датчиков (для обратной совместимости)
   const [sensorData, setSensorData] = useState({
     temperature: initialTemperature,
     humidity: initialHumidity,
@@ -30,35 +63,28 @@ function App() {
     initialHumidity: initialHumidity
   });
 
-  // Загрузка данных при монтировании
   useEffect(() => {
     fetchInitialData();
-    
-    // Логируем вход в систему
     logActivity('Вошла в систему', 'Система');
   }, []);
 
-  // Сохранение действий в localStorage
   useEffect(() => {
     localStorage.setItem('userActivities', JSON.stringify(activities));
   }, [activities]);
 
   const fetchInitialData = async () => {
     try {
-      // Загружаем историю действий из localStorage
       const savedActivities = localStorage.getItem('userActivities');
       if (savedActivities) {
         setActivities(JSON.parse(savedActivities));
       }
       
-      // Пробуем загрузить данные из микроклимата
       try {
         const [stats, logs] = await Promise.all([
           microclimateService.getDashboardStats(),
           microclimateService.getLogs(20)
         ]);
         
-        // Обновляем sensorData с реальными данными
         setSensorData(prev => ({
           ...prev,
           temperature: stats.avg_temperature || initialTemperature,
@@ -67,7 +93,6 @@ function App() {
           initialHumidity: stats.avg_humidity || initialHumidity
         }));
         
-        // Добавляем логи из микроклимата в activities
         const microclimateActivities = logs.map(log => ({
           id: log.id || Date.now(),
           user_name: log.user_name || 'Пользователь',
@@ -81,7 +106,6 @@ function App() {
         
       } catch (error) {
         console.log('Использую локальные данные:', error.message);
-        // Используем локальные данные если API недоступно
       }
       
     } catch (error) {
@@ -91,7 +115,6 @@ function App() {
     }
   };
 
-  // Функция для логирования действий
   const logActivity = (action, room = 'Общее') => {
     const newActivity = {
       id: Date.now(),
@@ -102,18 +125,9 @@ function App() {
       timestamp: new Date().toISOString()
     };
     
-    setActivities(prev => [newActivity, ...prev.slice(0, 49)]); // Храним последние 50 действий
-    
-    // Также можно отправлять логи на сервер микроклимата
-    try {
-      // В реальном приложении здесь будет вызов API для сохранения лога
-      // microclimateService.saveLog(action, room);
-    } catch (error) {
-      console.error('Ошибка при сохранении лога на сервере:', error);
-    }
+    setActivities(prev => [newActivity, ...prev.slice(0, 49)]);
   };
 
-  // Функции для обновления данных (оставлены для обратной совместимости)
   const updateTemperature = (newTemp) => {
     setSensorData(prev => ({
       ...prev,
@@ -142,15 +156,11 @@ function App() {
     }));
   };
 
-  // Функция для скачивания отчета
   const handleDownloadReport = (reportType) => {
-    // Логируем скачивание отчета
     logActivity(`Скачала ${reportType} отчет`, 'Отчеты');
-    
     console.log(`Скачивание отчета: ${reportType}`);
   };
 
-  // Функция для расчета изменений (оставлена для обратной совместимости с Dashboard)
   const calculateChanges = () => {
     const tempChange = ((sensorData.temperature - sensorData.initialTemperature) / sensorData.initialTemperature) * 100;
     const humidityChange = ((sensorData.humidity - sensorData.initialHumidity) / sensorData.initialHumidity) * 100;
@@ -175,7 +185,13 @@ function App() {
 
     switch (activeTab) {
       case 'dashboard':
-        return <Dashboard sensorData={sensorData} changes={changes} />;
+        return <Dashboard 
+          sensorData={sensorData} 
+          changes={changes} 
+          logActivity={logActivity}
+          activeTab={activeTab}
+          setActiveTab={setActiveTab}
+        />;
       case 'analytics':
         return <Analytics onDownloadReport={handleDownloadReport} />;
       case 'sensors':
@@ -189,132 +205,80 @@ function App() {
             logActivity={logActivity}
           />
         );
+      case 'reports':
+        return <Reports />;
       case 'users':
         return <Users activities={activities} />;
       default:
-        return <Dashboard sensorData={sensorData} changes={changes} />;
+        return <Dashboard 
+          sensorData={sensorData} 
+          changes={changes} 
+          logActivity={logActivity}
+          activeTab={activeTab}
+          setActiveTab={setActiveTab}
+        />;
     }
   };
-
-  const menuStyle = {
-    position: 'fixed',
-    left: '20px',
-    top: '19px',
-    width: '279px',
-    height: '983px',
-    backgroundColor: '#414141',
-    zIndex: 1000,
-    padding: '20px',
-    borderRadius: '12px',
-    boxShadow: '0 4px 20px rgba(0, 0, 0, 0.3)'
-  };
-
-  const menuItemStyle = (isActive) => ({
-    display: 'flex',
-    alignItems: 'center',
-    gap: '15px',
-    padding: '15px 20px',
-    margin: '8px 0',
-    borderRadius: '12px',
-    backgroundColor: isActive ? '#8234f7' : 'transparent',
-    cursor: 'pointer',
-    transition: 'all 0.3s ease',
-    color: 'white',
-    fontFamily: '"Inter-SemiBold", Helvetica',
-    fontSize: '18px',
-    zIndex: 1001,
-    border: '1px solid transparent',
-    '&:hover': {
-      backgroundColor: isActive ? '#9548ff' : 'rgba(130, 52, 247, 0.1)',
-      borderColor: '#8234f7'
-    }
-  });
 
   return (
-    <div className="screen">
-      {/* Боковое меню */}
-      <div style={menuStyle}>
-        <div
-          style={menuItemStyle(activeTab === 'dashboard')}
-          onClick={() => {
-            setActiveTab('dashboard');
-            logActivity('Перешла на Дэшборд', 'Навигация');
-          }}
-        >
-          <GridFour01 color="white" />
-          <span>Дэшборд</span>
-        </div>
-        
-        <div
-          style={menuItemStyle(activeTab === 'analytics')}
-          onClick={() => {
-            setActiveTab('analytics');
-            logActivity('Перешла в Анализ', 'Навигация');
-          }}
-        >
-          <ViewList color="white" />
-          <span>Анализ</span>
-        </div>
-        
-        <div
-          style={menuItemStyle(activeTab === 'sensors')}
-          onClick={() => {
-            setActiveTab('sensors');
-            logActivity('Перешла в Датчики', 'Навигация');
-          }}
-        >
-          <StyleLine color="white" />
-          <span>Датчики</span>
-        </div>
-        
-        <div
-          style={menuItemStyle(activeTab === 'users')}
-          onClick={() => {
-            setActiveTab('users');
-            logActivity('Перешла в Пользователи', 'Навигация');
-          }}
-        >
-          <User color="white" />
-          <span>Пользователи</span>
-        </div>
+    <div className="app-screen">
+      {/* Sidebar - точная копия из Dashboard.jsx */}
+      <aside className="app-sidebar">
+        <div className="app-sidebar-logo">TEMPERATURA.KZ</div>
 
-        {/* Кнопка для создания тестовых данных */}
-        <div style={{ marginTop: '30px', padding: '20px 0', borderTop: '1px solid #6d6d6d' }}>
+        <nav className="app-sidebar-nav">
           <button
-            onClick={async () => {
-              try {
-                await microclimateService.seedData();
-                logActivity('Создала тестовые данные', 'Система');
-                alert('Тестовые данные созданы!');
-                fetchInitialData(); // Перезагружаем данные
-              } catch (error) {
-                alert('Ошибка создания данных: ' + error.message);
-              }
-            }}
-            style={{
-              width: '100%',
-              padding: '12px',
-              backgroundColor: 'rgba(102, 183, 64, 0.2)',
-              border: '1px solid #66B740',
-              borderRadius: '8px',
-              color: '#66B740',
-              cursor: 'pointer',
-              fontFamily: '"Inter-Medium", Helvetica',
-              fontSize: '14px',
-              transition: 'all 0.3s ease'
-            }}
+            className={`app-nav-item ${activeTab === 'dashboard' ? 'app-nav-item--active' : ''}`}
+            onClick={() => setActiveTab('dashboard')}
           >
-            Создать тестовые данные
+            <span className="app-nav-icon"><IconDashboard /></span>
+            <span className="app-nav-label">Дэшборд</span>
           </button>
-        </div>
-      </div>
 
-      {/* Основной контент */}
-      <div className="main-content">
+          <button
+            className={`app-nav-item ${activeTab === 'sensors' ? 'app-nav-item--active' : ''}`}
+            onClick={() => setActiveTab('sensors')}
+          >
+            <span className="app-nav-icon"><IconSensors /></span>
+            <span className="app-nav-label">Датчики</span>
+          </button>
+
+          <button
+            className={`app-nav-item ${activeTab === 'analytics' ? 'app-nav-item--active' : ''}`}
+            onClick={() => setActiveTab('analytics')}
+          >
+            <span className="app-nav-icon"><IconAnalytics /></span>
+            <span className="app-nav-label">Аналитика</span>
+          </button>
+
+          <button
+            className={`app-nav-item ${activeTab === 'reports' ? 'app-nav-item--active' : ''}`}
+            onClick={() => setActiveTab('reports')}
+          >
+            <span className="app-nav-icon"><IconReports /></span>
+            <span className="app-nav-label">Уведомления</span>
+          </button>
+
+          <button
+            className={`app-nav-item ${activeTab === 'users' ? 'app-nav-item--active' : ''}`}
+            onClick={() => setActiveTab('users')}
+          >
+            <span className="app-nav-icon"><IconSettings /></span>
+            <span className="app-nav-label">Настройки</span>
+          </button>
+        </nav>
+
+        <div className="app-sidebar-user">
+          <IconPerson />
+          <span>Кручина Ксения</span>
+        </div>
+      </aside>
+
+      {/* Main Content */}
+      <div className="app-main">
         {renderContent()}
       </div>
 
-      {/* Стили для загрузки */}
       <style>{`
         .loading-screen {
           display: flex;
@@ -328,9 +292,9 @@ function App() {
         .loading-spinner {
           width: 50px;
           height: 50px;
-          border: 4px solid rgba(130, 52, 247, 0.3);
+          border: 4px solid rgba(255, 194, 7, 0.3);
           border-radius: 50%;
-          border-top-color: #8234f7;
+          border-top-color: #ffc207;
           animation: spin 1s linear infinite;
           margin-bottom: 20px;
         }
@@ -343,11 +307,6 @@ function App() {
         
         @keyframes spin {
           to { transform: rotate(360deg); }
-        }
-        
-        div[style*="menuItemStyle"]:hover {
-          background-color: ${menuItemStyle(false)['&:hover'].backgroundColor} !important;
-          border-color: ${menuItemStyle(false)['&:hover'].borderColor} !important;
         }
       `}</style>
     </div>
