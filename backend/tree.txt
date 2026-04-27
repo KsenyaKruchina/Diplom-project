@@ -1,0 +1,58 @@
+.
+├── app
+│   ├── __init__.py
+│   ├── api
+│   │   ├── deps.py
+│   │   └── v1
+│   │       ├── api.py
+│   │       └── endpoints
+│   │           ├── alarms.py
+│   │           ├── auth.py
+│   │           ├── locations.py
+│   │           ├── notifications.py
+│   │           ├── reports.py
+│   │           ├── sensors.py
+│   │           ├── telemetry.py
+│   │           ├── users.py
+│   │           └── websockets.py
+│   ├── core
+│   │   ├── config.py
+│   │   └── security.py
+│   ├── crud
+│   │   ├── __init__.py
+│   │   ├── crud_alarm.py
+│   │   ├── crud_audit.py
+│   │   ├── crud_locations.py
+│   │   ├── crud_sensor.py
+│   │   ├── crud_telemetry.py
+│   │   └── crud_user.py
+│   ├── db
+│   │   └── session.py
+│   ├── models
+│   │   ├── __init__.py
+│   │   ├── base.py
+│   │   ├── location.py
+│   │   ├── sensor.py
+│   │   └── user.py
+│   ├── schemas
+│   │   ├── alarms.py
+│   │   ├── location.py
+│   │   ├── sensor.py
+│   │   ├── telemetry.py
+│   │   └── user.py
+│   └── services
+│       ├── alarm_manager.py
+│       ├── arialmt.ttf
+│       ├── ble_scanner.py
+│       ├── email_sender.py
+│       ├── heartbeat.py
+│       ├── push_sender.py
+│       ├── report_generator.py
+│       ├── report_scheduler.py
+│       └── ws_manager.py
+├── digital_twin.db
+├── main.py
+├── requirements.txt
+└── tree.txt
+
+11 directories, 45 files

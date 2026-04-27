@@ -1,0 +1,15 @@
+name: Watchdog Cron
+
+on:
+  schedule:
+    # Запуск каждые 15 минут (бесплатно)
+    - cron: '*/15 * * * *'
+  workflow_dispatch: # Позволяет запустить вручную
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Watchdog Endpoint
+        run: |
+          curl -X GET "https://v2-iota-eosin.vercel.app/api/v1/cron/watchdog"
