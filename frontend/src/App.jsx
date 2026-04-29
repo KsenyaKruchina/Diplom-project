@@ -1,316 +1,196 @@
-import React, { useState, useEffect } from 'react';
-import Dashboard from './components/Dashboard';
-import Analytics from './components/Analytics';
-import Sensors from './components/Sensors';
-import Users from './components/SystemSettings';
-import Reports from './components/Reports';
-import { microclimateService } from './services/microclimateService';
-import './App.css';
+// frontend/src/App.jsx
+// ─── Корневой компонент с боковым меню и роутингом ───────────────────────────
 
-// --- ОРИГИНАЛЬНЫЕ ИКОНКИ ИЗ DASHBOARD.JSX ---
-const IconDashboard = () => (
-  <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-    <path d="M3 3h8v8H3zm10 0h8v8h-8zM3 13h8v8H3zm10 0h8v8h-8z" opacity=".9"/>
+import React, { useState } from "react";
+import { AuthProvider, useAuth } from "./context/AuthContext";
+import LoginPage from "./pages/LoginPage";
+import "./App.css";
+
+// ─── Страницы ─────────────────────────────────────────────────────────────────
+import Dashboard      from "./components/Dashboard";
+import Analytics      from "./components/Analytics";
+import Sensors        from "./components/Sensors";
+import Reports        from "./components/Reports";
+import SystemSettings from "./components/SystemSettings";
+
+// ─── Icons ────────────────────────────────────────────────────────────────────
+const IconDashboard = ({ active }) => (
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+    <rect x="3" y="3" width="7" height="7" rx="1.5"
+      stroke={active ? "#000" : "#fff"} strokeWidth="1.8"/>
+    <rect x="14" y="3" width="7" height="7" rx="1.5"
+      stroke={active ? "#000" : "#fff"} strokeWidth="1.8"/>
+    <rect x="3" y="14" width="7" height="7" rx="1.5"
+      stroke={active ? "#000" : "#fff"} strokeWidth="1.8"/>
+    <rect x="14" y="14" width="7" height="7" rx="1.5"
+      stroke={active ? "#000" : "#fff"} strokeWidth="1.8"/>
   </svg>
 );
 
-const IconSensors = () => (
-  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <circle cx="12" cy="12" r="3"/>
-    <path d="M6.3 6.3a8 8 0 0 0 0 11.4M17.7 6.3a8 8 0 0 1 0 11.4M3.5 3.5a14 14 0 0 0 0 17M20.5 3.5a14 14 0 0 1 0 17"/>
+const IconSensors = ({ active }) => (
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+    <circle cx="12" cy="12" r="3"
+      stroke={active ? "#000" : "#fff"} strokeWidth="1.8"/>
+    <path d="M6.3 6.3a8 8 0 0 0 0 11.4M17.7 6.3a8 8 0 0 1 0 11.4"
+      stroke={active ? "#000" : "#fff"} strokeWidth="1.8" strokeLinecap="round"/>
+    <path d="M9.2 9.2a4 4 0 0 0 0 5.6M14.8 9.2a4 4 0 0 1 0 5.6"
+      stroke={active ? "#000" : "#fff"} strokeWidth="1.8" strokeLinecap="round"/>
   </svg>
 );
 
-const IconAnalytics = () => (
-  <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-    <path d="M5 3v16h16v2H3V3h2zm14.293 2.293 1.414 1.414L16 11.414l-3-3-4.707 4.707-1.414-1.414L13 5.586l3 3 4.293-4.293z"/>
+const IconAnalytics = ({ active }) => (
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+    <polyline points="3,17 8,12 13,15 21,7"
+      stroke={active ? "#000" : "#fff"} strokeWidth="1.8"
+      strokeLinecap="round" strokeLinejoin="round"/>
+    <line x1="3" y1="20" x2="21" y2="20"
+      stroke={active ? "#000" : "#fff"} strokeWidth="1.8" strokeLinecap="round"/>
   </svg>
 );
 
-const IconReports = () => (
-  <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-    <path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm4 18H6V4h7v5h5v11zM8 15h8v2H8zm0-4h8v2H8z"/>
+const IconReports = ({ active }) => (
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+    <rect x="3" y="3" width="18" height="18" rx="2"
+      stroke={active ? "#000" : "#fff"} strokeWidth="1.8"/>
+    <line x1="7" y1="8"  x2="17" y2="8"
+      stroke={active ? "#000" : "#fff"} strokeWidth="1.6" strokeLinecap="round"/>
+    <line x1="7" y1="12" x2="17" y2="12"
+      stroke={active ? "#000" : "#fff"} strokeWidth="1.6" strokeLinecap="round"/>
+    <line x1="7" y1="16" x2="13" y2="16"
+      stroke={active ? "#000" : "#fff"} strokeWidth="1.6" strokeLinecap="round"/>
   </svg>
 );
 
-const IconSettings = () => (
-  <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-    <path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/>
+const IconSettings = ({ active }) => (
+  <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+    <circle cx="12" cy="12" r="3"
+      stroke={active ? "#000" : "#fff"} strokeWidth="1.8"/>
+    <path d="M12 2v2M12 20v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M2 12h2M20 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"
+      stroke={active ? "#000" : "#fff"} strokeWidth="1.8" strokeLinecap="round"/>
   </svg>
 );
 
-const IconPerson = () => (
-  <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-    <path d="M12 12c2.7 0 4.8-2.1 4.8-4.8S14.7 2.4 12 2.4 7.2 4.5 7.2 7.2 9.3 12 12 12zm0 2.4c-3.2 0-9.6 1.6-9.6 4.8v2.4h19.2v-2.4c0-3.2-6.4-4.8-9.6-4.8z"/>
+const IconLogout = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"
+      stroke="#ff5b5b" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+    <polyline points="16 17 21 12 16 7"
+      stroke="#ff5b5b" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+    <line x1="21" y1="12" x2="9" y2="12"
+      stroke="#ff5b5b" strokeWidth="1.8" strokeLinecap="round"/>
   </svg>
 );
-// --- КОНЕЦ ИКОНОК ---
 
-function App() {
-  const [activeTab, setActiveTab] = useState('dashboard');
-  const [activities, setActivities] = useState([]);
-  const [loading, setLoading] = useState(true);
-  
-  const initialTemperature = 20.2;
-  const initialHumidity = 43.8;
+// ─── Пункты меню ─────────────────────────────────────────────────────────────
+const NAV_ITEMS = [
+  { id: "dashboard", label: "Дашборд",     Icon: IconDashboard },
+  { id: "sensors",   label: "Датчики",     Icon: IconSensors   },
+  { id: "analytics", label: "Аналитика",   Icon: IconAnalytics },
+  { id: "reports",   label: "Уведомления", Icon: IconReports   },
+  { id: "settings",  label: "Настройки",   Icon: IconSettings  },
+];
 
-  const [sensorData, setSensorData] = useState({
-    temperature: initialTemperature,
-    humidity: initialHumidity,
-    tempEnabled: true,
-    humidityEnabled: false,
-    initialTemperature: initialTemperature,
-    initialHumidity: initialHumidity
-  });
+// ─── Sidebar ──────────────────────────────────────────────────────────────────
+const Sidebar = ({ activePage, onNavigate }) => {
+  const { user, logout } = useAuth();
 
-  useEffect(() => {
-    fetchInitialData();
-    logActivity('Вошла в систему', 'Система');
-  }, []);
+  const initials = user?.full_name
+    ? user.full_name.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase()
+    : (user?.username || "?").slice(0, 2).toUpperCase();
 
-  useEffect(() => {
-    localStorage.setItem('userActivities', JSON.stringify(activities));
-  }, [activities]);
+  return (
+    <aside className="app-sidebar">
+      <div className="app-sidebar-logo">
+        TEMPERATURA.KZ
+      </div>
 
-  const fetchInitialData = async () => {
-    try {
-      const savedActivities = localStorage.getItem('userActivities');
-      if (savedActivities) {
-        setActivities(JSON.parse(savedActivities));
-      }
-      
-      try {
-        const [stats, logs] = await Promise.all([
-          microclimateService.getDashboardStats(),
-          microclimateService.getLogs(20)
-        ]);
-        
-        setSensorData(prev => ({
-          ...prev,
-          temperature: stats.avg_temperature || initialTemperature,
-          humidity: stats.avg_humidity || initialHumidity,
-          initialTemperature: stats.avg_temperature || initialTemperature,
-          initialHumidity: stats.avg_humidity || initialHumidity
-        }));
-        
-        const microclimateActivities = logs.map(log => ({
-          id: log.id || Date.now(),
-          user_name: log.user_name || 'Пользователь',
-          action: log.action,
-          room: 'Общее',
-          completed: true,
-          timestamp: log.timestamp || new Date().toISOString()
-        }));
-        
-        setActivities(prev => [...microclimateActivities, ...prev]);
-        
-      } catch (error) {
-        console.log('Использую локальные данные:', error.message);
-      }
-      
-    } catch (error) {
-      console.error('Ошибка при загрузке данных:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+      <nav className="app-sidebar-nav">
+        {NAV_ITEMS.map(({ id, label, Icon }) => {
+          const active = activePage === id;
+          return (
+            <button
+              key={id}
+              className={`app-nav-item ${active ? "app-nav-item--active" : ""}`}
+              onClick={() => onNavigate(id)}
+            >
+              <span className="app-nav-icon">
+                <Icon active={active} />
+              </span>
+              <span className="app-nav-label">{label}</span>
+            </button>
+          );
+        })}
+      </nav>
 
-  const logActivity = (action, room = 'Общее') => {
-    const newActivity = {
-      id: Date.now(),
-      user_name: 'Engineer Kseniya Kruchina',
-      action: action,
-      room: room,
-      completed: true,
-      timestamp: new Date().toISOString()
-    };
-    
-    setActivities(prev => [newActivity, ...prev.slice(0, 49)]);
-  };
-
-  const updateTemperature = (newTemp) => {
-    setSensorData(prev => ({
-      ...prev,
-      temperature: newTemp
-    }));
-  };
-
-  const updateHumidity = (newHumidity) => {
-    setSensorData(prev => ({
-      ...prev,
-      humidity: newHumidity
-    }));
-  };
-
-  const toggleTemperature = (enabled) => {
-    setSensorData(prev => ({
-      ...prev,
-      tempEnabled: enabled
-    }));
-  };
-
-  const toggleHumidity = (enabled) => {
-    setSensorData(prev => ({
-      ...prev,
-      humidityEnabled: enabled
-    }));
-  };
-
-  const handleDownloadReport = (reportType) => {
-    logActivity(`Скачала ${reportType} отчет`, 'Отчеты');
-    console.log(`Скачивание отчета: ${reportType}`);
-  };
-
-  const calculateChanges = () => {
-    const tempChange = ((sensorData.temperature - sensorData.initialTemperature) / sensorData.initialTemperature) * 100;
-    const humidityChange = ((sensorData.humidity - sensorData.initialHumidity) / sensorData.initialHumidity) * 100;
-
-    return {
-      temperatureChange: tempChange,
-      humidityChange: humidityChange
-    };
-  };
-
-  const renderContent = () => {
-    if (loading) {
-      return (
-        <div className="loading-screen">
-          <div className="loading-spinner"></div>
-          <div className="loading-text">Загрузка данных...</div>
+      <div className="app-sidebar-user">
+        <div className="app-user-avatar">{initials}</div>
+        <div style={{ flex: 1 }}>
+          <div className="app-user-name">
+            {user?.full_name || user?.username || "Пользователь"}
+          </div>
+          <div className="app-user-role">
+            {user?.role === "admin"
+              ? "Администратор"
+              : user?.role === "editor"
+              ? "Редактор"
+              : "Наблюдатель"}
+          </div>
         </div>
-      );
-    }
+        <button className="app-logout-btn" onClick={logout} title="Выйти">
+          <IconLogout />
+        </button>
+      </div>
+    </aside>
+  );
+};
 
-    const changes = calculateChanges();
+// ─── Основной макет ───────────────────────────────────────────────────────────
+const AppLayout = () => {
+  const [activePage, setActivePage] = useState("dashboard");
 
-    switch (activeTab) {
-      case 'dashboard':
-        return <Dashboard 
-          sensorData={sensorData} 
-          changes={changes} 
-          logActivity={logActivity}
-          activeTab={activeTab}
-          setActiveTab={setActiveTab}
-        />;
-      case 'analytics':
-        return <Analytics onDownloadReport={handleDownloadReport} />;
-      case 'sensors':
-        return (
-          <Sensors
-            sensorData={sensorData}
-            updateTemperature={updateTemperature}
-            updateHumidity={updateHumidity}
-            toggleTemperature={toggleTemperature}
-            toggleHumidity={toggleHumidity}
-            logActivity={logActivity}
-          />
-        );
-      case 'reports':
-        return <Reports />;
-      case 'users':
-        return <Users activities={activities} />;
-      default:
-        return <Dashboard 
-          sensorData={sensorData} 
-          changes={changes} 
-          logActivity={logActivity}
-          activeTab={activeTab}
-          setActiveTab={setActiveTab}
-        />;
+  const renderPage = () => {
+    switch (activePage) {
+      case "dashboard":  return <Dashboard />;
+      case "sensors":    return <Sensors />;
+      case "analytics":  return <Analytics />;
+      case "reports":    return <Reports />;
+      case "settings":   return <SystemSettings />;
+      default:           return <Dashboard />;
     }
   };
 
   return (
     <div className="app-screen">
-      {/* Sidebar - точная копия из Dashboard.jsx */}
-      <aside className="app-sidebar">
-        <div className="app-sidebar-logo">TEMPERATURA.KZ</div>
-
-        <nav className="app-sidebar-nav">
-          <button
-            className={`app-nav-item ${activeTab === 'dashboard' ? 'app-nav-item--active' : ''}`}
-            onClick={() => setActiveTab('dashboard')}
-          >
-            <span className="app-nav-icon"><IconDashboard /></span>
-            <span className="app-nav-label">Дэшборд</span>
-          </button>
-
-          <button
-            className={`app-nav-item ${activeTab === 'sensors' ? 'app-nav-item--active' : ''}`}
-            onClick={() => setActiveTab('sensors')}
-          >
-            <span className="app-nav-icon"><IconSensors /></span>
-            <span className="app-nav-label">Датчики</span>
-          </button>
-
-          <button
-            className={`app-nav-item ${activeTab === 'analytics' ? 'app-nav-item--active' : ''}`}
-            onClick={() => setActiveTab('analytics')}
-          >
-            <span className="app-nav-icon"><IconAnalytics /></span>
-            <span className="app-nav-label">Аналитика</span>
-          </button>
-
-          <button
-            className={`app-nav-item ${activeTab === 'reports' ? 'app-nav-item--active' : ''}`}
-            onClick={() => setActiveTab('reports')}
-          >
-            <span className="app-nav-icon"><IconReports /></span>
-            <span className="app-nav-label">Уведомления</span>
-          </button>
-
-          <button
-            className={`app-nav-item ${activeTab === 'users' ? 'app-nav-item--active' : ''}`}
-            onClick={() => setActiveTab('users')}
-          >
-            <span className="app-nav-icon"><IconSettings /></span>
-            <span className="app-nav-label">Настройки</span>
-          </button>
-        </nav>
-
-        <div className="app-sidebar-user">
-          <IconPerson />
-          <span>Кручина Ксения</span>
-        </div>
-      </aside>
-
-      {/* Main Content */}
-      <div className="app-main">
-        {renderContent()}
-      </div>
-
-      <style>{`
-        .loading-screen {
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          justify-content: center;
-          height: 100vh;
-          color: white;
-        }
-        
-        .loading-spinner {
-          width: 50px;
-          height: 50px;
-          border: 4px solid rgba(255, 194, 7, 0.3);
-          border-radius: 50%;
-          border-top-color: #ffc207;
-          animation: spin 1s linear infinite;
-          margin-bottom: 20px;
-        }
-        
-        .loading-text {
-          font-family: "Inter-Regular", Helvetica;
-          font-size: 16px;
-          color: #bababa;
-        }
-        
-        @keyframes spin {
-          to { transform: rotate(360deg); }
-        }
-      `}</style>
+      <Sidebar activePage={activePage} onNavigate={setActivePage} />
+      <main className="app-main">
+        {renderPage()}
+      </main>
     </div>
   );
-}
+};
+
+// ─── Роутер ───────────────────────────────────────────────────────────────────
+const AppRouter = () => {
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="app-loading-screen">
+        <div className="app-loading-spinner"></div>
+        <span>Загрузка...</span>
+      </div>
+    );
+  }
+
+  if (!user) return <LoginPage />;
+  return <AppLayout />;
+};
+
+// ─── Root ─────────────────────────────────────────────────────────────────────
+const App = () => (
+  <AuthProvider>
+    <AppRouter />
+  </AuthProvider>
+);
 
 export default App;

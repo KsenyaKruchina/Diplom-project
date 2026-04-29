@@ -1,5 +1,10 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import "./Reports.css";
+import { apiRequest } from "../services/api";
+import { getToken } from "../services/api";
+import { wsService } from "../services/websocketService";
+
+const BASE_URL = import.meta.env.VITE_API_BASE_URL || "/api/v1";
 
 // ── Icons ─────────────────────────────────────────────────────────────────────
 const IconSearch = () => (
@@ -75,12 +80,6 @@ const IconCheck = () => (
     <path d="M2 7l4 4 6-6" stroke="#ffc207" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
   </svg>
 );
-const IconUser = () => (
-  <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-    <circle cx="7" cy="4.5" r="2.5" stroke="#929292" strokeWidth="1.2"/>
-    <path d="M2 12c0-2.76 2.24-5 5-5s5 2.24 5 5" stroke="#929292" strokeWidth="1.2" strokeLinecap="round"/>
-  </svg>
-);
 const IconCalendar = () => (
   <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
     <rect x="1" y="3" width="14" height="12" rx="2" stroke="#929292" strokeWidth="1.3"/>
@@ -95,7 +94,6 @@ const IconClose = () => (
     <line x1="13" y1="3" x2="3" y2="13" stroke="#929292" strokeWidth="1.5" strokeLinecap="round"/>
   </svg>
 );
-
 const IconPDF = () => (
   <svg width="52" height="52" viewBox="0 0 52 52" fill="none">
     <rect x="8" y="4" width="28" height="36" rx="3" fill="#1a1a1a" stroke="#ff5252" strokeWidth="1.5"/>
@@ -116,73 +114,93 @@ const IconExcel = () => (
     <text x="26" y="47" textAnchor="middle" fill="#01e676" fontSize="9" fontFamily="Inter, sans-serif" fontWeight="700">XLSX</text>
   </svg>
 );
+const IconRefresh = () => (
+  <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+    <path d="M13.5 8a5.5 5.5 0 1 1-1.1-3.3" stroke="#929292" strokeWidth="1.4" strokeLinecap="round"/>
+    <path d="M12 2.5V5.5H15" stroke="#929292" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
+  </svg>
+);
 
-// ── Data ──────────────────────────────────────────────────────────────────────
-const STATUS_STYLE = {
-  resolved: { label: "Устранено", color: "#01e676", bg: "#19282b" },
-  active:   { label: "Активна",   color: "#ff5252", bg: "#321c1b" },
-  inwork:   { label: "В работе",  color: "#ffd550", bg: "#312c1c" },
-  done:     { label: "Выполнено", color: "#01e676", bg: "#19282b" },
-};
-const PRIORITY_STYLE = {
-  high:   { label: "Высокая", color: "#ff5252" },
-  medium: { label: "Средняя", color: "#ffd550" },
-  low:    { label: "Низкая",  color: "#929292" },
-};
-const ALL_ASSIGNEES = [
-  "Кручина Ксения",
-  "Сибирцева Анастасия",
-  "Курбанов Артур",
-  "Петров Иван",
-  "Мне (Я)",
-];
+// ── Маппинг API → UI ──────────────────────────────────────────────────────────
+// API статусы: new, acknowledged, resolved
+// API severity: warning, critical
+// API alarm_type: temperature, humidity, connection_lost, low_battery
 
-const INITIAL_EVENTS = [
-  { id: "0001", priority: "high",   eventType: "Высокая температура Д1",  assignee: "Кручина Ксения",      description: "Проблема возникла из-за перегрева системы охлаждения.",    status: "resolved", eventTime: "03/04/26 12:39", resolveTime: "03/04/26 12:34" },
-  { id: "0002", priority: "medium", eventType: "Неисправность датчика Д3", assignee: "Сибирцева Анастасия", description: "Датчик не отвечает более 10 минут, требуется замена.",       status: "active",   eventTime: "03/04/26 12:40", resolveTime: "03/04/26 12:20" },
-  { id: "0003", priority: "high",   eventType: "Отказ оборудования",       assignee: "Курбанов Артур",       description: "Полный отказ насосного агрегата №3.",                       status: "inwork",   eventTime: "03/04/26 12:05", resolveTime: "03/04/26 12:00" },
-  { id: "0004", priority: "medium", eventType: "Обрыв связи",              assignee: "Кручина Ксения",      description: "Потеря связи с удалённым узлом на 15 минут.",              status: "done",     eventTime: "02/04/26 01:00", resolveTime: "02/04/26 00:20" },
-  { id: "0005", priority: "low",    eventType: "Низкий заряд батареи",     assignee: "Сибирцева Анастасия", description: "Уровень заряда резервной батареи опустился ниже 20%.",      status: "done",     eventTime: "01/04/26 22:32", resolveTime: "01/04/26 22:30" },
+const STATUS_MAP = {
+  new:          { label: "Новая",      color: "#ff5252", bg: "#321c1b" },
+  acknowledged: { label: "В работе",   color: "#ffd550", bg: "#312c1c" },
+  resolved:     { label: "Устранено",  color: "#01e676", bg: "#19282b" },
+};
+
+const SEVERITY_MAP = {
+  critical: { label: "Критическая", color: "#ff5252" },
+  warning:  { label: "Внимание",    color: "#ffd550" },
+};
+
+const ALARM_TYPE_MAP = {
+  temperature:     "Температура",
+  humidity:        "Влажность",
+  connection_lost: "Потеря связи",
+  low_battery:     "Низкий заряд",
+};
+
+// Маппинг UI-периодов → API-значения для отчётов
+const PERIOD_API_MAP = {
+  "1d": "last_24_hours",
+  "1w": "last_week",
+  "1m": "last_month",
+  "1y": "last_year",
+};
+
+const PERIOD_OPTIONS = [
+  { key: "1d", label: "1 день" },
+  { key: "1w", label: "1 неделя" },
+  { key: "1m", label: "1 месяц" },
+  { key: "1y", label: "1 год" },
+  { key: "custom", label: "Свой диапазон" },
 ];
 
 const COLS = [
   { key: "id",          label: "ID" },
-  { key: "priority",    label: "Критичность" },
-  { key: "eventType",   label: "Тип события" },
-  { key: "assignee",    label: "Исполнитель" },
+  { key: "severity",    label: "Критичность" },
+  { key: "alarm_type",  label: "Тип события" },
+  { key: "sensor_id",   label: "Датчик" },
   { key: "description", label: "Описание" },
   { key: "status",      label: "Статус" },
-  { key: "eventTime",   label: "Время события" },
-  { key: "resolveTime", label: "Время устранения" },
+  { key: "timestamp",   label: "Время события" },
+  { key: "resolved_at", label: "Время устранения" },
 ];
 
-const PERIOD_OPTIONS = [
-  { key: "1d",     label: "1 день" },
-  { key: "1w",     label: "1 неделя" },
-  { key: "1m",     label: "1 месяц" },
-  { key: "1y",     label: "1 год" },
-  { key: "custom", label: "Свой диапазон" },
-];
+// ── Helpers ───────────────────────────────────────────────────────────────────
+const formatDateTime = (iso) => {
+  if (!iso) return "—";
+  try {
+    return new Date(iso).toLocaleString("ru-RU", {
+      day: "2-digit", month: "2-digit", year: "2-digit",
+      hour: "2-digit", minute: "2-digit",
+    });
+  } catch { return iso; }
+};
 
-// ── Dropdown helper (portal-style, fixed positioning) ─────────────────────────
-function Dropdown({ trigger, children, open, setOpen, dropUp = false }) {
+// ── Dropdown ──────────────────────────────────────────────────────────────────
+function Dropdown({ trigger, children, open, setOpen }) {
   const ref = useRef(null);
   const menuRef = useRef(null);
   useEffect(() => {
     const handler = (e) => {
-      if (ref.current && !ref.current.contains(e.target) && menuRef.current && !menuRef.current.contains(e.target)) setOpen(false);
+      if (
+        ref.current && !ref.current.contains(e.target) &&
+        menuRef.current && !menuRef.current.contains(e.target)
+      ) setOpen(false);
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, [setOpen]);
-
   return (
     <div className="rp-dropdown-wrap" ref={ref}>
       <div onClick={() => setOpen(o => !o)}>{trigger}</div>
       {open && (
-        <div className={`rp-dropdown-menu ${dropUp ? "rp-dropdown-menu--up" : ""}`} ref={menuRef}>
-          {children}
-        </div>
+        <div className="rp-dropdown-menu" ref={menuRef}>{children}</div>
       )}
     </div>
   );
@@ -198,28 +216,40 @@ function FilterChip({ label, onRemove }) {
   );
 }
 
-// ── Description Edit Modal ────────────────────────────────────────────────────
-function DescriptionModal({ value, onSave, onClose }) {
-  const [val, setVal] = useState(value);
+// ── Comment Edit Modal ────────────────────────────────────────────────────────
+function CommentModal({ alarmId, value, onSave, onClose }) {
+  const [val, setVal] = useState(value || "");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
   const textareaRef = useRef(null);
 
   useEffect(() => {
     textareaRef.current?.focus();
-    // place cursor at end
-    const len = val.length;
-    textareaRef.current?.setSelectionRange(len, len);
   }, []);
 
-  const handleSave = () => {
-    onSave(val);
-    onClose();
+  const handleSave = async () => {
+    setSaving(true);
+    setError("");
+    try {
+      // PATCH /api/v1/alarms/{id} с комментарием
+      const updated = await apiRequest(`/alarms/${alarmId}`, {
+        method: "PATCH",
+        body: JSON.stringify({ user_comment: val }),
+      });
+      onSave(updated);
+      onClose();
+    } catch (err) {
+      setError(err.message || "Ошибка сохранения");
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
     <div className="rp-modal-overlay" onClick={onClose}>
       <div className="rp-modal" onClick={e => e.stopPropagation()}>
         <div className="rp-modal-header">
-          <h3 className="rp-modal-title">Редактировать описание</h3>
+          <h3 className="rp-modal-title">Комментарий к тревоге #{alarmId}</h3>
           <button className="rp-modal-close" onClick={onClose}><IconClose /></button>
         </div>
         <div className="rp-modal-body">
@@ -229,63 +259,66 @@ function DescriptionModal({ value, onSave, onClose }) {
             value={val}
             onChange={e => setVal(e.target.value)}
             onKeyDown={e => { if (e.key === "Escape") onClose(); }}
+            placeholder="Введите комментарий оператора..."
             rows={5}
           />
+          {error && <div style={{ color: "#ff5252", fontSize: "12px", marginTop: "6px" }}>{error}</div>}
         </div>
         <div className="rp-modal-footer">
           <button className="rp-btn-cancel" onClick={onClose}>Отмена</button>
-          <button className="rp-btn-save" onClick={handleSave}>Сохранить</button>
+          <button className="rp-btn-save" onClick={handleSave} disabled={saving}>
+            {saving ? "Сохранение..." : "Сохранить"}
+          </button>
         </div>
       </div>
     </div>
   );
 }
 
-// ── Assignee picker ───────────────────────────────────────────────────────────
-function AssigneePicker({ value, onChange }) {
+// ── Status picker — PATCH /api/v1/alarms/{id} ────────────────────────────────
+function StatusPicker({ alarm, onUpdate }) {
   const [open, setOpen] = useState(false);
-  return (
-    <Dropdown
-      open={open} setOpen={setOpen}
-      trigger={
-        <span className="rp-assignee-trigger">
-          <IconUser />
-          <span className="rp-assignee-name">{value || "—"}</span>
-          <IconChevDown />
-        </span>
-      }
-    >
-      {ALL_ASSIGNEES.map(a => (
-        <div key={a} className={`rp-dropdown-item ${value === a ? "rp-dropdown-item--active" : ""}`}
-          onClick={() => { onChange(a); setOpen(false); }}>
-          {value === a && <IconCheck />}
-          {a}
-        </div>
-      ))}
-    </Dropdown>
-  );
-}
+  const [loading, setLoading] = useState(false);
+  const st = STATUS_MAP[alarm.status] || STATUS_MAP.new;
 
-// ── Status picker ─────────────────────────────────────────────────────────────
-function StatusPicker({ value, onChange }) {
-  const [open, setOpen] = useState(false);
-  const st = STATUS_STYLE[value];
+  const handleChange = async (newStatus) => {
+    setOpen(false);
+    if (newStatus === alarm.status) return;
+    setLoading(true);
+    try {
+      const updated = await apiRequest(`/alarms/${alarm.id}`, {
+        method: "PATCH",
+        body: JSON.stringify({ status: newStatus }),
+      });
+      onUpdate(updated);
+    } catch (err) {
+      console.error("Ошибка смены статуса:", err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <Dropdown
       open={open} setOpen={setOpen}
       trigger={
-        <span className="rp-status-pill rp-status-pill--clickable"
-          style={{ color: st.color, background: st.bg }}>
-          {st.label}
+        <span
+          className="rp-status-pill rp-status-pill--clickable"
+          style={{ color: st.color, background: st.bg, opacity: loading ? 0.6 : 1 }}
+        >
+          {loading ? "..." : st.label}
           <IconChevDown />
         </span>
       }
     >
-      {Object.entries(STATUS_STYLE).map(([key, s]) => (
-        <div key={key} className={`rp-dropdown-item ${value === key ? "rp-dropdown-item--active" : ""}`}
-          onClick={() => { onChange(key); setOpen(false); }}
-          style={{ color: s.color }}>
-          {value === key && <IconCheck />}
+      {Object.entries(STATUS_MAP).map(([key, s]) => (
+        <div
+          key={key}
+          className={`rp-dropdown-item ${alarm.status === key ? "rp-dropdown-item--active" : ""}`}
+          onClick={() => handleChange(key)}
+          style={{ color: s.color }}
+        >
+          {alarm.status === key && <IconCheck />}
           {s.label}
         </div>
       ))}
@@ -293,23 +326,26 @@ function StatusPicker({ value, onChange }) {
   );
 }
 
-// ── Description cell with modal ───────────────────────────────────────────────
-function DescriptionCell({ value, onSave }) {
+// ── Description cell с открытием модала комментария ──────────────────────────
+function DescriptionCell({ alarm, onUpdate }) {
   const [modalOpen, setModalOpen] = useState(false);
+  const displayText = alarm.user_comment || alarm.description || "—";
+
   return (
     <>
       <span
         className="rp-editable-cell"
         onClick={() => setModalOpen(true)}
-        title="Нажмите для редактирования"
+        title="Нажмите для добавления комментария"
       >
         <IconEdit />
-        <span>{value}</span>
+        <span>{displayText}</span>
       </span>
       {modalOpen && (
-        <DescriptionModal
-          value={value}
-          onSave={onSave}
+        <CommentModal
+          alarmId={alarm.id}
+          value={alarm.user_comment || ""}
+          onSave={onUpdate}
           onClose={() => setModalOpen(false)}
         />
       )}
@@ -318,9 +354,9 @@ function DescriptionCell({ value, onSave }) {
 }
 
 // ── Calendar picker ───────────────────────────────────────────────────────────
-function CalendarPicker({ value, onChange }) {
+function CalendarPicker({ onChange }) {
   const today = new Date();
-  const [viewDate, setViewDate] = useState(value || today);
+  const [viewDate, setViewDate] = useState(today);
   const [selecting, setSelecting] = useState("start");
   const [startDate, setStartDate] = useState(null);
   const [endDate, setEndDate] = useState(null);
@@ -330,7 +366,6 @@ function CalendarPicker({ value, onChange }) {
   const firstDay = new Date(year, month, 1).getDay();
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const blanks = (firstDay + 6) % 7;
-
   const MONTHS = ["Январь","Февраль","Март","Апрель","Май","Июнь","Июль","Август","Сентябрь","Октябрь","Ноябрь","Декабрь"];
   const DAYS = ["Пн","Вт","Ср","Чт","Пт","Сб","Вс"];
 
@@ -381,34 +416,89 @@ function CalendarPicker({ value, onChange }) {
   );
 }
 
+// ── Скачивание отчёта (blob) ──────────────────────────────────────────────────
+const downloadReport = async (path, filename) => {
+  const token = getToken();
+  const response = await fetch(`${BASE_URL}${path}`, {
+    headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+  });
+  if (!response.ok) {
+    let msg = `Ошибка ${response.status}`;
+    try { const e = await response.json(); if (e.detail) msg = e.detail; } catch {}
+    throw new Error(msg);
+  }
+  let fname = filename;
+  const cd = response.headers.get("Content-Disposition");
+  if (cd) { const m = cd.match(/filename[^;=\n]*=([^;\n]*)/); if (m) fname = m[1].replace(/['"]/g, "").trim(); }
+  const blob = await response.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = fname;
+  document.body.appendChild(a); a.click();
+  document.body.removeChild(a); URL.revokeObjectURL(url);
+};
+
 // ── Main Component ────────────────────────────────────────────────────────────
 export const Reports = () => {
-  const [events, setEvents] = useState(INITIAL_EVENTS);
-  const [search, setSearch] = useState("");
-  const [filterPriority, setFilterPriority] = useState("");
-  const [filterAssignee, setFilterAssignee] = useState("");
-  const [filterStatus, setFilterStatus] = useState("");
-  const [filterIdRange, setFilterIdRange] = useState({ from: "", to: "" });
+  // ── Данные тревог ──
+  const [alarms, setAlarms]         = useState([]);
+  const [loading, setLoading]       = useState(true);
+  const [loadError, setLoadError]   = useState("");
 
-  const [filterOpen, setFilterOpen] = useState(false);
+  // ── Фильтры ──
+  const [search, setSearch]                 = useState("");
+  const [filterSeverity, setFilterSeverity] = useState("");
+  const [filterStatus, setFilterStatus]     = useState("");
+  const [filterType, setFilterType]         = useState("");
+  const [filterIdRange, setFilterIdRange]   = useState({ from: "", to: "" });
+  const [filterOpen, setFilterOpen]         = useState(false);
   const filterRef = useRef(null);
 
-  const [exportFmt, setExportFmt] = useState("pdf");
-  const [periodKey, setPeriodKey] = useState("1m");
+  // ── Экспорт ──
+  const [exportFmt, setExportFmt]       = useState("pdf");
+  const [periodKey, setPeriodKey]       = useState("1m");
   const [showCalendar, setShowCalendar] = useState(false);
-  const [customRange, setCustomRange] = useState(null);
+  const [customRange, setCustomRange]   = useState(null);
+  const [exportLoading, setExportLoading] = useState(false);
+  const [exportError, setExportError]   = useState("");
+  const [exportHistory, setExportHistory] = useState([]);
 
-  const [page, setPage] = useState(1);
-  const [sortCol, setSortCol] = useState(null);
-  const [sortDir, setSortDir] = useState("asc");
-  const [exportHistory, setExportHistory] = useState([
-    { label: "Скачан журнал событий за месяц",     fmt: "PDF",  date: "05/04/2026", color: "#ff5252" },
-    { label: "Скачан журнал событий за месяц",     fmt: "XLSX", date: "05/03/2026", color: "#01e676" },
-    { label: "Скачан журнал событий за 6 месяцев", fmt: "PDF",  date: "05/01/2026", color: "#ff5252" },
-    { label: "Скачан журнал событий за день",      fmt: "XLSX", date: "11/12/2025", color: "#01e676" },
-  ]);
+  // ── Таблица ──
+  const [page, setPage]       = useState(1);
+  const [sortCol, setSortCol] = useState("timestamp");
+  const [sortDir, setSortDir] = useState("desc");
 
-  // Close filter panel when clicking outside
+  const ROWS_PER_PAGE = 10;
+
+  // ── Загрузка тревог ───────────────────────────────────────────────────────
+  const loadAlarms = useCallback(async () => {
+    setLoading(true);
+    setLoadError("");
+    try {
+      const data = await apiRequest("/alarms/");
+      setAlarms(Array.isArray(data) ? data : []);
+    } catch (err) {
+      setLoadError(err.message || "Ошибка загрузки тревог");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { loadAlarms(); }, [loadAlarms]);
+
+  // ── WebSocket: live-обновление статуса тревог ─────────────────────────────
+  useEffect(() => {
+    const unsub = wsService.on("alarm_updated", (event) => {
+      setAlarms(prev => prev.map(a =>
+        a.id === event.alarm_id
+          ? { ...a, status: event.new_status, resolved_at: event.resolved_at, user_comment: event.user_comment ?? a.user_comment }
+          : a
+      ));
+    });
+    return () => unsub();
+  }, []);
+
+  // ── Закрыть фильтр при клике вне ─────────────────────────────────────────
   useEffect(() => {
     const handler = (e) => {
       if (filterRef.current && !filterRef.current.contains(e.target)) setFilterOpen(false);
@@ -417,46 +507,52 @@ export const Reports = () => {
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
-  const ROWS_PER_PAGE = 5;
+  // ── Обновление тревоги в state ────────────────────────────────────────────
+  const updateAlarm = useCallback((updated) => {
+    if (!updated) return;
+    setAlarms(prev => prev.map(a => a.id === updated.id ? updated : a));
+  }, []);
 
-  const updateEvent = (id, field, value) => {
-    setEvents(prev => prev.map(e => e.id === id ? { ...e, [field]: value } : e));
-  };
-
+  // ── Сортировка и фильтрация ───────────────────────────────────────────────
   const handleSort = (key) => {
     if (sortCol === key) setSortDir(d => d === "asc" ? "desc" : "asc");
     else { setSortCol(key); setSortDir("asc"); }
+    setPage(1);
   };
 
-  const filtered = events.filter(e => {
+  const filtered = alarms.filter(a => {
     if (search) {
       const q = search.toLowerCase();
-      if (![e.id, e.eventType, e.description].some(v => v.toLowerCase().includes(q))) return false;
+      const typeLabel = ALARM_TYPE_MAP[a.alarm_type] || a.alarm_type || "";
+      if (![String(a.id), typeLabel, a.description || "", a.user_comment || ""].some(v => v.toLowerCase().includes(q))) return false;
     }
-    if (filterPriority && e.priority !== filterPriority) return false;
-    if (filterAssignee && e.assignee !== filterAssignee) return false;
-    if (filterStatus && e.status !== filterStatus) return false;
-    if (filterIdRange.from && parseInt(e.id) < parseInt(filterIdRange.from)) return false;
-    if (filterIdRange.to && parseInt(e.id) > parseInt(filterIdRange.to)) return false;
+    if (filterSeverity && a.severity !== filterSeverity) return false;
+    if (filterStatus   && a.status   !== filterStatus)   return false;
+    if (filterType     && a.alarm_type !== filterType)   return false;
+    if (filterIdRange.from && a.id < parseInt(filterIdRange.from)) return false;
+    if (filterIdRange.to   && a.id > parseInt(filterIdRange.to))   return false;
     return true;
   });
 
   const sorted = [...filtered].sort((a, b) => {
     if (!sortCol) return 0;
-    const av = a[sortCol], bv = b[sortCol];
-    return sortDir === "asc" ? String(av).localeCompare(String(bv)) : String(bv).localeCompare(String(av));
+    const av = a[sortCol] ?? "", bv = b[sortCol] ?? "";
+    return sortDir === "asc"
+      ? String(av).localeCompare(String(bv))
+      : String(bv).localeCompare(String(av));
   });
 
   const totalPages = Math.max(1, Math.ceil(sorted.length / ROWS_PER_PAGE));
   const pageData = sorted.slice((page - 1) * ROWS_PER_PAGE, page * ROWS_PER_PAGE);
 
   const activeFilters = [
-    filterPriority && { key: "priority", label: `Критичность: ${PRIORITY_STYLE[filterPriority]?.label}`, clear: () => setFilterPriority("") },
-    filterAssignee && { key: "assignee", label: `Исполнитель: ${filterAssignee}`, clear: () => setFilterAssignee("") },
-    filterStatus && { key: "status", label: `Статус: ${STATUS_STYLE[filterStatus]?.label}`, clear: () => setFilterStatus("") },
+    filterSeverity && { key: "severity", label: `Критичность: ${SEVERITY_MAP[filterSeverity]?.label}`, clear: () => setFilterSeverity("") },
+    filterStatus   && { key: "status",   label: `Статус: ${STATUS_MAP[filterStatus]?.label}`,           clear: () => setFilterStatus("") },
+    filterType     && { key: "type",     label: `Тип: ${ALARM_TYPE_MAP[filterType] || filterType}`,     clear: () => setFilterType("") },
     (filterIdRange.from || filterIdRange.to) && { key: "id", label: `ID: ${filterIdRange.from || "—"} – ${filterIdRange.to || "—"}`, clear: () => setFilterIdRange({ from: "", to: "" }) },
   ].filter(Boolean);
 
+  // ── Экспорт ───────────────────────────────────────────────────────────────
   const getPeriodLabel = () => {
     if (periodKey === "custom" && customRange) {
       const fmt = d => d.toLocaleDateString("ru-RU", { day: "2-digit", month: "2-digit", year: "2-digit" });
@@ -470,27 +566,81 @@ export const Reports = () => {
     return map[periodKey] || "за период";
   };
 
-  const handleExport = () => {
+  // Экспорт журнала тревог — используем /reports/download-period-location
+  // без конкретного sensor_id, т.к. это сводный отчёт.
+  // Если нужен по конкретному датчику — используем /reports/download-period/{sensor_id}
+  // Здесь экспортируем все тревоги → location report или просто первый датчик
+  const handleExport = async () => {
+    setExportLoading(true);
+    setExportError("");
+    const fmt = exportFmt === "excel" ? "xlsx" : "pdf";
     const now = new Date();
     const dateStr = now.toLocaleDateString("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric" });
-    const label = `Скачан журнал событий ${getPeriodDescription()}`;
-    const color = exportFmt === "pdf" ? "#ff5252" : "#01e676";
-    setExportHistory(prev => [{ label, fmt: exportFmt.toUpperCase(), date: dateStr, color }, ...prev]);
+    const timeStr = now.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
+
+    try {
+      if (periodKey === "custom" && customRange) {
+        // Произвольный диапазон — используем первый датчик из списка тревог или общий
+        const sensorId = alarms[0]?.sensor_id;
+        if (sensorId) {
+          const start = customRange.start.toISOString().slice(0, 10);
+          const end   = customRange.end.toISOString().slice(0, 10);
+          const params = new URLSearchParams({ period: "custom", start_date: start, end_date: end, format: fmt });
+          await downloadReport(`/reports/download-period/${sensorId}?${params}`, `report_alarms_${start}_${end}.${fmt}`);
+        } else {
+          throw new Error("Нет данных для экспорта");
+        }
+      } else {
+        const apiPeriod = PERIOD_API_MAP[periodKey] || "last_month";
+        // Пробуем сводный отчёт по первой локации из тревог
+        const sensorId = alarms[0]?.sensor_id;
+        if (sensorId) {
+          const params = new URLSearchParams({ period: apiPeriod, format: fmt });
+          await downloadReport(`/reports/download-period/${sensorId}?${params}`, `report_alarms_${periodKey}.${fmt}`);
+        } else {
+          throw new Error("Нет данных для экспорта");
+        }
+      }
+
+      const color = exportFmt === "pdf" ? "#ff5252" : "#01e676";
+      setExportHistory(prev => [{
+        label: `Журнал событий ${getPeriodDescription()}`,
+        fmt: fmt.toUpperCase(),
+        date: dateStr,
+        time: timeStr,
+        color,
+      }, ...prev]);
+    } catch (err) {
+      setExportError(err.message || "Ошибка экспорта");
+    } finally {
+      setExportLoading(false);
+    }
   };
 
-  const uniqueAssignees = [...new Set(events.map(e => e.assignee))];
-
+  // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div className="rp-container">
       <main className="rp-main">
-        <h1 className="rp-page-title">Уведомления</h1>
+        <div className="rp-page-header">
+          <h1 className="rp-page-title">Уведомления</h1>
+          <button className="rp-refresh-btn" onClick={loadAlarms} disabled={loading} title="Обновить">
+            <IconRefresh />
+            {loading ? "Загрузка..." : "Обновить"}
+          </button>
+        </div>
+
+        {loadError && (
+          <div className="rp-error-banner">{loadError}</div>
+        )}
 
         {/* ── Event log table ── */}
         <div className="rp-card rp-table-card">
           <div className="rp-table-topbar">
-            <h2 className="rp-card-title">Журнал событий</h2>
+            <h2 className="rp-card-title">
+              Журнал событий
+              {!loading && <span className="rp-alarm-count">{alarms.length}</span>}
+            </h2>
             <div className="rp-table-controls">
-              {/* Search */}
               <div className="rp-search-box">
                 <IconSearch />
                 <input
@@ -502,7 +652,6 @@ export const Reports = () => {
                 {search && <button className="rp-search-clear" onClick={() => setSearch("")}><IconX /></button>}
               </div>
 
-              {/* Filter toggle — fixed positioned panel */}
               <div className="rp-filter-wrap" ref={filterRef}>
                 <button
                   className={`rp-filter-btn ${activeFilters.length ? "rp-filter-btn--active" : ""}`}
@@ -516,7 +665,6 @@ export const Reports = () => {
                   <div className="rp-filter-panel-fixed">
                     <div className="rp-filter-section-title">Фильтрация</div>
 
-                    {/* ID range */}
                     <div className="rp-filter-label">ID диапазон</div>
                     <div className="rp-filter-id-row">
                       <input className="rp-filter-id-input" placeholder="от" value={filterIdRange.from}
@@ -526,34 +674,34 @@ export const Reports = () => {
                         onChange={e => { setFilterIdRange(p => ({ ...p, to: e.target.value })); setPage(1); }} />
                     </div>
 
-                    {/* Priority */}
                     <div className="rp-filter-label">Критичность</div>
                     <div className="rp-filter-options">
-                      {Object.entries(PRIORITY_STYLE).map(([k, v]) => (
-                        <div key={k} className={`rp-filter-option ${filterPriority === k ? "rp-filter-option--active" : ""}`}
-                          style={{ color: filterPriority === k ? v.color : undefined }}
-                          onClick={() => { setFilterPriority(p => p === k ? "" : k); setPage(1); }}>
+                      {Object.entries(SEVERITY_MAP).map(([k, v]) => (
+                        <div key={k}
+                          className={`rp-filter-option ${filterSeverity === k ? "rp-filter-option--active" : ""}`}
+                          style={{ color: filterSeverity === k ? v.color : undefined }}
+                          onClick={() => { setFilterSeverity(p => p === k ? "" : k); setPage(1); }}>
                           {v.label}
                         </div>
                       ))}
                     </div>
 
-                    {/* Assignee */}
-                    <div className="rp-filter-label">Исполнитель</div>
+                    <div className="rp-filter-label">Тип события</div>
                     <div className="rp-filter-options rp-filter-options--col">
-                      {uniqueAssignees.map(a => (
-                        <div key={a} className={`rp-filter-option ${filterAssignee === a ? "rp-filter-option--active" : ""}`}
-                          onClick={() => { setFilterAssignee(p => p === a ? "" : a); setPage(1); }}>
-                          {a}
+                      {Object.entries(ALARM_TYPE_MAP).map(([k, v]) => (
+                        <div key={k}
+                          className={`rp-filter-option ${filterType === k ? "rp-filter-option--active" : ""}`}
+                          onClick={() => { setFilterType(p => p === k ? "" : k); setPage(1); }}>
+                          {v}
                         </div>
                       ))}
                     </div>
 
-                    {/* Status */}
                     <div className="rp-filter-label">Статус</div>
                     <div className="rp-filter-options rp-filter-options--col">
-                      {Object.entries(STATUS_STYLE).map(([k, v]) => (
-                        <div key={k} className={`rp-filter-option ${filterStatus === k ? "rp-filter-option--active" : ""}`}
+                      {Object.entries(STATUS_MAP).map(([k, v]) => (
+                        <div key={k}
+                          className={`rp-filter-option ${filterStatus === k ? "rp-filter-option--active" : ""}`}
                           style={{ color: filterStatus === k ? v.color : undefined }}
                           onClick={() => { setFilterStatus(p => p === k ? "" : k); setPage(1); }}>
                           {v.label}
@@ -563,7 +711,7 @@ export const Reports = () => {
 
                     {activeFilters.length > 0 && (
                       <button className="rp-filter-clear-all" onClick={() => {
-                        setFilterPriority(""); setFilterAssignee(""); setFilterStatus("");
+                        setFilterSeverity(""); setFilterStatus(""); setFilterType("");
                         setFilterIdRange({ from: "", to: "" }); setPage(1);
                       }}>
                         Сбросить все
@@ -575,55 +723,57 @@ export const Reports = () => {
             </div>
           </div>
 
-          {/* Active filter chips */}
           {activeFilters.length > 0 && (
             <div className="rp-filter-chips">
               {activeFilters.map(f => <FilterChip key={f.key} label={f.label} onRemove={f.clear} />)}
             </div>
           )}
 
-          {/* Column headers */}
           <div className="rp-col-header">
             {COLS.map(col => (
               <div key={col.key} className="rp-col-head" onClick={() => handleSort(col.key)}>
                 <span>{col.label}</span>
-                {["id","priority","status","eventTime","resolveTime"].includes(col.key) ? <IconSort /> : <IconSortAlt />}
+                {["id","severity","status","timestamp","resolved_at"].includes(col.key) ? <IconSort /> : <IconSortAlt />}
               </div>
             ))}
           </div>
 
-          {/* Rows */}
           <div className="rp-table-body">
-            {pageData.length === 0 && (
-              <div className="rp-empty-state">Нет событий, соответствующих фильтрам</div>
+            {loading && (
+              <div className="rp-empty-state">Загрузка событий...</div>
             )}
-            {pageData.map((row) => {
-              const pr = PRIORITY_STYLE[row.priority];
+            {!loading && pageData.length === 0 && (
+              <div className="rp-empty-state">
+                {alarms.length === 0 ? "Нет тревог" : "Нет событий, соответствующих фильтрам"}
+              </div>
+            )}
+            {!loading && pageData.map((row) => {
+              const sev = SEVERITY_MAP[row.severity] || { label: row.severity, color: "#929292" };
+              const typeLabel = ALARM_TYPE_MAP[row.alarm_type] || row.alarm_type || "—";
               return (
                 <div key={row.id} className="rp-table-row">
                   <div className="rp-td">{row.id}</div>
-                  <div className="rp-td" style={{ color: pr.color }}>{pr.label}</div>
+                  <div className="rp-td" style={{ color: sev.color }}>{sev.label}</div>
                   <div className="rp-td rp-td--gap">
                     <IconMessage />
-                    {row.eventType}
+                    {typeLabel}
+                  </div>
+                  <div className="rp-td" style={{ color: "#929292" }}>
+                    #{row.sensor_id}
                   </div>
                   <div className="rp-td">
-                    <AssigneePicker value={row.assignee} onChange={v => updateEvent(row.id, "assignee", v)} />
+                    <DescriptionCell alarm={row} onUpdate={updateAlarm} />
                   </div>
                   <div className="rp-td">
-                    <DescriptionCell value={row.description} onSave={v => updateEvent(row.id, "description", v)} />
+                    <StatusPicker alarm={row} onUpdate={updateAlarm} />
                   </div>
-                  <div className="rp-td">
-                    <StatusPicker value={row.status} onChange={v => updateEvent(row.id, "status", v)} />
-                  </div>
-                  <div className="rp-td">{row.eventTime}</div>
-                  <div className="rp-td">{row.resolveTime}</div>
+                  <div className="rp-td">{formatDateTime(row.timestamp)}</div>
+                  <div className="rp-td">{formatDateTime(row.resolved_at)}</div>
                 </div>
               );
             })}
           </div>
 
-          {/* Pagination */}
           <div className="rp-pagination">
             <span className="rp-pagination-count">{filtered.length} записей</span>
             <button className="rp-page-btn" onClick={() => setPage(p => Math.max(1, p - 1))}><IconChevLeft /></button>
@@ -636,8 +786,6 @@ export const Reports = () => {
 
         {/* ── Bottom row ── */}
         <div className="rp-bottom-row">
-
-          {/* Export panel */}
           <div className="rp-card rp-export-card">
             <h2 className="rp-card-title">Экспортировать данные</h2>
 
@@ -659,7 +807,7 @@ export const Reports = () => {
               {PERIOD_OPTIONS.filter(p => p.key !== "custom").map(p => (
                 <button key={p.key}
                   className={`rp-period-chip ${periodKey === p.key ? "rp-period-chip--active" : ""}`}
-                  onClick={() => { setPeriodKey(p.key); setShowCalendar(false); }}>
+                  onClick={() => { setPeriodKey(p.key); setShowCalendar(false); setCustomRange(null); }}>
                   {p.label}
                 </button>
               ))}
@@ -680,16 +828,21 @@ export const Reports = () => {
               <span className="rp-period-label">Выбранный период</span>
             </div>
 
-            <button className="rp-export-btn" onClick={handleExport}>
+            {exportError && (
+              <div style={{ fontSize: "12px", color: "#ff5252" }}>{exportError}</div>
+            )}
+
+            <button className="rp-export-btn" onClick={handleExport} disabled={exportLoading}>
               <IconDownload />
-              <span>Экспортировать&nbsp;&nbsp;{exportFmt.toUpperCase()}</span>
+              <span>{exportLoading ? "Загрузка..." : `Экспортировать  ${exportFmt.toUpperCase()}`}</span>
             </button>
           </div>
 
-          {/* Export history */}
           <div className="rp-card rp-history-card">
             <h2 className="rp-card-title">История экспорта</h2>
-            {exportHistory.length === 0 && <div className="rp-empty-state" style={{ marginTop: 16 }}>Нет истории</div>}
+            {exportHistory.length === 0 && (
+              <div className="rp-empty-state" style={{ marginTop: 16 }}>Нет истории</div>
+            )}
             <ul className="rp-history-list">
               {exportHistory.map((item, i) => (
                 <li key={i} className="rp-history-item">
@@ -702,7 +855,7 @@ export const Reports = () => {
                       <span className="rp-history-label">{item.label}</span>
                       <span className="rp-history-fmt-tag" style={{ color: item.color, borderColor: item.color }}>{item.fmt}</span>
                     </div>
-                    <span className="rp-history-date">{item.date}</span>
+                    <span className="rp-history-date">{item.date} в {item.time}</span>
                   </div>
                 </li>
               ))}

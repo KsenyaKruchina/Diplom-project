@@ -95,11 +95,24 @@ body { font-family: "Inter", Helvetica, sans-serif; }
 
 .floor-svg { width: 100%; height: 100%; }
 
-.floor-image-container { position: relative; width: 100%; height: 100%; }
+/* Fix 1: изображение занимает всё пространство блока */
+.floor-image {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+  pointer-events: none;
+  user-select: none;
+}
 
-.floor-image { width: 100%; height: 100%; object-fit: contain; display: block; }
-
-.floor-image-overlay { position: absolute; inset: 0; pointer-events: none; }
+/* Fix 1: оверлей поверх изображения */
+.floor-image-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
 .floor-image-overlay .floor-sensor-pin { pointer-events: all; }
 
 .floor-sensor-pin {
@@ -119,8 +132,6 @@ body { font-family: "Inter", Helvetica, sans-serif; }
   box-shadow: 0 0 12px currentColor;
   transform: translate(-50%, -50%) scale(1.08);
 }
-.floor-sensor-pin-name { font-size: 10px; font-weight: 700; }
-.floor-sensor-pin-vals { font-size: 8px; opacity: 0.9; }
 
 .floor-footer {
   display: flex; align-items: center;
@@ -136,6 +147,18 @@ body { font-family: "Inter", Helvetica, sans-serif; }
 /* ── Buttons ─────────────────────────────────────────────────────────────── */
 
 .floor-actions { display: flex; gap: 8px; }
+
+/* Fix 2: унифицированная кнопка действия на плане */
+.btn-floor-action {
+  display: flex; align-items: center; gap: 6px;
+  padding: 6px 12px; border-radius: 8px;
+  border: 1px solid rgba(255,255,255,0.15);
+  background: rgba(255,255,255,0.04);
+  color: var(--text-secondary); cursor: pointer;
+  font-size: 12px; font-family: inherit;
+  transition: background 0.15s, color 0.15s;
+}
+.btn-floor-action:hover { background: rgba(255,255,255,0.08); color: var(--text-primary); }
 
 .btn-sensor {
   display: flex; align-items: center; gap: 6px;
@@ -209,19 +232,27 @@ body { font-family: "Inter", Helvetica, sans-serif; }
 .sensor-card-header { display: flex; align-items: center; justify-content: space-between; }
 .sensor-card-title  { font-size: 11px; color: var(--text-secondary); font-weight: 400; }
 
-.sensor-battery { display: flex; align-items: center; gap: 6px; }
-.battery-label  { font-size: 11px; font-weight: 500; }
+/* Fix 4: два блока метрик в одной строке с выровненной высотой */
+.sensor-metrics-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  align-items: stretch; /* одинаковая высота */
+}
 
-.sensor-metric { background: #171717; border-radius: 8px; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+.sensor-metric-half {
+  border: 1px solid;
+  border-radius: 8px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  /* растягиваем нижний блок (график) на всю оставшуюся высоту */
+}
 
-.sensor-metric-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
-.sensor-metric-label { font-size: 10px; color: var(--text-secondary); margin-bottom: 2px; }
-
-.sensor-card-value { display: flex; align-items: baseline; gap: 2px; }
-.sensor-val  { font-size: 28px; font-weight: 500; color: var(--text-primary); line-height: 1; }
-.sensor-unit { font-size: 16px; font-weight: 700; color: var(--text-primary); }
-
-.sensor-badge { border-radius: 4px; padding: 3px 8px; font-size: 10px; font-weight: 400; white-space: nowrap; flex-shrink: 0; margin-top: 2px; }
+.sensor-metric-half > div:last-child {
+  flex: 1;
+  min-height: 0;
+}
 
 /* ── Mini Chart ──────────────────────────────────────────────────────────── */
 
@@ -303,6 +334,7 @@ body { font-family: "Inter", Helvetica, sans-serif; }
   font-size: 13px; font-weight: 600; font-family: inherit; transition: opacity 0.15s;
 }
 .btn-save:hover { opacity: 0.88; }
+.btn-save:disabled { opacity: 0.5; cursor: not-allowed; }
 
 /* ── Sensor drag map ─────────────────────────────────────────────────────── */
 
@@ -314,14 +346,12 @@ body { font-family: "Inter", Helvetica, sans-serif; }
   background: #0d0d0d;
 }
 
-/* Real floor image as background of drag area */
 .sensor-drag-bg-image {
   position: absolute; inset: 0;
   width: 100%; height: 100%;
   object-fit: contain;
   pointer-events: none;
   user-select: none;
-  /* slight dark overlay so markers are readable */
   filter: brightness(0.75);
 }
 
@@ -331,7 +361,6 @@ body { font-family: "Inter", Helvetica, sans-serif; }
   pointer-events: none;
 }
 
-/* Ghost markers (other sensors) */
 .sensor-drag-ghost {
   position: absolute;
   transform: translate(-50%, -50%);
@@ -345,7 +374,6 @@ body { font-family: "Inter", Helvetica, sans-serif; }
   z-index: 5;
 }
 
-/* Active draggable marker */
 .sensor-drag-marker {
   position: absolute;
   width: 36px; height: 36px;
@@ -374,4 +402,207 @@ body { font-family: "Inter", Helvetica, sans-serif; }
   .dashboard-main       { padding: 16px 12px; }
   .modal-two-col        { grid-template-columns: 1fr; }
   .modal-box            { min-width: unset; padding: 20px 16px; }
+  .sensor-metrics-row   { grid-template-columns: 1fr 1fr; }
+}
+
+/* Выпадающий список локаций */
+.location-dropdown-container {
+  position: relative;
+  margin-bottom: 16px;
+}
+
+.location-dropdown-trigger {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: rgba(15, 20, 25, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  padding: 10px 14px;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.location-dropdown-trigger:hover {
+  background: rgba(25, 35, 45, 0.9);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.location-dropdown-value {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.location-dropdown-value svg {
+  width: 14px;
+  height: 14px;
+  stroke: #01e676;
+}
+
+.location-dropdown-arrow {
+  transition: transform 0.2s;
+}
+
+.location-dropdown-arrow.open {
+  transform: rotate(180deg);
+}
+
+.location-dropdown-arrow svg {
+  width: 14px;
+  height: 14px;
+  stroke: #929292;
+}
+
+.location-dropdown-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  background: #1a1e22;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  overflow: hidden;
+  z-index: 100;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
+}
+
+.location-dropdown-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  background: transparent;
+  border: none;
+  color: #e0e0e0;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.15s;
+  text-align: left;
+}
+
+.location-dropdown-item svg {
+  width: 12px;
+  height: 12px;
+  stroke: #666;
+}
+
+.location-dropdown-item:hover {
+  background: rgba(1, 230, 118, 0.1);
+  color: #01e676;
+}
+
+.location-dropdown-item.active {
+  background: rgba(1, 230, 118, 0.15);
+  color: #01e676;
+}
+
+.location-dropdown-item.active svg {
+  stroke: #01e676;
+}
+
+/* Выпадающий список локаций */
+.location-dropdown-container {
+  position: relative;
+  margin-bottom: 16px;
+}
+
+.location-dropdown-trigger {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: rgba(15, 20, 25, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  padding: 10px 14px;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.location-dropdown-trigger:hover {
+  background: rgba(25, 35, 45, 0.9);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.location-dropdown-value {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.location-dropdown-value svg {
+  width: 14px;
+  height: 14px;
+  stroke: #01e676;
+}
+
+.location-dropdown-arrow {
+  transition: transform 0.2s;
+}
+
+.location-dropdown-arrow.open {
+  transform: rotate(180deg);
+}
+
+.location-dropdown-arrow svg {
+  width: 14px;
+  height: 14px;
+  stroke: #929292;
+}
+
+.location-dropdown-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  background: #1a1e22;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  overflow: hidden;
+  z-index: 100;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
+}
+
+.location-dropdown-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  background: transparent;
+  border: none;
+  color: #e0e0e0;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.15s;
+  text-align: left;
+}
+
+.location-dropdown-item svg {
+  width: 12px;
+  height: 12px;
+  stroke: #666;
+}
+
+.location-dropdown-item:hover {
+  background: rgba(1, 230, 118, 0.1);
+  color: #01e676;
+}
+
+.location-dropdown-item.active {
+  background: rgba(1, 230, 118, 0.15);
+  color: #01e676;
+}
+
+.location-dropdown-item.active svg {
+  stroke: #01e676;
 }

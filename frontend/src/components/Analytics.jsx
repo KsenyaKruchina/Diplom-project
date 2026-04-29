@@ -1,31 +1,28 @@
+// frontend/src/components/Analytics.jsx
+// ─── Аналитика с реальными данными из API ────────────────────────────────────
+//
+// Изменения по сравнению со старой версией:
+//   1. Список датчиков и локаций загружается из API
+//   2. График строится по реальной телеметрии
+//   3. Кнопка "Скачать" вызывает реальный endpoint /reports/download-period/
+
 import React, { useState, useRef, useEffect } from "react";
 import "./Analytics.css";
+import { useAnalyticsData } from "../hooks/useAnalyticsData";
+import { downloadPeriodReport, downloadRangeReport, PERIOD_MAP } from "../services/reportsService";
 
-// ── Icons ─────────────────────────────────────────────────────────────────────
-const IconEventNote = () => (
-  <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-    <rect x="3" y="5" width="18" height="16" rx="2" stroke="white" strokeWidth="1.6"/>
-    <line x1="3" y1="10" x2="21" y2="10" stroke="white" strokeWidth="1.4"/>
-    <line x1="8" y1="3" x2="8" y2="7" stroke="white" strokeWidth="1.8" strokeLinecap="round"/>
-    <line x1="16" y1="3" x2="16" y2="7" stroke="white" strokeWidth="1.8" strokeLinecap="round"/>
-    <line x1="7" y1="14" x2="12" y2="14" stroke="white" strokeWidth="1.4" strokeLinecap="round"/>
-    <line x1="7" y1="17" x2="10" y2="17" stroke="white" strokeWidth="1.4" strokeLinecap="round"/>
-  </svg>
-);
-
+// ── Icons (без изменений) ──────────────────────────────────────────────────
 const IconDownloadArrow = ({ color = "#ffc207" }) => (
   <svg width="18" height="20" viewBox="0 0 20 22" fill="none">
     <path d="M10 2v13M10 15l-5-5M10 15l5-5" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
     <line x1="2" y1="20" x2="18" y2="20" stroke={color} strokeWidth="1.8" strokeLinecap="round"/>
   </svg>
 );
-
 const IconChevronDown = () => (
   <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
     <path d="M4 6l4 4 4-4" stroke="#929292" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
   </svg>
 );
-
 const IconCalendar = () => (
   <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
     <rect x="1.5" y="3" width="13" height="11" rx="2" stroke="#929292" strokeWidth="1.3"/>
@@ -34,14 +31,12 @@ const IconCalendar = () => (
     <line x1="1.5" y1="7" x2="14.5" y2="7" stroke="#929292" strokeWidth="1.3"/>
   </svg>
 );
-
 const IconClose = () => (
   <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
     <line x1="4" y1="4" x2="12" y2="12" stroke="#929292" strokeWidth="1.6" strokeLinecap="round"/>
     <line x1="12" y1="4" x2="4" y2="12" stroke="#929292" strokeWidth="1.6" strokeLinecap="round"/>
   </svg>
 );
-
 const IconSensor = () => (
   <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
     <circle cx="8" cy="8" r="3" fill="#ffc207" fillOpacity="0.3" stroke="#ffc207" strokeWidth="1.3"/>
@@ -49,71 +44,37 @@ const IconSensor = () => (
     <path d="M4 4a5.66 5.66 0 0 0 0 8M12 4a5.66 5.66 0 0 1 0 8" stroke="#ffc207" strokeWidth="1.2" strokeLinecap="round"/>
   </svg>
 );
-
 const IconLocation = () => (
   <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
     <path d="M8 1.5a4.5 4.5 0 0 1 4.5 4.5c0 3.5-4.5 8.5-4.5 8.5S3.5 9.5 3.5 6A4.5 4.5 0 0 1 8 1.5z" stroke="#07bcd4" strokeWidth="1.3" fill="#07bcd4" fillOpacity="0.15"/>
     <circle cx="8" cy="6" r="1.5" fill="#07bcd4"/>
   </svg>
 );
-
 const IconXLS = () => (
   <svg width="44" height="44" viewBox="0 0 44 44" fill="none">
     <rect x="6" y="3" width="24" height="30" rx="2.5" fill="#1a1a1a" stroke="#01e676" strokeWidth="1.4"/>
     <path d="M30 3l8 8h-8V3z" fill="#01e676" fillOpacity="0.5"/>
-    <line x1="11" y1="13" x2="25" y2="13" stroke="#01e676" strokeWidth="1.2" strokeLinecap="round"/>
-    <line x1="11" y1="17" x2="25" y2="17" stroke="#01e676" strokeWidth="1.2" strokeLinecap="round"/>
-    <line x1="11" y1="21" x2="20" y2="21" stroke="#01e676" strokeWidth="1.2" strokeLinecap="round"/>
     <text x="22" y="41" textAnchor="middle" fill="#01e676" fontSize="8" fontFamily="Inter, sans-serif" fontWeight="700">XLSX</text>
   </svg>
 );
-
 const IconPDF = () => (
   <svg width="44" height="44" viewBox="0 0 44 44" fill="none">
     <rect x="6" y="3" width="24" height="30" rx="2.5" fill="#1a1a1a" stroke="#ff5252" strokeWidth="1.4"/>
     <path d="M30 3l8 8h-8V3z" fill="#ff5252" fillOpacity="0.5"/>
-    <line x1="11" y1="13" x2="25" y2="13" stroke="#ff5252" strokeWidth="1.2" strokeLinecap="round"/>
-    <line x1="11" y1="17" x2="25" y2="17" stroke="#ff5252" strokeWidth="1.2" strokeLinecap="round"/>
-    <line x1="11" y1="21" x2="20" y2="21" stroke="#ff5252" strokeWidth="1.2" strokeLinecap="round"/>
     <text x="22" y="41" textAnchor="middle" fill="#ff5252" fontSize="8" fontFamily="Inter, sans-serif" fontWeight="700">PDF</text>
   </svg>
 );
 
-// ── Static data ───────────────────────────────────────────────────
-const SENSORS = [
-  { id: "0001", name: "Д1", location: "ПХ №1" },
-  { id: "0002", name: "Д2", location: "ПХ №1" },
-  { id: "0003", name: "Д3", location: "ПХ №7" },
-  { id: "0004", name: "Д4", location: "ПХ №7" },
-  { id: "0005", name: "Д5", location: "ПХ №3" },
-];
-const LOCATIONS = ["ПХ №1", "ПХ №2", "ПХ №7", "ПХ №3", "Хозяйственный блок", "Зона брака", "ПХ №6"];
-
+// ── Периоды ───────────────────────────────────────────────────────────────────
 const PERIODS = [
   { key: "day",   label: "День" },
   { key: "week",  label: "Нед" },
   { key: "month", label: "Мес" },
   { key: "year",  label: "Год" },
 ];
-
-const PERIOD_LABELS_FULL = {
-  day: "день",
-  week: "неделю",
-  month: "месяц",
-  year: "год",
-};
-
-// ── Helpers ───────────────────────────────────────────────────────
-const genData = (count, base, spread) =>
-  Array.from({ length: count }, () => +(base + (Math.random() - 0.5) * spread).toFixed(1));
-
-const getChartData = (period) => {
-  const counts = { day: 24, week: 7, month: 30, year: 12 };
-  const n = counts[period];
-  return { temp: genData(n, 22, 8), hum: genData(n, 55, 20) };
-};
-
+const PERIOD_LABELS_FULL = { day: "день", week: "неделю", month: "месяц", year: "год" };
 const MONTH_LABELS = ["Янв","Фев","Мар","Апр","Май","Июн","Июл","Авг","Сен","Окт","Ноя","Дек"];
+
 const getLabels = (period) => {
   if (period === "day")   return Array.from({length:24},(_,i)=>`${i}:00`).filter((_,i)=>i%3===0);
   if (period === "week")  return ["Пн","Вт","Ср","Чт","Пт","Сб","Вс"];
@@ -121,23 +82,25 @@ const getLabels = (period) => {
   return MONTH_LABELS;
 };
 
+// Заглушка графика когда нет реальных данных
+const genFallback = (n) => Array.from({ length: n }, (_, i) => 20 + Math.sin(i / 2) * 5);
+
 const FORMAT_CONFIG = {
   xlsx: { label: "Excel (XLSX)", icon: <IconXLS />, color: "#01e676", accentBg: "rgba(1,230,118,0.08)", borderColor: "#01e676", btnBg: "#1a1410" },
   pdf:  { label: "PDF",          icon: <IconPDF />, color: "#ff5252", accentBg: "rgba(255,82,82,0.08)",  borderColor: "#ff5252", btnBg: "#1a1010" },
 };
 
-// ── Chart component ───────────────────────────────────────────────
+// ── Chart ─────────────────────────────────────────────────────────────────────
 const LineChart = ({ data, color, height = 130 }) => {
+  if (!data || data.length < 2) return <div style={{height, background:"#111", borderRadius:8}}/>;
   const W = 520, H = height;
-  const min = Math.min(...data);
-  const max = Math.max(...data);
+  const min = Math.min(...data), max = Math.max(...data);
   const range = max - min || 1;
   const step = W / (data.length - 1);
   const toY = v => H - 8 - ((v - min) / range) * (H - 20);
   const pts = data.map((v, i) => `${i * step},${toY(v)}`).join(" ");
   const fill = `0,${H} ${pts} ${(data.length-1)*step},${H}`;
   const gradId = `grad-${color.replace("#","")}`;
-
   return (
     <svg width="100%" height={H} viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none">
       <defs>
@@ -148,15 +111,14 @@ const LineChart = ({ data, color, height = 130 }) => {
       </defs>
       <polygon points={fill} fill={`url(#${gradId})`}/>
       <polyline points={pts} fill="none" stroke={color} strokeWidth="2" strokeLinejoin="round"/>
-      {data.map((v, i) => (
-        i % Math.ceil(data.length / 8) === 0 &&
+      {data.map((v, i) => i % Math.ceil(data.length / 8) === 0 &&
         <circle key={i} cx={i*step} cy={toY(v)} r="3.5" fill={color} fillOpacity="0.9"/>
-      ))}
+      )}
     </svg>
   );
 };
 
-// ── Dropdown ──────────────────────────────────────────────────────
+// ── Dropdown ──────────────────────────────────────────────────────────────────
 const Dropdown = ({ icon, options, value, onChange, placeholder }) => {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
@@ -165,9 +127,7 @@ const Dropdown = ({ icon, options, value, onChange, placeholder }) => {
     document.addEventListener("mousedown", h);
     return () => document.removeEventListener("mousedown", h);
   }, []);
-
   const current = options.find(o => o.value === value);
-
   return (
     <div className="an-dropdown" ref={ref}>
       <button className="an-dropdown-btn" onClick={() => setOpen(o => !o)}>
@@ -184,12 +144,11 @@ const Dropdown = ({ icon, options, value, onChange, placeholder }) => {
       </button>
       {open && (
         <div className="an-dropdown-menu">
+          {options.length === 0 && <div style={{padding:"12px 14px", color:"#555", fontSize:"13px"}}>Нет данных</div>}
           {options.map(o => (
-            <button
-              key={o.value}
+            <button key={o.value}
               className={`an-dropdown-item ${value === o.value ? "an-dropdown-item--active" : ""}`}
-              onClick={() => { onChange(o.value); setOpen(false); }}
-            >
+              onClick={() => { onChange(o.value); setOpen(false); }}>
               {o.label}
             </button>
           ))}
@@ -199,7 +158,7 @@ const Dropdown = ({ icon, options, value, onChange, placeholder }) => {
   );
 };
 
-// ── Date picker modal ─────────────────────────────────────────────
+// ── DatePickerModal ───────────────────────────────────────────────────────────
 const DatePickerModal = ({ onClose, onApply }) => {
   const [from, setFrom] = useState("");
   const [to, setTo]     = useState("");
@@ -231,46 +190,52 @@ const DatePickerModal = ({ onClose, onApply }) => {
   );
 };
 
-// ── Main ──────────────────────────────────────────────────────────
+// ── Main ──────────────────────────────────────────────────────────────────────
 export const Analytics = () => {
+  const {
+    sensorOptions,
+    locationOptions,
+    history,
+    histLoading,
+    loading,
+    fetchHistory,
+  } = useAnalyticsData();
+
   const [filterSensor,   setFilterSensor]   = useState(null);
   const [filterLocation, setFilterLocation] = useState(null);
   const [chartPeriod,    setChartPeriod]    = useState("month");
   const [customRange,    setCustomRange]    = useState(null);
   const [showCal,        setShowCal]        = useState(false);
   const [exportFormat,   setExportFormat]   = useState("xlsx");
-  const [chartData,      setChartData]      = useState(() => getChartData("month"));
   const [exportHistory,  setExportHistory]  = useState([]);
-
-  const sensorOptions   = SENSORS.map(s => ({ value: s.id, label: `${s.name} (${s.id}) — ${s.location}` }));
-  const locationOptions = LOCATIONS.map(l => ({ value: l, label: l }));
+  const [exportLoading,  setExportLoading]  = useState(false);
+  const [exportError,    setExportError]    = useState("");
 
   const labels = getLabels(chartPeriod);
 
+  // Когда выбран датчик — загружаем его историю
+  useEffect(() => {
+    if (filterSensor) {
+      const apiPeriod = PERIOD_MAP[chartPeriod] || "30d";
+      if (customRange) {
+        fetchHistory(Number(filterSensor), {
+          period: null,
+          dateFrom: customRange.from + "T00:00:00",
+          dateTo:   customRange.to   + "T23:59:59",
+        });
+      } else {
+        fetchHistory(Number(filterSensor), { period: apiPeriod });
+      }
+    }
+  }, [filterSensor, chartPeriod, customRange, fetchHistory]);
+
+  // Данные для графика: реальные если загружены, иначе заглушка
+  const periodCounts = { day: 24, week: 7, month: 30, year: 12 };
+  const n = periodCounts[chartPeriod];
+  const chartTemp = history.temp.length > 0 ? history.temp : genFallback(n);
+  const chartHum  = history.hum.length  > 0 ? history.hum  : genFallback(n);
+
   const currentFmt = FORMAT_CONFIG[exportFormat];
-
-  // Recompute chart data when period or filters change
-  const handleSetPeriod = (key) => {
-    setChartPeriod(key);
-    setCustomRange(null);
-    setChartData(getChartData(key));
-  };
-
-  const handleSetSensor = (val) => {
-    setFilterSensor(val);
-    setChartData(getChartData(chartPeriod));
-  };
-
-  const handleSetLocation = (val) => {
-    setFilterLocation(val);
-    setChartData(getChartData(chartPeriod));
-  };
-
-  // Build export context summary
-  const sensorLabel = filterSensor
-    ? sensorOptions.find(s => s.value === filterSensor)?.label
-    : null;
-  const sensorName = sensorLabel ? sensorLabel.split(" ")[0] : null;
 
   const periodLabel = customRange
     ? `${customRange.from} – ${customRange.to}`
@@ -280,23 +245,51 @@ export const Analytics = () => {
     ? `${customRange.from} – ${customRange.to}`
     : { day: "День", week: "Неделя", month: "Месяц", year: "Год" }[chartPeriod];
 
-  const doExport = () => {
+  const sensorLabel = filterSensor
+    ? sensorOptions.find(s => s.value === filterSensor)?.label
+    : null;
+
+  // ─── Экспорт ────────────────────────────────────────────────────────────────
+
+  const doExport = async () => {
+    if (!filterSensor) {
+      setExportError("Выберите датчик для экспорта");
+      return;
+    }
+    setExportError("");
+    setExportLoading(true);
     const now = new Date();
     const dateStr = now.toLocaleDateString("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric" });
     const timeStr = now.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
 
-    const sensorPart   = sensorName   ? `, ${sensorName}`      : "";
-    const locPart      = filterLocation ? `, ${filterLocation}` : "";
+    try {
+      if (customRange) {
+        await downloadRangeReport(
+          Number(filterSensor),
+          customRange.from + "T00:00:00",
+          customRange.to   + "T23:59:59",
+          exportFormat
+        );
+      } else {
+        await downloadPeriodReport(
+          Number(filterSensor),
+          PERIOD_MAP[chartPeriod] || "30d",
+          exportFormat
+        );
+      }
 
-    const entry = {
-      label:  `Отчёт за ${periodLabel}${sensorPart}${locPart}`,
-      format: currentFmt.label,
-      color:  currentFmt.color,
-      date:   dateStr,
-      time:   timeStr,
-    };
-
-    setExportHistory(prev => [entry, ...prev]);
+      setExportHistory(prev => [{
+        label:  `Отчёт за ${periodLabel}${sensorLabel ? ", " + sensorLabel.split(" ")[0] : ""}`,
+        format: currentFmt.label,
+        color:  currentFmt.color,
+        date:   dateStr,
+        time:   timeStr,
+      }, ...prev]);
+    } catch (err) {
+      setExportError(err.message || "Ошибка экспорта");
+    } finally {
+      setExportLoading(false);
+    }
   };
 
   return (
@@ -312,23 +305,24 @@ export const Analytics = () => {
           <div className="an-filter-label">Фильтр данных:</div>
           <Dropdown
             icon={<IconSensor />}
-            placeholder="Выбрать датчик"
+            placeholder={loading ? "Загрузка..." : "Выбрать датчик"}
             options={sensorOptions}
             value={filterSensor}
-            onChange={handleSetSensor}
+            onChange={setFilterSensor}
           />
           <Dropdown
             icon={<IconLocation />}
-            placeholder="Выбрать локацию"
+            placeholder={loading ? "Загрузка..." : "Выбрать локацию"}
             options={locationOptions}
             value={filterLocation}
-            onChange={handleSetLocation}
+            onChange={setFilterLocation}
           />
           {(filterSensor || filterLocation) && (
-            <button className="an-filter-reset" onClick={() => { handleSetSensor(null); handleSetLocation(null); }}>
+            <button className="an-filter-reset" onClick={() => { setFilterSensor(null); setFilterLocation(null); }}>
               Сбросить
             </button>
           )}
+          {histLoading && <span style={{fontSize:"12px", color:"#929292"}}>Загрузка данных...</span>}
         </div>
 
         {/* ── Charts ── */}
@@ -340,34 +334,30 @@ export const Analytics = () => {
                 <h2 className="an-card-title">Температура</h2>
                 <p className="an-chart-sub">
                   {filterSensor
-                    ? `Датчик ${SENSORS.find(s=>s.id===filterSensor)?.name}`
-                    : filterLocation ? filterLocation : "Все датчики"}
+                    ? sensorOptions.find(s => s.value === filterSensor)?.label
+                    : filterLocation
+                      ? locationOptions.find(l => l.value === filterLocation)?.label
+                      : "Все датчики"}
                 </p>
               </div>
               <div className="an-period-bar">
                 {PERIODS.map(p => (
-                  <button
-                    key={p.key}
+                  <button key={p.key}
                     className={`an-period-btn ${chartPeriod === p.key && !customRange ? "an-period-btn--active" : ""}`}
-                    onClick={() => handleSetPeriod(p.key)}
-                  >
+                    onClick={() => { setChartPeriod(p.key); setCustomRange(null); }}>
                     {p.label}
                   </button>
                 ))}
                 <button
                   className={`an-period-btn an-period-btn--cal ${customRange ? "an-period-btn--active" : ""}`}
-                  onClick={() => setShowCal(true)}
-                  title="Произвольный период"
-                >
+                  onClick={() => setShowCal(true)} title="Произвольный период">
                   <IconCalendar />
                 </button>
               </div>
             </div>
-            <div className="an-chart-labels">
-              {labels.map(l => <span key={l}>{l}</span>)}
-            </div>
+            <div className="an-chart-labels">{labels.map(l => <span key={l}>{l}</span>)}</div>
             <div className="an-chart-area">
-              <LineChart data={chartData.temp} color="#07bcd4" />
+              <LineChart data={chartTemp} color="#07bcd4" />
             </div>
           </div>
 
@@ -378,34 +368,30 @@ export const Analytics = () => {
                 <h2 className="an-card-title">Влажность</h2>
                 <p className="an-chart-sub">
                   {filterSensor
-                    ? `Датчик ${SENSORS.find(s=>s.id===filterSensor)?.name}`
-                    : filterLocation ? filterLocation : "Все датчики"}
+                    ? sensorOptions.find(s => s.value === filterSensor)?.label
+                    : filterLocation
+                      ? locationOptions.find(l => l.value === filterLocation)?.label
+                      : "Все датчики"}
                 </p>
               </div>
               <div className="an-period-bar">
                 {PERIODS.map(p => (
-                  <button
-                    key={p.key}
+                  <button key={p.key}
                     className={`an-period-btn ${chartPeriod === p.key && !customRange ? "an-period-btn--active" : ""}`}
-                    onClick={() => handleSetPeriod(p.key)}
-                  >
+                    onClick={() => { setChartPeriod(p.key); setCustomRange(null); }}>
                     {p.label}
                   </button>
                 ))}
                 <button
                   className={`an-period-btn an-period-btn--cal ${customRange ? "an-period-btn--active" : ""}`}
-                  onClick={() => setShowCal(true)}
-                  title="Произвольный период"
-                >
+                  onClick={() => setShowCal(true)} title="Произвольный период">
                   <IconCalendar />
                 </button>
               </div>
             </div>
-            <div className="an-chart-labels">
-              {labels.map(l => <span key={l}>{l}</span>)}
-            </div>
+            <div className="an-chart-labels">{labels.map(l => <span key={l}>{l}</span>)}</div>
             <div className="an-chart-area">
-              <LineChart data={chartData.hum} color="#ffc207" />
+              <LineChart data={chartHum} color="#ffc207" />
             </div>
           </div>
         </div>
@@ -415,18 +401,18 @@ export const Analytics = () => {
           {/* Export card */}
           <div className="an-card an-export-card">
             <h2 className="an-card-title">Экспортировать данные</h2>
-
-            {/* Active filter/period context */}
             <div className="an-export-context">
               <div className="an-export-context-row">
                 <IconSensor />
                 <span className="an-export-context-key">Датчик:</span>
-                <span className="an-export-context-val">{sensorLabel || "Все датчики"}</span>
+                <span className="an-export-context-val">{sensorLabel || "Не выбран"}</span>
               </div>
               <div className="an-export-context-row">
                 <IconLocation />
                 <span className="an-export-context-key">Локация:</span>
-                <span className="an-export-context-val">{filterLocation || "Все локации"}</span>
+                <span className="an-export-context-val">
+                  {filterLocation ? locationOptions.find(l => l.value === filterLocation)?.label : "Все локации"}
+                </span>
               </div>
               <div className="an-export-context-row">
                 <IconCalendar />
@@ -435,28 +421,30 @@ export const Analytics = () => {
               </div>
             </div>
 
-            {/* Format selector — XLSX and PDF only */}
             <div className="an-format-row">
               {Object.entries(FORMAT_CONFIG).map(([key, cfg]) => (
-                <button
-                  key={key}
+                <button key={key}
                   className={`an-format-btn ${exportFormat === key ? "an-format-btn--active" : ""}`}
                   style={exportFormat === key ? { borderColor: cfg.borderColor, backgroundColor: cfg.accentBg, color: cfg.color } : {}}
-                  onClick={() => setExportFormat(key)}
-                >
+                  onClick={() => setExportFormat(key)}>
                   {cfg.icon}
                   <span>{cfg.label}</span>
                 </button>
               ))}
             </div>
 
+            {exportError && (
+              <div style={{ fontSize:"12px", color:"#ff5252", padding:"4px 0" }}>{exportError}</div>
+            )}
+
             <button
               className="an-export-btn"
-              style={{ borderColor: currentFmt.color, color: currentFmt.color, backgroundColor: currentFmt.btnBg }}
+              style={{ borderColor: currentFmt.color, color: currentFmt.color, backgroundColor: currentFmt.btnBg, opacity: exportLoading ? 0.7 : 1 }}
               onClick={doExport}
+              disabled={exportLoading}
             >
               <IconDownloadArrow color={currentFmt.color} />
-              <span>Скачать&nbsp;&nbsp;{currentFmt.label}</span>
+              <span>{exportLoading ? "Загрузка..." : `Скачать  ${currentFmt.label}`}</span>
             </button>
           </div>
 
@@ -493,10 +481,7 @@ export const Analytics = () => {
       {showCal && (
         <DatePickerModal
           onClose={() => setShowCal(false)}
-          onApply={(from, to) => {
-            setCustomRange({ from, to });
-            setChartData(getChartData(chartPeriod));
-          }}
+          onApply={(from, to) => { setCustomRange({ from, to }); }}
         />
       )}
     </div>
