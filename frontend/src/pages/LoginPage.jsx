@@ -30,15 +30,7 @@ const LoginPage = ({ onSuccess }) => {
     <div style={styles.page}>
       <div style={styles.card}>
         <div style={styles.logo}>
-          <svg width="40" height="40" viewBox="0 0 40 40" fill="none">
-            <rect width="40" height="40" rx="10" fill="#01e676" fillOpacity="0.15"/>
-            <circle cx="20" cy="20" r="8" stroke="#01e676" strokeWidth="2"/>
-            <circle cx="20" cy="20" r="3" fill="#01e676"/>
-            <line x1="20" y1="6" x2="20" y2="10" stroke="#01e676" strokeWidth="2" strokeLinecap="round"/>
-            <line x1="20" y1="30" x2="20" y2="34" stroke="#01e676" strokeWidth="2" strokeLinecap="round"/>
-            <line x1="6" y1="20" x2="10" y2="20" stroke="#01e676" strokeWidth="2" strokeLinecap="round"/>
-            <line x1="30" y1="20" x2="34" y2="20" stroke="#01e676" strokeWidth="2" strokeLinecap="round"/>
-          </svg>
+          <span style={styles.logoText}>TEMPERATURA.KZ</span>
         </div>
 
         <h1 style={styles.title}>Система мониторинга</h1>
@@ -111,6 +103,13 @@ const styles = {
     gap: "8px",
   },
   logo: { marginBottom: "8px" },
+  logoText: {
+    fontSize: "18px",
+    fontWeight: "800",
+    color: "#e6ad00",
+    letterSpacing: "0.08em",
+    textTransform: "uppercase",
+  },
   title: {
     fontSize: "22px",
     fontWeight: "700",
@@ -150,7 +149,7 @@ const styles = {
     padding: "12px",
     borderRadius: "8px",
     border: "none",
-    background: "#01e676",
+    background: "#e6ad00",
     color: "#000",
     fontSize: "14px",
     fontWeight: "600",

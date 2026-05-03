@@ -799,3 +799,43 @@
 @media (max-width: 960px) {
   .rp-search-box { width: 200px; }
 }
+/* ── Refresh Button ──────────────────────────────────────────────────────────── */
+.rp-refresh-btn {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 16px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.05);
+  color: #929292;
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.rp-refresh-btn:hover {
+  background: rgba(255, 255, 255, 0.09);
+  border-color: rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+}
+
+.rp-refresh-btn:hover svg path,
+.rp-refresh-btn:hover svg line {
+  stroke: #ffffff;
+}
+
+.rp-refresh-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.rp-refresh-btn:disabled svg {
+  animation: rp-spin 1s linear infinite;
+}
+
+@keyframes rp-spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
