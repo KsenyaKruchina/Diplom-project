@@ -1,19 +1,16 @@
 // frontend/src/App.jsx
-// ─── Корневой компонент с боковым меню и роутингом ───────────────────────────
 
 import React, { useState } from "react";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import LoginPage from "./pages/LoginPage";
 import "./App.css";
-
-// ─── Страницы ─────────────────────────────────────────────────────────────────
 import Dashboard      from "./components/Dashboard";
 import Analytics      from "./components/Analytics";
 import Sensors        from "./components/Sensors";
 import Reports        from "./components/Reports";
 import SystemSettings from "./components/SystemSettings";
 
-// ─── Icons ────────────────────────────────────────────────────────────────────
+// иконки для меню
 const IconDashboard = ({ active }) => (
   <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
     <rect x="3" y="3" width="7" height="7" rx="1.5"
@@ -83,7 +80,25 @@ const IconLogout = () => (
   </svg>
 );
 
+// ─── Отображение роли ─────────────────────────────────────────────────────────
+// admin  → "Администратор" (Temperature KZ, полный контроль)
+// editor → "Редактор"      (Клиент-менеджер, управление порогами и датчиками)
+// viewer → "Наблюдатель"   (Охранник, только просмотр + квитирование алармов)
+const ROLE_DISPLAY = {
+  admin:  "Администратор",
+  editor: "Редактор",
+  viewer: "Наблюдатель",
+};
+
 // ─── Пункты меню ─────────────────────────────────────────────────────────────
+// Все пункты доступны всем ролям.
+// Что именно видит пользователь ВНУТРИ каждой страницы —
+// определяется логикой самого компонента на основе role из useAuth().
+//
+// Страница «Настройки»:
+//   admin  → локации + пользователи всех компаний + аудит-лог + профиль
+//   editor → пользователи своей локации + история действий + профиль
+//   viewer → только блок профиля (имя, роль, email, кнопка «редактировать имя»)
 const NAV_ITEMS = [
   { id: "dashboard", label: "Дашборд",     Icon: IconDashboard },
   { id: "sensors",   label: "Датчики",     Icon: IconSensors   },
@@ -92,7 +107,7 @@ const NAV_ITEMS = [
   { id: "settings",  label: "Настройки",   Icon: IconSettings  },
 ];
 
-// ─── Sidebar ──────────────────────────────────────────────────────────────────
+// ─── Боковое меню ─────────────────────────────────────────────────────────────
 const Sidebar = ({ activePage, onNavigate }) => {
   const { user, logout } = useAuth();
 
@@ -131,11 +146,7 @@ const Sidebar = ({ activePage, onNavigate }) => {
             {user?.full_name || user?.username || "Пользователь"}
           </div>
           <div className="app-user-role">
-            {user?.role === "admin"
-              ? "Администратор"
-              : user?.role === "editor"
-              ? "Редактор"
-              : "Наблюдатель"}
+            {ROLE_DISPLAY[user?.role] ?? "—"}
           </div>
         </div>
         <button className="app-logout-btn" onClick={logout} title="Выйти">

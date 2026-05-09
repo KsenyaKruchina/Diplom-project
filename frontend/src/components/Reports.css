@@ -839,3 +839,73 @@
   from { transform: rotate(0deg); }
   to   { transform: rotate(360deg); }
 }
+
+/* ── Добавить в Reports.css ──────────────────────────────────────────────────
+   Backdrop для StatusPicker dropdown.
+   Закрывает меню при клике вне него, не мешая кликам по пунктам меню.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+   .rp-dropdown-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    background: transparent;
+  }
+  
+  /* Убедиться, что само меню всегда выше backdrop */
+  .rp-dropdown-menu {
+    position: absolute;
+    z-index: 1001;
+  }
+
+  /* ── Добавить / заменить в Reports.css ───────────────────────────────────────
+
+   1. Backdrop для StatusPicker dropdown
+   2. Стили для портальной панели фильтров
+   ─────────────────────────────────────────────────────────────────────────── */
+
+/* StatusPicker backdrop */
+.rp-dropdown-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: transparent;
+}
+.rp-dropdown-menu {
+  position: absolute;
+  z-index: 1001;
+}
+
+/* ── Портальная панель фильтров ──────────────────────────────────────────────
+   Панель рендерится через ReactDOM.createPortal прямо в document.body,
+   поэтому position: fixed работает относительно вьюпорта,
+   а не какого-либо родителя. z-index: 9999 гарантирует,
+   что панель будет выше любых карточек, таблиц и блоков страницы.
+   ─────────────────────────────────────────────────────────────────────────── */
+.rp-filter-panel-fixed {
+  width: 260px;
+  max-height: 80vh;
+  overflow-y: auto;
+
+  background: #1a1a1a;
+  border: 1px solid #2e2e2e;
+  border-radius: 10px;
+  padding: 16px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.55);
+
+  position: fixed;
+  z-index: 9999;
+
+  transition: opacity 0.12s ease;
+}
+
+.rp-filter-panel-fixed::-webkit-scrollbar {
+  width: 4px;
+}
+.rp-filter-panel-fixed::-webkit-scrollbar-track {
+  background: transparent;
+}
+.rp-filter-panel-fixed::-webkit-scrollbar-thumb {
+  background: #3a3a3a;
+  border-radius: 2px;
+}

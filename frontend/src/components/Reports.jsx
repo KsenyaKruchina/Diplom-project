@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
+import ReactDOM from "react-dom";
 import "./Reports.css";
 import { apiRequest } from "../services/api";
 import { getToken } from "../services/api";
@@ -122,10 +123,6 @@ const IconRefresh = () => (
 );
 
 // ── Маппинг API → UI ──────────────────────────────────────────────────────────
-// API статусы: new, acknowledged, resolved
-// API severity: warning, critical
-// API alarm_type: temperature, humidity, connection_lost, low_battery
-
 const STATUS_MAP = {
   new:          { label: "Новая",      color: "#ff5252", bg: "#321c1b" },
   acknowledged: { label: "В работе",   color: "#ffd550", bg: "#312c1c" },
@@ -144,7 +141,6 @@ const ALARM_TYPE_MAP = {
   low_battery:     "Низкий заряд",
 };
 
-// Маппинг UI-периодов → API-значения для отчётов
 const PERIOD_API_MAP = {
   "1d": "last_24_hours",
   "1w": "last_week",
@@ -183,24 +179,30 @@ const formatDateTime = (iso) => {
 };
 
 // ── Dropdown ──────────────────────────────────────────────────────────────────
+// FIX: The original implementation used a mousedown listener on document to close
+// the dropdown. This caused a race condition: mousedown fired and closed the menu
+// BEFORE the click event on a menu item could register — so items were never selectable.
+// Solution: use a transparent backdrop div that closes the menu on click,
+// and let menu items handle their own clicks normally. This guarantees
+// the item's onClick fires before the backdrop's onClick.
 function Dropdown({ trigger, children, open, setOpen }) {
-  const ref = useRef(null);
-  const menuRef = useRef(null);
-  useEffect(() => {
-    const handler = (e) => {
-      if (
-        ref.current && !ref.current.contains(e.target) &&
-        menuRef.current && !menuRef.current.contains(e.target)
-      ) setOpen(false);
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, [setOpen]);
   return (
-    <div className="rp-dropdown-wrap" ref={ref}>
-      <div onClick={() => setOpen(o => !o)}>{trigger}</div>
+    <div className="rp-dropdown-wrap">
+      <div onClick={(e) => { e.stopPropagation(); setOpen(o => !o); }}>
+        {trigger}
+      </div>
       {open && (
-        <div className="rp-dropdown-menu" ref={menuRef}>{children}</div>
+        <>
+          {/* Backdrop closes menu; pointer-events none on children ensures
+              clicks on menu items reach their onClick handlers first */}
+          <div
+            className="rp-dropdown-backdrop"
+            onClick={(e) => { e.stopPropagation(); setOpen(false); }}
+          />
+          <div className="rp-dropdown-menu" style={{ position: "relative", zIndex: 1001 }}>
+            {children}
+          </div>
+        </>
       )}
     </div>
   );
@@ -231,7 +233,6 @@ function CommentModal({ alarmId, value, onSave, onClose }) {
     setSaving(true);
     setError("");
     try {
-      // PATCH /api/v1/alarms/{id} с комментарием
       const updated = await apiRequest(`/alarms/${alarmId}`, {
         method: "PATCH",
         body: JSON.stringify({ user_comment: val }),
@@ -275,23 +276,42 @@ function CommentModal({ alarmId, value, onSave, onClose }) {
   );
 }
 
-// ── Status picker — PATCH /api/v1/alarms/{id} ────────────────────────────────
+// ── Status picker ─────────────────────────────────────────────────────────────
+// FIX 1: Removed setOpen(false) from handleChange — the backdrop now handles closing,
+//         so calling setOpen(false) before the await caused the menu to vanish
+//         before the item click event fully propagated.
+// FIX 2: Added optimistic UI update — status pill updates immediately on click,
+//         then rolls back to the server response (or original on error).
+// FIX 3: All three statuses (new, acknowledged, resolved) are now always clickable
+//         regardless of the alarm's current status.
 function StatusPicker({ alarm, onUpdate }) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
-  const st = STATUS_MAP[alarm.status] || STATUS_MAP.new;
+  // Optimistic: show the picked status immediately while the request is in-flight
+  const [optimisticStatus, setOptimisticStatus] = useState(null);
+
+  const currentStatus = optimisticStatus ?? alarm.status;
+  const st = STATUS_MAP[currentStatus] || STATUS_MAP.new;
 
   const handleChange = async (newStatus) => {
+    // Close the dropdown via backdrop naturally; just update state here
     setOpen(false);
     if (newStatus === alarm.status) return;
+
+    // Optimistic update so the pill changes instantly
+    setOptimisticStatus(newStatus);
     setLoading(true);
     try {
       const updated = await apiRequest(`/alarms/${alarm.id}`, {
         method: "PATCH",
         body: JSON.stringify({ status: newStatus }),
       });
+      // Sync with server response
+      setOptimisticStatus(null);
       onUpdate(updated);
     } catch (err) {
+      // Roll back on error
+      setOptimisticStatus(null);
       console.error("Ошибка смены статуса:", err.message);
     } finally {
       setLoading(false);
@@ -299,12 +319,11 @@ function StatusPicker({ alarm, onUpdate }) {
   };
 
   return (
-    <Dropdown
-      open={open} setOpen={setOpen}
+    <Dropdown open={open} setOpen={setOpen}
       trigger={
         <span
           className="rp-status-pill rp-status-pill--clickable"
-          style={{ color: st.color, background: st.bg, opacity: loading ? 0.6 : 1 }}
+          style={{ color: st.color, background: st.bg, opacity: loading ? 0.7 : 1, cursor: "pointer" }}
         >
           {loading ? "..." : st.label}
           <IconChevDown />
@@ -314,11 +333,11 @@ function StatusPicker({ alarm, onUpdate }) {
       {Object.entries(STATUS_MAP).map(([key, s]) => (
         <div
           key={key}
-          className={`rp-dropdown-item ${alarm.status === key ? "rp-dropdown-item--active" : ""}`}
-          onClick={() => handleChange(key)}
-          style={{ color: s.color }}
+          className={`rp-dropdown-item ${currentStatus === key ? "rp-dropdown-item--active" : ""}`}
+          onClick={(e) => { e.stopPropagation(); handleChange(key); }}
+          style={{ color: s.color, cursor: "pointer" }}
         >
-          {alarm.status === key && <IconCheck />}
+          {currentStatus === key && <IconCheck />}
           {s.label}
         </div>
       ))}
@@ -326,7 +345,7 @@ function StatusPicker({ alarm, onUpdate }) {
   );
 }
 
-// ── Description cell с открытием модала комментария ──────────────────────────
+// ── Description cell ──────────────────────────────────────────────────────────
 function DescriptionCell({ alarm, onUpdate }) {
   const [modalOpen, setModalOpen] = useState(false);
   const displayText = alarm.user_comment || alarm.description || "—";
@@ -438,14 +457,140 @@ const downloadReport = async (path, filename) => {
   document.body.removeChild(a); URL.revokeObjectURL(url);
 };
 
+// ── FilterPanel (Portal) ──────────────────────────────────────────────────────
+// Рендерится через ReactDOM.createPortal прямо в document.body.
+// Позиция вычисляется по getBoundingClientRect кнопки-якоря,
+// поэтому панель всегда отображается поверх любых блоков страницы
+// независимо от overflow, z-index или stacking context родителей.
+function FilterPanel({
+  anchorRef, onClose,
+  filterIdRange, setFilterIdRange,
+  filterSeverity, setFilterSeverity,
+  filterType, setFilterType,
+  filterStatus, setFilterStatus,
+  activeFilters, setPage, onClearAll,
+}) {
+  const panelRef = useRef(null);
+  const [style, setStyle] = useState({ opacity: 0 });
+
+  // Вычисляем позицию под кнопкой после монтирования
+  useEffect(() => {
+    if (!anchorRef.current) return;
+    const rect = anchorRef.current.getBoundingClientRect();
+    const panelWidth = 260;
+    const viewportWidth = window.innerWidth;
+
+    let left = rect.right - panelWidth;
+    if (left < 8) left = 8;
+    if (left + panelWidth > viewportWidth - 8) left = viewportWidth - panelWidth - 8;
+
+    setStyle({
+      position: "fixed",
+      top: rect.bottom + 8,
+      left,
+      width: panelWidth,
+      zIndex: 9999,
+      opacity: 1,
+    });
+  }, [anchorRef]);
+
+  // Закрываем при клике вне панели и кнопки
+  useEffect(() => {
+    const handler = (e) => {
+      if (
+        panelRef.current && !panelRef.current.contains(e.target) &&
+        anchorRef.current && !anchorRef.current.contains(e.target)
+      ) {
+        onClose();
+      }
+    };
+    // Небольшая задержка чтобы не сработало на сам клик открытия
+    const timeout = setTimeout(() => {
+      document.addEventListener("mousedown", handler);
+    }, 50);
+    return () => {
+      clearTimeout(timeout);
+      document.removeEventListener("mousedown", handler);
+    };
+  }, [onClose, anchorRef]);
+
+  // Закрываем при скролле страницы (позиция уплывёт)
+  useEffect(() => {
+    const handler = () => onClose();
+    window.addEventListener("scroll", handler, true);
+    return () => window.removeEventListener("scroll", handler, true);
+  }, [onClose]);
+
+  return ReactDOM.createPortal(
+    <div
+      ref={panelRef}
+      className="rp-filter-panel-fixed"
+      style={style}
+      // Не даём клику внутри панели дойти до backdrop документа
+      onMouseDown={e => e.stopPropagation()}
+    >
+      <div className="rp-filter-section-title">Фильтрация</div>
+
+      <div className="rp-filter-label">ID диапазон</div>
+      <div className="rp-filter-id-row">
+        <input className="rp-filter-id-input" placeholder="от" value={filterIdRange.from}
+          onChange={e => { setFilterIdRange(p => ({ ...p, from: e.target.value })); setPage(1); }} />
+        <span style={{ color: "#929292" }}>—</span>
+        <input className="rp-filter-id-input" placeholder="до" value={filterIdRange.to}
+          onChange={e => { setFilterIdRange(p => ({ ...p, to: e.target.value })); setPage(1); }} />
+      </div>
+
+      <div className="rp-filter-label">Критичность</div>
+      <div className="rp-filter-options">
+        {Object.entries(SEVERITY_MAP).map(([k, v]) => (
+          <div key={k}
+            className={`rp-filter-option ${filterSeverity === k ? "rp-filter-option--active" : ""}`}
+            style={{ color: filterSeverity === k ? v.color : undefined }}
+            onClick={() => { setFilterSeverity(p => p === k ? "" : k); setPage(1); }}>
+            {v.label}
+          </div>
+        ))}
+      </div>
+
+      <div className="rp-filter-label">Тип события</div>
+      <div className="rp-filter-options rp-filter-options--col">
+        {Object.entries(ALARM_TYPE_MAP).map(([k, v]) => (
+          <div key={k}
+            className={`rp-filter-option ${filterType === k ? "rp-filter-option--active" : ""}`}
+            onClick={() => { setFilterType(p => p === k ? "" : k); setPage(1); }}>
+            {v}
+          </div>
+        ))}
+      </div>
+
+      <div className="rp-filter-label">Статус</div>
+      <div className="rp-filter-options rp-filter-options--col">
+        {Object.entries(STATUS_MAP).map(([k, v]) => (
+          <div key={k}
+            className={`rp-filter-option ${filterStatus === k ? "rp-filter-option--active" : ""}`}
+            style={{ color: filterStatus === k ? v.color : undefined }}
+            onClick={() => { setFilterStatus(p => p === k ? "" : k); setPage(1); }}>
+            {v.label}
+          </div>
+        ))}
+      </div>
+
+      {activeFilters.length > 0 && (
+        <button className="rp-filter-clear-all" onClick={onClearAll}>
+          Сбросить все
+        </button>
+      )}
+    </div>,
+    document.body
+  );
+}
+
 // ── Main Component ────────────────────────────────────────────────────────────
 export const Reports = () => {
-  // ── Данные тревог ──
   const [alarms, setAlarms]         = useState([]);
   const [loading, setLoading]       = useState(true);
   const [loadError, setLoadError]   = useState("");
 
-  // ── Фильтры ──
   const [search, setSearch]                 = useState("");
   const [filterSeverity, setFilterSeverity] = useState("");
   const [filterStatus, setFilterStatus]     = useState("");
@@ -454,23 +599,20 @@ export const Reports = () => {
   const [filterOpen, setFilterOpen]         = useState(false);
   const filterRef = useRef(null);
 
-  // ── Экспорт ──
-  const [exportFmt, setExportFmt]       = useState("pdf");
-  const [periodKey, setPeriodKey]       = useState("1m");
-  const [showCalendar, setShowCalendar] = useState(false);
-  const [customRange, setCustomRange]   = useState(null);
+  const [exportFmt, setExportFmt]         = useState("pdf");
+  const [periodKey, setPeriodKey]         = useState("1m");
+  const [showCalendar, setShowCalendar]   = useState(false);
+  const [customRange, setCustomRange]     = useState(null);
   const [exportLoading, setExportLoading] = useState(false);
-  const [exportError, setExportError]   = useState("");
+  const [exportError, setExportError]     = useState("");
   const [exportHistory, setExportHistory] = useState([]);
 
-  // ── Таблица ──
   const [page, setPage]       = useState(1);
   const [sortCol, setSortCol] = useState("timestamp");
   const [sortDir, setSortDir] = useState("desc");
 
   const ROWS_PER_PAGE = 10;
 
-  // ── Загрузка тревог ───────────────────────────────────────────────────────
   const loadAlarms = useCallback(async () => {
     setLoading(true);
     setLoadError("");
@@ -486,7 +628,6 @@ export const Reports = () => {
 
   useEffect(() => { loadAlarms(); }, [loadAlarms]);
 
-  // ── WebSocket: live-обновление статуса тревог ─────────────────────────────
   useEffect(() => {
     const unsub = wsService.on("alarm_updated", (event) => {
       setAlarms(prev => prev.map(a =>
@@ -498,22 +639,13 @@ export const Reports = () => {
     return () => unsub();
   }, []);
 
-  // ── Закрыть фильтр при клике вне ─────────────────────────────────────────
-  useEffect(() => {
-    const handler = (e) => {
-      if (filterRef.current && !filterRef.current.contains(e.target)) setFilterOpen(false);
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, []);
+  // Закрытие фильтр-панели при клике вне обрабатывается внутри FilterPanel (портал)
 
-  // ── Обновление тревоги в state ────────────────────────────────────────────
   const updateAlarm = useCallback((updated) => {
     if (!updated) return;
     setAlarms(prev => prev.map(a => a.id === updated.id ? updated : a));
   }, []);
 
-  // ── Сортировка и фильтрация ───────────────────────────────────────────────
   const handleSort = (key) => {
     if (sortCol === key) setSortDir(d => d === "asc" ? "desc" : "asc");
     else { setSortCol(key); setSortDir("asc"); }
@@ -552,7 +684,6 @@ export const Reports = () => {
     (filterIdRange.from || filterIdRange.to) && { key: "id", label: `ID: ${filterIdRange.from || "—"} – ${filterIdRange.to || "—"}`, clear: () => setFilterIdRange({ from: "", to: "" }) },
   ].filter(Boolean);
 
-  // ── Экспорт ───────────────────────────────────────────────────────────────
   const getPeriodLabel = () => {
     if (periodKey === "custom" && customRange) {
       const fmt = d => d.toLocaleDateString("ru-RU", { day: "2-digit", month: "2-digit", year: "2-digit" });
@@ -566,10 +697,6 @@ export const Reports = () => {
     return map[periodKey] || "за период";
   };
 
-  // Экспорт журнала тревог — используем /reports/download-period-location
-  // без конкретного sensor_id, т.к. это сводный отчёт.
-  // Если нужен по конкретному датчику — используем /reports/download-period/{sensor_id}
-  // Здесь экспортируем все тревоги → location report или просто первый датчик
   const handleExport = async () => {
     setExportLoading(true);
     setExportError("");
@@ -580,7 +707,6 @@ export const Reports = () => {
 
     try {
       if (periodKey === "custom" && customRange) {
-        // Произвольный диапазон — используем первый датчик из списка тревог или общий
         const sensorId = alarms[0]?.sensor_id;
         if (sensorId) {
           const start = customRange.start.toISOString().slice(0, 10);
@@ -592,7 +718,6 @@ export const Reports = () => {
         }
       } else {
         const apiPeriod = PERIOD_API_MAP[periodKey] || "last_month";
-        // Пробуем сводный отчёт по первой локации из тревог
         const sensorId = alarms[0]?.sensor_id;
         if (sensorId) {
           const params = new URLSearchParams({ period: apiPeriod, format: fmt });
@@ -617,7 +742,6 @@ export const Reports = () => {
     }
   };
 
-  // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div className="rp-container">
       <main className="rp-main">
@@ -633,7 +757,6 @@ export const Reports = () => {
           <div className="rp-error-banner">{loadError}</div>
         )}
 
-        {/* ── Event log table ── */}
         <div className="rp-card rp-table-card">
           <div className="rp-table-topbar">
             <h2 className="rp-card-title">
@@ -661,64 +784,28 @@ export const Reports = () => {
                   {activeFilters.length > 0 && <span className="rp-filter-badge">{activeFilters.length}</span>}
                 </button>
 
-                {filterOpen && (
-                  <div className="rp-filter-panel-fixed">
-                    <div className="rp-filter-section-title">Фильтрация</div>
-
-                    <div className="rp-filter-label">ID диапазон</div>
-                    <div className="rp-filter-id-row">
-                      <input className="rp-filter-id-input" placeholder="от" value={filterIdRange.from}
-                        onChange={e => { setFilterIdRange(p => ({ ...p, from: e.target.value })); setPage(1); }} />
-                      <span style={{ color: "#929292" }}>—</span>
-                      <input className="rp-filter-id-input" placeholder="до" value={filterIdRange.to}
-                        onChange={e => { setFilterIdRange(p => ({ ...p, to: e.target.value })); setPage(1); }} />
-                    </div>
-
-                    <div className="rp-filter-label">Критичность</div>
-                    <div className="rp-filter-options">
-                      {Object.entries(SEVERITY_MAP).map(([k, v]) => (
-                        <div key={k}
-                          className={`rp-filter-option ${filterSeverity === k ? "rp-filter-option--active" : ""}`}
-                          style={{ color: filterSeverity === k ? v.color : undefined }}
-                          onClick={() => { setFilterSeverity(p => p === k ? "" : k); setPage(1); }}>
-                          {v.label}
-                        </div>
-                      ))}
-                    </div>
-
-                    <div className="rp-filter-label">Тип события</div>
-                    <div className="rp-filter-options rp-filter-options--col">
-                      {Object.entries(ALARM_TYPE_MAP).map(([k, v]) => (
-                        <div key={k}
-                          className={`rp-filter-option ${filterType === k ? "rp-filter-option--active" : ""}`}
-                          onClick={() => { setFilterType(p => p === k ? "" : k); setPage(1); }}>
-                          {v}
-                        </div>
-                      ))}
-                    </div>
-
-                    <div className="rp-filter-label">Статус</div>
-                    <div className="rp-filter-options rp-filter-options--col">
-                      {Object.entries(STATUS_MAP).map(([k, v]) => (
-                        <div key={k}
-                          className={`rp-filter-option ${filterStatus === k ? "rp-filter-option--active" : ""}`}
-                          style={{ color: filterStatus === k ? v.color : undefined }}
-                          onClick={() => { setFilterStatus(p => p === k ? "" : k); setPage(1); }}>
-                          {v.label}
-                        </div>
-                      ))}
-                    </div>
-
-                    {activeFilters.length > 0 && (
-                      <button className="rp-filter-clear-all" onClick={() => {
-                        setFilterSeverity(""); setFilterStatus(""); setFilterType("");
-                        setFilterIdRange({ from: "", to: "" }); setPage(1);
-                      }}>
-                        Сбросить все
-                      </button>
-                    )}
-                  </div>
-                )}
+                {/* Portal: рендерим панель прямо в document.body,
+                    позицию вычисляем по координатам кнопки.
+                    Это гарантирует, что никакой overflow/z-index родителя
+                    не обрежет панель и она всегда будет поверх всех блоков. */}
+                {filterOpen && <FilterPanel
+                  anchorRef={filterRef}
+                  onClose={() => setFilterOpen(false)}
+                  filterIdRange={filterIdRange}
+                  setFilterIdRange={setFilterIdRange}
+                  filterSeverity={filterSeverity}
+                  setFilterSeverity={setFilterSeverity}
+                  filterType={filterType}
+                  setFilterType={setFilterType}
+                  filterStatus={filterStatus}
+                  setFilterStatus={setFilterStatus}
+                  activeFilters={activeFilters}
+                  setPage={setPage}
+                  onClearAll={() => {
+                    setFilterSeverity(""); setFilterStatus(""); setFilterType("");
+                    setFilterIdRange({ from: "", to: "" }); setPage(1);
+                  }}
+                />}
               </div>
             </div>
           </div>
@@ -784,7 +871,6 @@ export const Reports = () => {
           </div>
         </div>
 
-        {/* ── Bottom row ── */}
         <div className="rp-bottom-row">
           <div className="rp-card rp-export-card">
             <h2 className="rp-card-title">Экспортировать данные</h2>

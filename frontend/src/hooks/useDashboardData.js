@@ -70,6 +70,22 @@ export const useDashboardData = () => {
   // ─── WebSocket: обновление телеметрии в реальном времени ───────────────────
 
   useEffect(() => {
+    // ── Синхронизация позиций датчиков на мнемосхеме ─────────────────────────
+    // Когда Flutter (или другой браузер) сохраняет позицию датчика через
+    // PATCH /sensors/{id}, сервер рассылает это событие всем WS-клиентам.
+    // Обновляем только координаты конкретного датчика — без перезагрузки списка.
+    const unsubPosition = wsService.on("sensor_position_updated", (data) => {
+      // data = { type, sensor_id, pos_x, pos_y }
+      if (!mountedRef.current) return;
+      setSensors((prev) =>
+        prev.map((s) =>
+          s.id === data.sensor_id
+            ? { ...s, pos_x: data.pos_x, pos_y: data.pos_y } // обновляем только координаты
+            : s
+        )
+      );
+    });
+
     // Обработчик нового измерения
     const unsubMeasurement = wsService.on("new_measurement", (data) => {
       // data = { type, sensor_id, sensor_name, temp, hum, is_alarm }
@@ -106,6 +122,7 @@ export const useDashboardData = () => {
     });
 
     return () => {
+      unsubPosition();
       unsubMeasurement();
       unsubAlarm();
     };

@@ -1,25 +1,8 @@
 import React, { useState, useEffect, useMemo } from "react";
 import "./SystemSettings.css";
-
-const BASE_URL = "http://157.90.127.202:8000";
-
-const api = async (path, options = {}) => {
-  const token = localStorage.getItem("token");
-  const res = await fetch(`${BASE_URL}/api/v1${path}`, {
-    ...options,
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-      ...options.headers,
-    },
-  });
-  if (res.status === 401) {
-    localStorage.removeItem("token");
-    window.location.href = "/login";
-    return null;
-  }
-  return res;
-};
+import { apiRequest } from "../services/api";
+import { getCurrentUser, registerUser } from "../services/authService";
+import { useAuth } from "../context/AuthContext";
 
 // ── Icons ─────────────────────────────────────────────────────────
 const IconPlus = () => (
@@ -28,19 +11,16 @@ const IconPlus = () => (
     <line x1="2" y1="9" x2="16" y2="9" stroke="white" strokeWidth="2" strokeLinecap="round"/>
   </svg>
 );
-
 const IconSort = () => (
   <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
     <path d="M7 4v12M7 16l-3-3M7 16l3-3M13 16V4M13 4l-3 3M13 4l3 3" stroke="#929292" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
   </svg>
 );
-
 const IconEdit = () => (
   <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
     <path d="M11 2l3 3-8 8H3v-3l8-8z" stroke="#929292" strokeWidth="1.3" strokeLinejoin="round"/>
   </svg>
 );
-
 const IconLogout = () => (
   <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
     <path d="M6 2H3a1 1 0 00-1 1v10a1 1 0 001 1h3" stroke="#ff5b5b" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
@@ -48,36 +28,18 @@ const IconLogout = () => (
     <line x1="13" y1="8" x2="6" y2="8" stroke="#ff5b5b" strokeWidth="1.4" strokeLinecap="round"/>
   </svg>
 );
-
 const IconClose = () => (
   <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
     <line x1="3" y1="3" x2="13" y2="13" stroke="#929292" strokeWidth="1.5" strokeLinecap="round"/>
     <line x1="13" y1="3" x2="3" y2="13" stroke="#929292" strokeWidth="1.5" strokeLinecap="round"/>
   </svg>
 );
-
-const IconBuilding = () => (
-  <svg width="18" height="18" viewBox="0 0 16 16" fill="none">
-    <rect x="2" y="4" width="12" height="10" rx="1" stroke="#ffc207" strokeWidth="1.3"/>
-    <path d="M5 14V9h6v5" stroke="#ffc207" strokeWidth="1.3" strokeLinecap="round"/>
-    <path d="M5 4V2h6v2" stroke="#ffc207" strokeWidth="1.3" strokeLinecap="round"/>
-    <rect x="6.5" y="10" width="3" height="2" rx="0.5" fill="#ffc207"/>
-  </svg>
-);
-
-const IconArrowBack = () => (
-  <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-    <path d="M12 5l-5 5 5 5" stroke="#ffffff" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-  </svg>
-);
-
 const IconHistory = () => (
   <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
     <circle cx="7.5" cy="7.5" r="5.5" stroke="#929292" strokeWidth="1.3"/>
     <path d="M7.5 4.5v3l2 1.5" stroke="#929292" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
   </svg>
 );
-
 const IconUsers = () => (
   <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
     <circle cx="5.5" cy="5" r="2.5" stroke="#929292" strokeWidth="1.3"/>
@@ -86,18 +48,36 @@ const IconUsers = () => (
     <path d="M13.5 12.5c0-2-1.3-3-2.5-3" stroke="#929292" strokeWidth="1.3" strokeLinecap="round"/>
   </svg>
 );
-
 const IconSearch = () => (
   <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
     <circle cx="7" cy="7" r="5" stroke="#929292" strokeWidth="1.3"/>
     <path d="M11 11l3.5 3.5" stroke="#929292" strokeWidth="1.3" strokeLinecap="round"/>
   </svg>
 );
+const IconChevron = ({ open }) => (
+  <svg width="14" height="14" viewBox="0 0 14 14" fill="none"
+    style={{ transform: open ? "rotate(180deg)" : "rotate(0deg)", transition: "transform 0.2s" }}>
+    <path d="M3 5l4 4 4-4" stroke="#929292" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
+  </svg>
+);
+const IconLocation = () => (
+  <svg width="13" height="13" viewBox="0 0 14 14" fill="none">
+    <path d="M7 1C4.79 1 3 2.79 3 5c0 3 4 8 4 8s4-5 4-8c0-2.21-1.79-4-4-4z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round"/>
+    <circle cx="7" cy="5" r="1.3" stroke="currentColor" strokeWidth="1.1"/>
+  </svg>
+);
+const IconBuilding = () => (
+  <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+    <rect x="2" y="3" width="12" height="11" rx="1" stroke="currentColor" strokeWidth="1.3"/>
+    <path d="M5 14V9h6v5" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round"/>
+    <rect x="5" y="5" width="2" height="2" rx="0.3" stroke="currentColor" strokeWidth="1.1"/>
+    <rect x="9" y="5" width="2" height="2" rx="0.3" stroke="currentColor" strokeWidth="1.1"/>
+  </svg>
+);
 
 // ── Avatar ────────────────────────────────────────────────────────
 const AVATAR_COLORS = ["#ffd550", "#07bcd4", "#01e676", "#ff5b5b", "#b47afe", "#ff8c42"];
 const getAvatarColor = (id) => AVATAR_COLORS[(id || 0) % AVATAR_COLORS.length];
-
 const Avatar = ({ name, color, size = 28 }) => {
   const initials = (name || "?").split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase();
   return (
@@ -114,11 +94,31 @@ const STATUS_STYLE = {
   online:  { color: "#01e676", dot: "#01e676", label: "Онлайн" },
   offline: { color: "#ff5b5b", dot: "#ff5b5b", label: "Оффлайн" },
 };
-
 const formatDate = (iso) => {
   if (!iso) return "—";
   const d = new Date(iso);
   return d.toLocaleString("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
+};
+
+// ── Нормализация location_id ──────────────────────────────────────
+const normalizeLocationId = (val) => {
+  if (val === null || val === undefined || val === "" || val === "null") return null;
+  const n = Number(val);
+  return isNaN(n) ? null : n;
+};
+
+// ── Получить group_id редактора через датчики (fallback) ──────────
+const getEditorGroupIdViaSensors = async () => {
+  try {
+    const sensors = await apiRequest("/sensors/");
+    if (Array.isArray(sensors) && sensors.length > 0) {
+      const groupId = sensors[0]?.group_id;
+      if (groupId != null) return Number(groupId);
+    }
+  } catch (err) {
+    console.error("getEditorGroupIdViaSensors failed:", err);
+  }
+  return null;
 };
 
 // ── Add User Modal ─────────────────────────────────────────────────
@@ -138,6 +138,17 @@ const AddUserModal = ({ onClose, onAdd, currentUser, locations }) => {
     ? Object.entries(ROLE_LABELS)
     : [["viewer", ROLE_LABELS.viewer]];
 
+  useEffect(() => {
+    if (currentUser?.role === "editor") {
+      const locId = normalizeLocationId(currentUser?.location_id) ?? normalizeLocationId(currentUser?._locationId);
+      setForm(f => ({
+        ...f,
+        role: "viewer",
+        location_id: locId ? String(locId) : f.location_id,
+      }));
+    }
+  }, [currentUser]);
+
   const validate = () => {
     const e = {};
     if (!form.full_name.trim()) e.full_name = "Введите ФИО";
@@ -153,34 +164,18 @@ const AddUserModal = ({ onClose, onAdd, currentUser, locations }) => {
     if (Object.keys(e).length) { setErrors(e); return; }
     setLoading(true);
     try {
-      const token = localStorage.getItem("token");
-      const res = await fetch(`${BASE_URL}/api/v1/users/register`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          full_name: form.full_name,
-          username: form.username,
-          password: form.password,
-          email: form.email,
-          role: form.role,
-          location_id: parseInt(form.location_id),
-        }),
+      const newUser = await registerUser({
+        full_name:   form.full_name,
+        username:    form.username,
+        password:    form.password,
+        email:       form.email,
+        role:        form.role,
+        location_id: parseInt(form.location_id),
       });
-      if (!res.ok) {
-        const err = await res.json();
-        const detail = typeof err.detail === "string" ? err.detail : JSON.stringify(err.detail);
-        setErrors({ username: detail });
-        setLoading(false);
-        return;
-      }
-      const newUser = await res.json();
-      onAdd(newUser);
+      onAdd({ ...newUser, location_id: parseInt(form.location_id) });
       onClose();
-    } catch {
-      setErrors({ username: "Ошибка соединения с сервером" });
+    } catch (err) {
+      setErrors({ username: err.message || "Ошибка соединения с сервером" });
     }
     setLoading(false);
   };
@@ -203,21 +198,19 @@ const AddUserModal = ({ onClose, onAdd, currentUser, locations }) => {
               <label className="ss-form-label">{label}</label>
               <input
                 className={`ss-form-input${errors[key] ? " ss-form-input--error" : ""}`}
-                type={type}
-                placeholder={placeholder}
-                value={form[key]}
+                type={type} placeholder={placeholder} value={form[key]}
                 onChange={e => set(key, e.target.value)}
               />
               {errors[key] && <span className="ss-form-error">{errors[key]}</span>}
             </div>
           ))}
-
           <div className="ss-form-group">
             <label className="ss-form-label">Локация</label>
             <select
               className={`ss-form-input ss-form-select${errors.location_id ? " ss-form-input--error" : ""}`}
               value={form.location_id}
               onChange={e => set("location_id", e.target.value)}
+              disabled={currentUser?.role === "editor"}
             >
               <option value="">— Выберите локацию —</option>
               {locations.map(loc => (
@@ -226,17 +219,14 @@ const AddUserModal = ({ onClose, onAdd, currentUser, locations }) => {
             </select>
             {errors.location_id && <span className="ss-form-error">{errors.location_id}</span>}
           </div>
-
           <div className="ss-form-group">
             <label className="ss-form-label">Роль</label>
             <div className="ss-role-selector">
               {availableRoles.map(([val, lbl]) => (
-                <button
-                  key={val}
+                <button key={val}
                   className={`ss-role-btn${form.role === val ? " ss-role-btn--active" : ""}`}
                   style={form.role === val ? { borderColor: ROLE_COLORS[val], color: ROLE_COLORS[val], background: `${ROLE_COLORS[val]}18` } : {}}
-                  onClick={() => set("role", val)}
-                >
+                  onClick={() => set("role", val)}>
                   {lbl}
                 </button>
               ))}
@@ -270,25 +260,14 @@ const EditProfileModal = ({ profile, onClose, onSave }) => {
     setLoading(true);
     setError("");
     try {
-      const token = localStorage.getItem("token");
-      const res = await fetch(`${BASE_URL}/api/v1/users/${profile.id}`, {
+      const updated = await apiRequest(`/users/${profile.id}`, {
         method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
         body: JSON.stringify({ full_name: name.trim() }),
       });
-
-      if (res.ok) {
-        const updated = await res.json();
-        onSave(updated);
-      } else {
-        onSave({ full_name: name.trim() });
-      }
+      onSave(updated || { full_name: name.trim() });
       onClose();
-    } catch {
-      setError("Ошибка соединения");
+    } catch (err) {
+      setError(err.message || "Ошибка соединения");
     }
     setLoading(false);
   };
@@ -305,8 +284,7 @@ const EditProfileModal = ({ profile, onClose, onSave }) => {
             <label className="ss-form-label">ФИО</label>
             <input
               className={`ss-form-input${error ? " ss-form-input--error" : ""}`}
-              type="text"
-              value={name}
+              type="text" value={name}
               onChange={e => { setName(e.target.value); setError(""); }}
               onKeyDown={e => e.key === "Enter" && handleSave()}
               autoFocus
@@ -325,84 +303,113 @@ const EditProfileModal = ({ profile, onClose, onSave }) => {
   );
 };
 
-// ── Company Detail Panel (Users + History) ─────────────────────────
-const CompanyDetailPanel = ({ location, allUsers, allAuditLogs, currentUser, locations, onUserAdded, onBack }) => {
-  const [activeTab, setActiveTab] = useState("users");
+// ── Users Panel (editor — только своя локация) ─────────────────────
+const UsersPanel = ({ allUsers, allAuditLogs, currentUser, locations, onUserAdded }) => {
+  const [activeTab, setActiveTab]       = useState("users");
   const [showAddModal, setShowAddModal] = useState(false);
-  const [localUsers, setLocalUsers] = useState(allUsers);
+  const [searchQuery, setSearchQuery]   = useState("");
+  const [roleFilter, setRoleFilter]     = useState("all");
+  const [roleDropdownOpen, setRoleDropdownOpen] = useState(false);
 
-  useEffect(() => { setLocalUsers(allUsers); }, [allUsers]);
+  const roleOptions = [
+    { value: "all",    label: "Все роли" },
+    { value: "editor", label: "Редактор" },
+    { value: "viewer", label: "Читатель" },
+  ];
 
-  const companyUsers = localUsers.filter(u => u.location_id === location.id);
-  const companyUserIds = new Set(companyUsers.map(u => u.id));
-  const companyLogs = [...allAuditLogs]
-    .filter(h => companyUserIds.has(h.user_id))
-    .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+  const filteredUsers = useMemo(() => {
+    // Исключаем adminов из списка
+    let result = allUsers.filter(u => u.role !== "admin");
 
-  const getUserById = (id) => localUsers.find(u => u.id === id);
-  const canAdd = currentUser?.role === "admin" || (currentUser?.role === "editor" && currentUser?.location_id === location.id);
+    if (roleFilter !== "all") result = result.filter(u => u.role === roleFilter);
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      result = result.filter(u =>
+        (u.full_name || "").toLowerCase().includes(q) ||
+        (u.username  || "").toLowerCase().includes(q) ||
+        (u.email     || "").toLowerCase().includes(q)
+      );
+    }
+    return result;
+  }, [allUsers, roleFilter, searchQuery]);
 
-  const handleUserAdded = (newUser) => {
-    setLocalUsers(prev => [...prev, newUser]);
-    if (onUserAdded) onUserAdded(newUser);
-  };
+  const sortedLogs = useMemo(() => {
+    return [...allAuditLogs].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+  }, [allAuditLogs]);
+
+  const getUserById = (id) => allUsers.find(u => u.id === id);
 
   return (
-    <div className="ss-company-detail">
-      <div className="ss-detail-header">
-        <button className="ss-back-btn" onClick={onBack}>
-          <IconArrowBack />
-          <span>Назад к списку</span>
-        </button>
-        <div className="ss-detail-title">
-          <IconBuilding />
-          <span>{location.name}</span>
-        </div>
-      </div>
-
+    <div className="ss-users-panel">
       <div className="ss-tabs">
         <button className={`ss-tab${activeTab === "users" ? " ss-tab--active" : ""}`} onClick={() => setActiveTab("users")}>
-          <IconUsers />
-          <span>Пользователи</span>
-          <span className="ss-tab-count">{companyUsers.length}</span>
+          <IconUsers /><span>Пользователи</span>
+          <span className="ss-tab-count">{filteredUsers.length}</span>
         </button>
         <button className={`ss-tab${activeTab === "history" ? " ss-tab--active" : ""}`} onClick={() => setActiveTab("history")}>
-          <IconHistory />
-          <span>История действий</span>
-          <span className="ss-tab-count">{companyLogs.length}</span>
+          <IconHistory /><span>История</span>
+          <span className="ss-tab-count">{sortedLogs.length}</span>
         </button>
-        {canAdd && activeTab === "users" && (
-          <button className="ss-add-btn ss-add-btn--tab" onClick={() => setShowAddModal(true)}>
-            <IconPlus />
-          </button>
+
+        {activeTab === "users" && (
+          <div className="ss-tab-toolbar">
+            <div className="ss-search-wrapper ss-search-wrapper--sm">
+              <IconSearch />
+              <input type="text" className="ss-search-input" placeholder="Поиск..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)}/>
+            </div>
+            <div className="ss-dropdown-wrap">
+              <button className="ss-dropdown-btn" onClick={() => setRoleDropdownOpen(o => !o)}>
+                <span style={{ color: roleFilter !== "all" ? ROLE_COLORS[roleFilter] : undefined }}>
+                  {roleOptions.find(o => o.value === roleFilter)?.label}
+                </span>
+                <IconChevron open={roleDropdownOpen} />
+              </button>
+              {roleDropdownOpen && (
+                <>
+                  <div className="ss-dropdown-backdrop" onClick={() => setRoleDropdownOpen(false)} />
+                  <div className="ss-dropdown-menu">
+                    {roleOptions.map(opt => (
+                      <button key={opt.value}
+                        className={`ss-dropdown-item${roleFilter === opt.value ? " ss-dropdown-item--active" : ""}`}
+                        style={opt.value !== "all" ? { color: roleFilter === opt.value ? ROLE_COLORS[opt.value] : undefined } : {}}
+                        onClick={() => { setRoleFilter(opt.value); setRoleDropdownOpen(false); }}>
+                        {opt.value !== "all" && <span className="ss-dropdown-dot" style={{ background: ROLE_COLORS[opt.value] }} />}
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+            <button className="ss-add-btn" onClick={() => setShowAddModal(true)}>
+              <IconPlus /><span>Добавить</span>
+            </button>
+          </div>
         )}
       </div>
 
       {activeTab === "users" && (
         <div className="ss-inline-table">
-          <div className="ss-users-col-header ss-users-col-header--detail">
+          <div className="ss-users-col-header ss-users-col-header--4col">
             {["Пользователь", "Email", "Роль", "Статус"].map(col => (
-              <div key={col} className="ss-users-col-head">
-                <span>{col}</span>
-                <IconSort />
-              </div>
+              <div key={col} className="ss-users-col-head"><span>{col}</span><IconSort /></div>
             ))}
           </div>
           <div className="ss-users-body">
-            {companyUsers.length === 0 && (
-              <div className="ss-empty">Нет пользователей в этой локации</div>
-            )}
-            {companyUsers.map((user) => {
-              const isOnline = user.is_online ?? false;
-              const st = STATUS_STYLE[isOnline ? "online" : "offline"];
+            {filteredUsers.length === 0 && <div className="ss-empty">Пользователи не найдены</div>}
+            {filteredUsers.map(user => {
+              const st = STATUS_STYLE[user.is_online ? "online" : "offline"];
               return (
                 <div key={user.id} className="ss-users-row ss-users-row--4col">
                   <div className="ss-users-cell ss-user-name-cell">
                     <Avatar name={user.full_name} color={getAvatarColor(user.id)} size={26}/>
-                    <span>{user.full_name}</span>
+                    <div className="ss-user-name-block">
+                      <span>{user.full_name || "—"}</span>
+                      <span className="ss-user-username">@{user.username}</span>
+                    </div>
                   </div>
                   <div className="ss-users-cell">
-                    <a href={`mailto:${user.email}`} className="ss-email-link">{user.email || "—"}</a>
+                    {user.email ? <a href={`mailto:${user.email}`} className="ss-email-link">{user.email}</a> : <span style={{ color: "#555" }}>—</span>}
                   </div>
                   <div className="ss-users-cell">
                     <span className="ss-role-pill" style={{ color: ROLE_COLORS[user.role], background: `${ROLE_COLORS[user.role]}18`, borderColor: `${ROLE_COLORS[user.role]}40` }}>
@@ -422,19 +429,13 @@ const CompanyDetailPanel = ({ location, allUsers, allAuditLogs, currentUser, loc
 
       {activeTab === "history" && (
         <div className="ss-history-list">
-          {companyLogs.length === 0 && (
-            <div className="ss-empty">Действий пока нет</div>
-          )}
-          {companyLogs.map(h => {
+          {sortedLogs.length === 0 && <div className="ss-empty">Действий пока нет</div>}
+          {sortedLogs.map(h => {
             const actor = getUserById(h.user_id);
             return (
               <div key={h.id} className="ss-history-row">
                 <div className="ss-history-actor">
-                  {actor ? (
-                    <Avatar name={actor.full_name} color={getAvatarColor(actor.id)} size={30}/>
-                  ) : (
-                    <div className="ss-history-actor-unknown">?</div>
-                  )}
+                  {actor ? <Avatar name={actor.full_name} color={getAvatarColor(actor.id)} size={30}/> : <div className="ss-history-actor-unknown">?</div>}
                 </div>
                 <div className="ss-history-body">
                   <div className="ss-history-top">
@@ -457,7 +458,14 @@ const CompanyDetailPanel = ({ location, allUsers, allAuditLogs, currentUser, loc
       {showAddModal && (
         <AddUserModal
           onClose={() => setShowAddModal(false)}
-          onAdd={handleUserAdded}
+          onAdd={(newUser) => {
+            if (onUserAdded) onUserAdded({
+              ...newUser,
+              // FIX: принудительно ставим location_id из текущей локации,
+              // так как бэкенд может вернуть null
+              location_id: locations[0]?.id ?? newUser.location_id,
+            });
+          }}
           currentUser={currentUser}
           locations={locations}
         />
@@ -466,58 +474,313 @@ const CompanyDetailPanel = ({ location, allUsers, allAuditLogs, currentUser, loc
   );
 };
 
-// ── Companies List Component ────────────────────────────────────────
-const CompaniesList = ({ locations, allUsers, allAuditLogs, currentUser, onSelectCompany, onUserAdded }) => {
+// ── Location Detail Panel (admin) ─────────────────────────────────
+const LocationDetailPanel = ({ location, allUsers, allAuditLogs, currentUser, onUserAdded, onClose }) => {
+  const [activeTab, setActiveTab] = useState("users");
+  const [showAddModal, setShowAddModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [roleFilter, setRoleFilter] = useState("all");
+  const [roleDropdownOpen, setRoleDropdownOpen] = useState(false);
 
-  const filteredLocations = useMemo(() => {
-    if (!searchQuery.trim()) return locations;
-    const query = searchQuery.toLowerCase();
-    return locations.filter(loc => loc.name.toLowerCase().includes(query));
-  }, [locations, searchQuery]);
+  const locationUsers = useMemo(
+    () => allUsers.filter(u => normalizeLocationId(u.location_id) === normalizeLocationId(location.id) && u.role !== "admin"),
+    [allUsers, location.id]
+  );
+  const filteredUsers = useMemo(() => {
+    let result = [...locationUsers];
+    if (roleFilter !== "all") result = result.filter(u => u.role === roleFilter);
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      result = result.filter(u =>
+        (u.full_name || "").toLowerCase().includes(q) ||
+        (u.username  || "").toLowerCase().includes(q) ||
+        (u.email     || "").toLowerCase().includes(q)
+      );
+    }
+    return result;
+  }, [locationUsers, roleFilter, searchQuery]);
+
+  const locationUserIds = useMemo(() => new Set(locationUsers.map(u => u.id)), [locationUsers]);
+  const sortedLogs = useMemo(() =>
+    allAuditLogs.filter(log => locationUserIds.has(log.user_id))
+      .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp)),
+    [allAuditLogs, locationUserIds]
+  );
+  const getUserById = (id) => allUsers.find(u => u.id === id);
+  const roleOptions = [
+    { value: "all", label: "Все роли" },
+    { value: "editor", label: "Редактор" },
+    { value: "viewer", label: "Читатель" },
+  ];
 
   return (
-    <div className="ss-companies-list">
-      <div className="ss-companies-header">
-        <h2 className="ss-card-title">Компании</h2>
-        <div className="ss-search-wrapper">
-          <IconSearch />
-          <input
-            type="text"
-            className="ss-search-input"
-            placeholder="Поиск компании..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+    <div className="ss-location-detail-overlay" onClick={onClose}>
+      <div className="ss-location-detail-panel" onClick={e => e.stopPropagation()}>
+        <div className="ss-location-detail-header">
+          <div className="ss-location-detail-title-row">
+            <div className="ss-location-detail-icon"><IconBuilding /></div>
+            <div>
+              <h3 className="ss-location-detail-name">{location.name}</h3>
+              <span className="ss-location-detail-meta">{locationUsers.length} пользователей · {sortedLogs.length} событий</span>
+            </div>
+          </div>
+          <button className="ss-modal-close" onClick={onClose}><IconClose /></button>
+        </div>
+        <div className="ss-tabs ss-tabs--detail">
+          <button className={`ss-tab${activeTab === "users" ? " ss-tab--active" : ""}`} onClick={() => setActiveTab("users")}>
+            <IconUsers /><span>Пользователи</span><span className="ss-tab-count">{filteredUsers.length}</span>
+          </button>
+          <button className={`ss-tab${activeTab === "history" ? " ss-tab--active" : ""}`} onClick={() => setActiveTab("history")}>
+            <IconHistory /><span>История</span><span className="ss-tab-count">{sortedLogs.length}</span>
+          </button>
+          {activeTab === "users" && (
+            <div className="ss-tab-toolbar">
+              <div className="ss-search-wrapper ss-search-wrapper--sm">
+                <IconSearch />
+                <input type="text" className="ss-search-input" placeholder="Поиск..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)}/>
+              </div>
+              <div className="ss-dropdown-wrap">
+                <button className="ss-dropdown-btn" onClick={() => setRoleDropdownOpen(o => !o)}>
+                  <span style={{ color: roleFilter !== "all" ? ROLE_COLORS[roleFilter] : undefined }}>
+                    {roleOptions.find(o => o.value === roleFilter)?.label}
+                  </span>
+                  <IconChevron open={roleDropdownOpen} />
+                </button>
+                {roleDropdownOpen && (
+                  <>
+                    <div className="ss-dropdown-backdrop" onClick={() => setRoleDropdownOpen(false)} />
+                    <div className="ss-dropdown-menu">
+                      {roleOptions.map(opt => (
+                        <button key={opt.value}
+                          className={`ss-dropdown-item${roleFilter === opt.value ? " ss-dropdown-item--active" : ""}`}
+                          style={opt.value !== "all" ? { color: roleFilter === opt.value ? ROLE_COLORS[opt.value] : undefined } : {}}
+                          onClick={() => { setRoleFilter(opt.value); setRoleDropdownOpen(false); }}>
+                          {opt.value !== "all" && <span className="ss-dropdown-dot" style={{ background: ROLE_COLORS[opt.value] }} />}
+                          {opt.label}
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
+              <button className="ss-add-btn" onClick={() => setShowAddModal(true)}>
+                <IconPlus /><span>Добавить</span>
+              </button>
+            </div>
+          )}
+        </div>
+        {activeTab === "users" && (
+          <div className="ss-inline-table">
+            <div className="ss-users-col-header ss-users-col-header--4col">
+              {["Пользователь", "Email", "Роль", "Статус"].map(col => (
+                <div key={col} className="ss-users-col-head"><span>{col}</span><IconSort /></div>
+              ))}
+            </div>
+            <div className="ss-users-body">
+              {filteredUsers.length === 0 && <div className="ss-empty">Пользователи не найдены</div>}
+              {filteredUsers.map(user => {
+                const st = STATUS_STYLE[user.is_online ? "online" : "offline"];
+                return (
+                  <div key={user.id} className="ss-users-row ss-users-row--4col">
+                    <div className="ss-users-cell ss-user-name-cell">
+                      <Avatar name={user.full_name} color={getAvatarColor(user.id)} size={26}/>
+                      <div className="ss-user-name-block">
+                        <span>{user.full_name || "—"}</span>
+                        <span className="ss-user-username">@{user.username}</span>
+                      </div>
+                    </div>
+                    <div className="ss-users-cell">
+                      {user.email ? <a href={`mailto:${user.email}`} className="ss-email-link">{user.email}</a> : <span style={{ color: "#555" }}>—</span>}
+                    </div>
+                    <div className="ss-users-cell">
+                      <span className="ss-role-pill" style={{ color: ROLE_COLORS[user.role], background: `${ROLE_COLORS[user.role]}18`, borderColor: `${ROLE_COLORS[user.role]}40` }}>
+                        {ROLE_LABELS[user.role] || user.role}
+                      </span>
+                    </div>
+                    <div className="ss-users-cell">
+                      <span className="ss-status-dot" style={{ background: st.dot }}/>
+                      <span style={{ color: st.color }}>{st.label}</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+        {activeTab === "history" && (
+          <div className="ss-history-list">
+            {sortedLogs.length === 0 && <div className="ss-empty">Действий пока нет</div>}
+            {sortedLogs.map(h => {
+              const actor = getUserById(h.user_id);
+              return (
+                <div key={h.id} className="ss-history-row">
+                  <div className="ss-history-actor">
+                    {actor ? <Avatar name={actor.full_name} color={getAvatarColor(actor.id)} size={30}/> : <div className="ss-history-actor-unknown">?</div>}
+                  </div>
+                  <div className="ss-history-body">
+                    <div className="ss-history-top">
+                      <span className="ss-history-name">{actor?.full_name || "Неизвестно"}</span>
+                      {actor?.role && (
+                        <span className="ss-history-role-pill" style={{ color: ROLE_COLORS[actor.role], background: `${ROLE_COLORS[actor.role]}18` }}>
+                          {ROLE_LABELS[actor.role] || "—"}
+                        </span>
+                      )}
+                      <span className="ss-history-action">{h.action}</span>
+                    </div>
+                    <div className="ss-history-time">{formatDate(h.timestamp)}</div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+        {showAddModal && (
+          <AddUserModal
+            onClose={() => setShowAddModal(false)}
+            onAdd={(newUser) => { if (onUserAdded) onUserAdded(newUser); }}
+            currentUser={currentUser}
+            locations={[location]}
           />
+        )}
+      </div>
+    </div>
+  );
+};
+
+// ── Locations Panel (только admin) ─────────────────────────────────
+const LocationsPanel = ({ locations, allUsers, allAuditLogs, currentUser, onUserAdded }) => {
+  const [selectedLocation, setSelectedLocation] = useState(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [locationFilter, setLocationFilter] = useState("all");
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+
+  const locationOptions = useMemo(() => [
+    { value: "all", label: "Все локации" },
+    ...locations.map(loc => ({ value: String(loc.id), label: loc.name })),
+  ], [locations]);
+
+  const getUsersForLocation = (locId) =>
+    allUsers.filter(u => normalizeLocationId(u.location_id) === normalizeLocationId(locId) && u.role !== "admin");
+
+  const filteredLocations = useMemo(() => {
+    let result = [...locations];
+    if (locationFilter !== "all") result = result.filter(loc => String(loc.id) === locationFilter);
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      result = result.filter(loc => (loc.name || "").toLowerCase().includes(q));
+    }
+    return result;
+  }, [locations, locationFilter, searchQuery]);
+
+  const activeLocationLabel = locationOptions.find(o => o.value === locationFilter)?.label ?? "Все локации";
+
+  return (
+    <div className="ss-locations-panel">
+      <div className="ss-locations-toolbar">
+        <div className="ss-search-wrapper ss-search-wrapper--sm">
+          <IconSearch />
+          <input type="text" className="ss-search-input" placeholder="Поиск локации..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)}/>
+        </div>
+        <div className="ss-dropdown-wrap">
+          <button className="ss-dropdown-btn" onClick={() => setDropdownOpen(o => !o)}>
+            <span style={{ color: "#929292", display: "flex", alignItems: "center" }}><IconLocation /></span>
+            <span style={{ color: locationFilter !== "all" ? "#07bcd4" : undefined, marginLeft: 4 }}>{activeLocationLabel}</span>
+            <IconChevron open={dropdownOpen} />
+          </button>
+          {dropdownOpen && (
+            <>
+              <div className="ss-dropdown-backdrop" onClick={() => setDropdownOpen(false)} />
+              <div className="ss-dropdown-menu ss-dropdown-menu--location">
+                {locationOptions.map(opt => (
+                  <button key={opt.value}
+                    className={`ss-dropdown-item${locationFilter === opt.value ? " ss-dropdown-item--active" : ""}`}
+                    style={opt.value !== "all" && locationFilter === opt.value ? { color: "#07bcd4" } : {}}
+                    onClick={() => { setLocationFilter(opt.value); setDropdownOpen(false); }}>
+                    {opt.value !== "all" && <span className="ss-dropdown-dot" style={{ background: "#07bcd4" }} />}
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
         </div>
       </div>
-
-      <div className="ss-companies-grid">
-        {filteredLocations.length === 0 && (
-          <div className="ss-empty ss-empty-grid">Компании не найдены</div>
-        )}
+      <div className="ss-locations-grid">
+        {filteredLocations.length === 0 && <div className="ss-empty">Локации не найдены</div>}
         {filteredLocations.map(loc => {
-          const companyUsers = allUsers.filter(u => u.location_id === loc.id);
-          const userCount = companyUsers.length;
+          const locUsers = getUsersForLocation(loc.id);
+          const locUserIds = new Set(locUsers.map(u => u.id));
+          const locLogsCount = allAuditLogs.filter(log => locUserIds.has(log.user_id)).length;
+          const editors = locUsers.filter(u => u.role === "editor");
+          const viewers = locUsers.filter(u => u.role === "viewer");
+          const onlineCount = locUsers.filter(u => u.is_online).length;
           return (
-            <div key={loc.id} className="ss-company-card" onClick={() => onSelectCompany(loc)}>
-              <div className="ss-company-card-icon">
-                <IconBuilding />
+            <div key={loc.id} className="ss-location-card" onClick={() => setSelectedLocation(loc)} role="button" tabIndex={0} onKeyDown={e => e.key === "Enter" && setSelectedLocation(loc)}>
+              <div className="ss-location-card-header">
+                <div className="ss-location-card-icon"><IconBuilding /></div>
+                <div className="ss-location-card-title-block">
+                  <span className="ss-location-card-name">{loc.name}</span>
+                  {loc.address && <span className="ss-location-card-address"><IconLocation /> {loc.address}</span>}
+                </div>
+                <IconChevron open={false} />
               </div>
-              <div className="ss-company-card-info">
-                <span className="ss-company-card-name">{loc.name}</span>
-                <span className="ss-company-card-meta">{userCount} пользователей</span>
+              <div className="ss-location-card-stats">
+                <div className="ss-location-stat">
+                  <span className="ss-location-stat-value">{locUsers.length}</span>
+                  <span className="ss-location-stat-label">пользователей</span>
+                </div>
+                <div className="ss-location-stat-divider" />
+                <div className="ss-location-stat">
+                  <span className="ss-location-stat-value" style={{ color: "#01e676" }}>{onlineCount}</span>
+                  <span className="ss-location-stat-label">онлайн</span>
+                </div>
+                <div className="ss-location-stat-divider" />
+                <div className="ss-location-stat">
+                  <span className="ss-location-stat-value">{locLogsCount}</span>
+                  <span className="ss-location-stat-label">событий</span>
+                </div>
               </div>
+              <div className="ss-location-card-roles">
+                {editors.length > 0 && (
+                  <span className="ss-role-pill" style={{ color: ROLE_COLORS.editor, background: `${ROLE_COLORS.editor}18`, borderColor: `${ROLE_COLORS.editor}40` }}>
+                    {editors.length} редактор{editors.length !== 1 ? "а" : ""}
+                  </span>
+                )}
+                {viewers.length > 0 && (
+                  <span className="ss-role-pill" style={{ color: ROLE_COLORS.viewer, background: `${ROLE_COLORS.viewer}18`, borderColor: `${ROLE_COLORS.viewer}40` }}>
+                    {viewers.length} читатель{viewers.length > 1 ? (viewers.length < 5 ? "я" : "ей") : ""}
+                  </span>
+                )}
+                {locUsers.length === 0 && <span style={{ color: "#555", fontSize: 12 }}>Нет пользователей</span>}
+              </div>
+              {locUsers.length > 0 && (
+                <div className="ss-location-card-avatars">
+                  {locUsers.slice(0, 5).map(u => <Avatar key={u.id} name={u.full_name} color={getAvatarColor(u.id)} size={24} />)}
+                  {locUsers.length > 5 && <div className="ss-location-avatar-more">+{locUsers.length - 5}</div>}
+                </div>
+              )}
             </div>
           );
         })}
       </div>
+      {selectedLocation && (
+        <LocationDetailPanel
+          location={selectedLocation}
+          allUsers={allUsers}
+          allAuditLogs={allAuditLogs}
+          currentUser={currentUser}
+          onUserAdded={onUserAdded}
+          onClose={() => setSelectedLocation(null)}
+        />
+      )}
     </div>
   );
 };
 
 // ── Main Component ─────────────────────────────────────────────────
 export const SystemSettings = () => {
+  const { isViewer, isAdmin, isEditor } = useAuth();
+
   const [profile, setProfile]     = useState(null);
   const [locations, setLocations] = useState([]);
   const [allUsers, setAllUsers]   = useState([]);
@@ -525,96 +788,174 @@ export const SystemSettings = () => {
   const [loading, setLoading]     = useState(true);
   const [error, setError]         = useState(null);
   const [showEditModal, setShowEditModal] = useState(false);
-  const [selectedCompany, setSelectedCompany] = useState(null);
 
   useEffect(() => {
     const loadData = async () => {
       setLoading(true);
       setError(null);
       try {
-        // Получаем текущего пользователя
-        const meRes = await api("/users/me");
-        if (!meRes.ok) {
-          const errData = await meRes.json();
-          throw new Error(errData.detail || "Ошибка авторизации");
-        }
-        const me = await meRes.json();
+        const me = await getCurrentUser();
         setProfile(me);
 
-        // Получаем все локации
-        const locationsRes = await api("/locations/");
-        let allLocations = [];
-        if (locationsRes.ok) {
-          allLocations = await locationsRes.json();
-        }
-        
-        // Получаем всех пользователей
-        const usersRes = await api("/users/");
-        let allUsersData = [];
-        if (usersRes.ok) {
-          allUsersData = await usersRes.json();
+        // ── Viewer: только профиль ──
+        if (me?.role === "viewer") {
+          setLoading(false);
+          return;
         }
 
-        // Получаем audit logs
-        const logsRes = await api("/users/audit-logs");
-        let logsData = [];
-        if (logsRes.ok) {
-          logsData = await logsRes.json();
-        }
+        // ── Admin: все локации + детали через /locations/{id}/details ──
+        if (me?.role === "admin") {
+          const allLocations = await apiRequest("/locations/");
+          const locationsList = Array.isArray(allLocations) ? allLocations : [];
+          setLocations(locationsList);
 
-        // Фильтруем данные в зависимости от роли
-        if (me.role === "admin") {
-          setLocations(Array.isArray(allLocations) ? allLocations : []);
-          setAllUsers(Array.isArray(allUsersData) ? allUsersData : []);
-          setAuditLogs(Array.isArray(logsData) ? logsData : []);
-        } else {
-          // Для editor и viewer показываем только их локацию и пользователей этой локации
-          const userLocationId = me.location_id;
-          if (userLocationId) {
-            const userLocation = Array.isArray(allLocations) 
-              ? allLocations.find(l => l.id === userLocationId)
-              : null;
-            if (userLocation) {
-              setLocations([userLocation]);
+          const detailsResults = await Promise.allSettled(
+            locationsList.map(loc =>
+              apiRequest(`/locations/${loc.id}/details?users_limit=200&logs_limit=500`)
+            )
+          );
+
+          const allUsersMap = new Map();
+          const allLogsMap  = new Map();
+
+          detailsResults.forEach((result, idx) => {
+            if (result.status === "fulfilled" && result.value) {
+              const { users = [], audit_logs = [] } = result.value;
+              users.forEach(u => {
+                // FIX: всегда явно ставим location_id из локации, а не доверяем бэкенду
+                allUsersMap.set(u.id, { ...u, location_id: locationsList[idx].id });
+              });
+              audit_logs.forEach(log => {
+                allLogsMap.set(log.id, log);
+              });
             } else {
-              setLocations([{ id: userLocationId, name: `Локация #${userLocationId}` }]);
+              console.warn(`Failed to load details for location ${locationsList[idx]?.id}:`, result.reason);
             }
-            const filteredUsers = Array.isArray(allUsersData)
-              ? allUsersData.filter(u => u.location_id === userLocationId)
-              : [];
-            setAllUsers(filteredUsers);
-          } else {
-            setLocations([]);
-            setAllUsers([]);
+          });
+
+          setAllUsers([...allUsersMap.values()]);
+          setAuditLogs([...allLogsMap.values()]);
+
+        // ── Editor: загружаем данные своей локации через /locations/{group_id}/details ──
+        } else if (me?.role === "editor") {
+          // Шаг 1: определяем group_id редактора
+          let groupId = normalizeLocationId(me?.location_id);
+
+          if (groupId === null) {
+            console.warn("Editor: location_id не пришёл из /users/me, пробуем /sensors/ ...");
+            groupId = await getEditorGroupIdViaSensors();
+            if (groupId !== null) {
+              setProfile(p => ({ ...p, _locationId: groupId }));
+            }
           }
-          // Для audit logs фильтруем по пользователям текущей локации
-          if (me.location_id) {
-            const filteredLogs = Array.isArray(logsData)
-              ? logsData.filter(log => {
-                  const user = allUsersData.find(u => u.id === log.user_id);
-                  return user && user.location_id === me.location_id;
-                })
-              : [];
-            setAuditLogs(filteredLogs);
-          } else {
-            setAuditLogs([]);
+
+          if (groupId === null) {
+            console.warn("Editor: не удалось определить локацию");
+            setLoading(false);
+            return;
+          }
+
+          // Шаг 2: загружаем данные локации через /locations/{group_id}/details
+          try {
+            const details = await apiRequest(
+              `/locations/${groupId}/details?users_limit=200&logs_limit=500`
+            );
+
+            if (details) {
+              const { location, users = [], audit_logs = [] } = details;
+
+              if (location) {
+                setLocations([location]);
+              } else {
+                setLocations([{ id: groupId, name: `Локация #${groupId}` }]);
+              }
+
+              // FIX: принудительно ставим groupId всем пользователям —
+              // бэкенд иногда возвращает location_id: null даже для пользователей этой локации
+              const usersWithLocation = users.map(u => ({
+                ...u,
+                location_id: groupId,
+              }));
+
+              // FIX: дедупликация — добавляем me только если его нет в списке
+              const hasCurrentUser = usersWithLocation.some(u => u.id === me.id);
+              const finalUsers = hasCurrentUser
+                ? usersWithLocation
+                : [{ ...me, location_id: groupId }, ...usersWithLocation];
+
+              setAllUsers(finalUsers);
+              setAuditLogs(audit_logs);
+            }
+          } catch (detailsErr) {
+            // Fallback: если /locations/{id}/details недоступен для editor
+            console.warn(`/locations/${groupId}/details вернул ошибку, используем fallback:`, detailsErr);
+
+            try {
+              const locData = await apiRequest(`/locations/${groupId}`);
+              setLocations([locData || { id: groupId, name: `Локация #${groupId}` }]);
+            } catch {
+              setLocations([{ id: groupId, name: `Локация #${groupId}` }]);
+            }
+
+            // FIX: убираем лишний фильтр по location_id в fallback —
+            // редактор и так видит только свою локацию через /users/by-role
+            let usersData = [{ ...me, location_id: groupId }];
+            try {
+              const [viewers, editors] = await Promise.allSettled([
+                apiRequest("/users/by-role/viewer"),
+                apiRequest("/users/by-role/editor"),
+              ]);
+              const combined = [
+                ...(viewers.status === "fulfilled" && Array.isArray(viewers.value) ? viewers.value : []),
+                ...(editors.status === "fulfilled" && Array.isArray(editors.value) ? editors.value : []),
+              ];
+              if (combined.length > 0) {
+                // FIX: принудительно ставим groupId всем — не фильтруем по location_id,
+                // потому что бэкенд уже вернул только пользователей нашей локации
+                const withLocation = combined.map(u => ({
+                  ...u,
+                  location_id: groupId,
+                }));
+                // FIX: дедупликация через Map по id
+                const usersMap = new Map();
+                // Сначала добавляем me
+                usersMap.set(me.id, { ...me, location_id: groupId });
+                // Затем остальных (перезапишет me если он есть в списке — это нормально)
+                withLocation.forEach(u => usersMap.set(u.id, u));
+                usersData = [...usersMap.values()];
+              }
+            } catch (usersErr) {
+              console.warn("Fallback /users/by-role тоже не сработал:", usersErr);
+            }
+            setAllUsers(usersData);
+
+            try {
+              const logsData = await apiRequest("/users/audit-logs?limit=500");
+              if (Array.isArray(logsData)) {
+                const userIds = new Set(usersData.map(u => u.id));
+                setAuditLogs(logsData.filter(log => userIds.has(log.user_id)));
+              }
+            } catch {
+              setAuditLogs([]);
+            }
           }
         }
+
       } catch (err) {
         console.error("Ошибка загрузки данных:", err);
-        setError(err.message || "Не удалось загрузить данные. Проверьте соединение с сервером.");
+        if (!isEditor) {
+          setError(err.message || "Не удалось загрузить данные.");
+        }
       }
       setLoading(false);
     };
+
     loadData();
   }, []);
 
-  const handleSaveProfile = (updates) => {
-    setProfile(p => ({ ...p, ...updates }));
-  };
-
-  const handleUserAdded = (newUser) => {
-    setAllUsers(prev => [...prev, newUser]);
+  const handleLogout = () => {
+    localStorage.removeItem("token");
+    window.location.href = "/login";
   };
 
   if (loading) {
@@ -627,7 +968,7 @@ export const SystemSettings = () => {
     );
   }
 
-  if (error) {
+  if (error && !isEditor) {
     return (
       <div className="ss-container">
         <main className="ss-main">
@@ -643,22 +984,19 @@ export const SystemSettings = () => {
         <h1 className="ss-page-title">Настройки</h1>
         <div className="ss-content-grid">
 
-          {/* ── Профиль ── */}
+          {/* ── Профиль — все роли ── */}
           <div className="ss-card ss-profile-card">
             <div className="ss-card-header">
               <h2 className="ss-card-title">Профиль</h2>
               <div className="ss-profile-actions">
                 <button className="ss-icon-btn ss-edit-profile-btn" onClick={() => setShowEditModal(true)}>
-                  <IconEdit />
-                  <span>Редактировать</span>
+                  <IconEdit /><span>Редактировать</span>
                 </button>
-                <button className="ss-icon-btn ss-logout-btn" onClick={() => { localStorage.removeItem("token"); window.location.href = "/login"; }}>
-                  <IconLogout />
-                  <span>Выйти</span>
+                <button className="ss-icon-btn ss-logout-btn" onClick={handleLogout}>
+                  <IconLogout /><span>Выйти</span>
                 </button>
               </div>
             </div>
-
             <div className="ss-profile-hero">
               <div className="ss-profile-avatar" style={{ background: getAvatarColor(profile?.id) }}>
                 <span>{(profile?.full_name || profile?.username || "?").split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase()}</span>
@@ -669,43 +1007,63 @@ export const SystemSettings = () => {
                 {profile?.email && (
                   <span className="ss-profile-email" style={{ fontSize: 12, color: "#929292" }}>{profile.email}</span>
                 )}
-                <span
-                  className="ss-profile-role-badge"
-                  style={{
-                    color: ROLE_COLORS[profile?.role],
-                    background: `${ROLE_COLORS[profile?.role]}18`,
-                    borderColor: `${ROLE_COLORS[profile?.role]}40`
-                  }}
-                >
+                <span className="ss-profile-role-badge" style={{
+                  color: ROLE_COLORS[profile?.role],
+                  background: `${ROLE_COLORS[profile?.role]}18`,
+                  borderColor: `${ROLE_COLORS[profile?.role]}40`,
+                }}>
                   {ROLE_LABELS[profile?.role] || profile?.role || "—"}
                 </span>
               </div>
             </div>
+            {isViewer && (
+              <div style={{ marginTop: 16, padding: "12px 14px", background: "rgba(146,146,146,0.08)", borderRadius: 10, fontSize: 12, color: "#929292", lineHeight: 1.6 }}>
+                Вы можете редактировать своё имя. Для расширенного доступа обратитесь к администратору.
+              </div>
+            )}
           </div>
 
-          {/* ── Компании / Локации ── */}
-          {locations.length > 0 && (
+          {/* ── Локации — только admin ── */}
+          {isAdmin && (
             <div className="ss-card ss-companies-full-card">
-              {!selectedCompany ? (
-                <CompaniesList
-                  locations={locations}
-                  allUsers={allUsers}
-                  allAuditLogs={auditLogs}
-                  currentUser={profile}
-                  onSelectCompany={setSelectedCompany}
-                  onUserAdded={handleUserAdded}
-                />
-              ) : (
-                <CompanyDetailPanel
-                  location={selectedCompany}
-                  allUsers={allUsers}
-                  allAuditLogs={auditLogs}
-                  currentUser={profile}
-                  locations={locations}
-                  onUserAdded={handleUserAdded}
-                  onBack={() => setSelectedCompany(null)}
-                />
-              )}
+              <div className="ss-card-header">
+                <h2 className="ss-card-title">Локации</h2>
+                <span className="ss-card-header-meta">{locations.length} локаций</span>
+              </div>
+              <LocationsPanel
+                locations={locations}
+                allUsers={allUsers}
+                allAuditLogs={auditLogs}
+                currentUser={profile}
+                onUserAdded={(newUser) => setAllUsers(prev => [...prev, newUser])}
+              />
+            </div>
+          )}
+
+          {/* ── Пользователи — editor ── */}
+          {isEditor && (
+            <div className="ss-card ss-companies-full-card">
+              <div className="ss-card-header">
+                <h2 className="ss-card-title">Пользователи</h2>
+                <span className="ss-card-header-meta" style={{ fontSize: 12, color: "#929292" }}>
+                  {locations[0]?.name ?? "Моя локация"}
+                </span>
+              </div>
+              <UsersPanel
+                allUsers={allUsers}
+                allAuditLogs={auditLogs}
+                currentUser={profile}
+                locations={locations}
+                onUserAdded={(newUser) => {
+                  // FIX: принудительно ставим location_id из текущей локации редактора,
+                  // чтобы новый пользователь сразу отображался в списке после добавления
+                  const groupId = normalizeLocationId(locations[0]?.id);
+                  setAllUsers(prev => [
+                    ...prev,
+                    { ...newUser, location_id: groupId ?? newUser.location_id },
+                  ]);
+                }}
+              />
             </div>
           )}
 
@@ -716,7 +1074,7 @@ export const SystemSettings = () => {
         <EditProfileModal
           profile={profile}
           onClose={() => setShowEditModal(false)}
-          onSave={handleSaveProfile}
+          onSave={(updates) => setProfile(p => ({ ...p, ...updates }))}
         />
       )}
     </div>

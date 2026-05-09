@@ -143,3 +143,65 @@ export const apiLogin = async (username, password) => {
   console.log("✅ Login success, token received"); // Для отладки
   return data; // { access_token, token_type }
 };
+
+// ─── НОВЫЕ ФУНКЦИИ ДЛЯ ФИЛЬТРАЦИИ ПО РОЛЯМ ─────────────────────────────────────
+
+/**
+ * Получение локаций пользователя с учётом роли
+ * - Admin: все локации
+ * - Editor/Viewer: только свои локации (бэкенд должен возвращать только их)
+ */
+export const getUserLocations = async () => {
+  const data = await apiRequest("/locations/");
+  return data || [];
+};
+
+/**
+ * Получение датчиков пользователя с фильтрацией по локациям
+ * - Admin: все датчики
+ * - Editor/Viewer: только датчики из своих локаций
+ */
+export const getUserSensors = async () => {
+  // Получаем все датчики
+  const allSensors = await apiRequest("/sensors/");
+  
+  // Получаем локации пользователя (уже отфильтрованные бэкендом)
+  const userLocations = await getUserLocations();
+  const userLocationIds = userLocations.map(loc => loc.id);
+  
+  // Если пользователь admin, возвращаем все датчики
+  const token = getToken();
+  // Проверяем роль через отдельный запрос (или можно сохранить в контексте)
+  try {
+    const userInfo = await apiRequest("/auth/me");
+    if (userInfo?.role === "admin") {
+      return allSensors || [];
+    }
+  } catch (e) {
+    console.error("Failed to get user role:", e);
+  }
+  
+  // Для editor и viewer — фильтруем датчики по своим локациям
+  if (userLocationIds.length > 0 && allSensors) {
+    return allSensors.filter(sensor => userLocationIds.includes(sensor.group_id));
+  }
+  
+  return allSensors || [];
+};
+
+/**
+ * Проверка доступа к датчику перед редактированием
+ * @param {number} sensorId - ID датчика
+ * @returns {Promise<boolean>} - есть ли доступ
+ */
+export const canAccessSensor = async (sensorId) => {
+  try {
+    const userLocations = await getUserLocations();
+    const userLocationIds = userLocations.map(loc => loc.id);
+    
+    const sensor = await apiRequest(`/sensors/${sensorId}`);
+    return userLocationIds.includes(sensor?.group_id);
+  } catch {
+    return false;
+  }
+};
