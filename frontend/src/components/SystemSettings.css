@@ -12,7 +12,7 @@
   color: #ffffff;
 }
 
-/* ── Main ────────────────────────────────────────────────────── */
+/* ── Main ─────────────────────────────────────────────────────────── */
 .ss-main {
   padding: 32px 28px;
   display: flex;
@@ -29,14 +29,14 @@
   color: #ffffff;
 }
 
-/* ── Content grid ─────── */
+/* ── Content grid ─────────────────────────────────────────────────── */
 .ss-content-grid {
   display: flex;
   flex-direction: column;
   gap: 20px;
 }
 
-/* ── Card base ───────────────────────────────────────────────── */
+/* ── Card base ────────────────────────────────────────────────────── */
 .ss-card {
   background-color: rgba(49, 49, 49, 0.30);
   backdrop-filter: blur(2px);
@@ -65,7 +65,17 @@
   flex-wrap: wrap;
 }
 
-/* ── Profile card ────────────────────────────────────────────── */
+.ss-card-header-meta {
+  font-size: 12px;
+  color: #555;
+  margin-left: auto;
+}
+
+/* ── Profile card ─────────────────────────────────────────────────── */
+.ss-companies-full-card {
+  padding-bottom: 12px;
+}
+
 .ss-profile-actions {
   display: flex;
   align-items: center;
@@ -136,6 +146,7 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
+  min-width: 0;
 }
 
 .ss-profile-name {
@@ -143,6 +154,7 @@
   font-weight: 600;
   color: #ffffff;
   letter-spacing: -0.3px;
+  word-break: break-word;
 }
 
 .ss-profile-role-badge {
@@ -157,164 +169,26 @@
   letter-spacing: -0.1px;
 }
 
-/* ── Companies list ──────────────────────────────────────────── */
-.ss-companies-full-card {
-  padding-bottom: 12px;
-}
-
-.ss-companies-list {
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
-}
-
-.ss-companies-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 16px;
-  padding: 0 4px;
-}
-
-.ss-search-wrapper {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  background: rgba(255,255,255,0.05);
-  border: 1px solid rgba(255,255,255,0.1);
-  border-radius: 10px;
-  padding: 6px 12px;
-}
-
-.ss-search-input {
-  background: transparent;
-  border: none;
-  color: #ffffff;
-  font-size: 13px;
-  font-family: "Inter", Helvetica, sans-serif;
-  outline: none;
-  width: 200px;
-}
-
-.ss-search-input::placeholder {
-  color: #555;
-}
-
-.ss-search-input:focus {
-  border-color: #ffc207;
-}
-
-.ss-companies-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 12px;
-}
-
-.ss-company-card {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  padding: 16px;
-  background: rgba(255,255,255,0.03);
-  border: 1px solid rgba(255,255,255,0.06);
-  border-radius: 12px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.ss-company-card:hover {
-  background: rgba(255,194,7,0.08);
-  border-color: rgba(255,194,7,0.3);
-  transform: translateY(-1px);
-}
-
-.ss-company-card-icon {
-  width: 44px;
-  height: 44px;
-  border-radius: 10px;
-  background: rgba(255,194,7,0.1);
+/* ── Avatar ────────────────────────────────────────────────────────── */
+.ss-avatar {
   display: flex;
   align-items: center;
   justify-content: center;
+  font-weight: 700;
+  color: #000;
   flex-shrink: 0;
-}
-
-.ss-company-card-info {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.ss-company-card-name {
-  font-size: 15px;
-  font-weight: 600;
-  color: #ffffff;
-}
-
-.ss-company-card-meta {
-  font-size: 12px;
-  color: #929292;
-}
-
-/* ── Company Detail View ──────────────────────────────────────── */
-.ss-company-detail {
-  display: flex;
-  flex-direction: column;
-  gap: 0;
-}
-
-.ss-detail-header {
-  display: flex;
-  align-items: center;
-  gap: 20px;
-  padding-bottom: 16px;
-  margin-bottom: 8px;
-  border-bottom: 1px solid rgba(255,255,255,0.08);
-}
-
-.ss-back-btn {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  background: transparent;
-  border: 1px solid rgba(255,255,255,0.1);
-  border-radius: 8px;
-  padding: 6px 12px;
-  cursor: pointer;
-  font-size: 13px;
-  color: #929292;
+  letter-spacing: -0.3px;
   font-family: "Inter", Helvetica, sans-serif;
-  transition: all 0.15s ease;
 }
 
-.ss-back-btn:hover {
-  background: rgba(255,255,255,0.05);
-  border-color: rgba(255,255,255,0.2);
-  color: #ffffff;
-}
-
-.ss-detail-title {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-size: 18px;
-  font-weight: 600;
-  color: #ffffff;
-}
-
-.ss-detail-title svg rect,
-.ss-detail-title svg path {
-  stroke: #ffc207;
-}
-
-/* ── Tabs ─────────────────────────────────────────────────────── */
+/* ── Tabs ─────────────────────────────────────────────────────────── */
 .ss-tabs {
   display: flex;
   align-items: center;
   gap: 0;
   border-bottom: 1px solid rgba(255,255,255,0.08);
   background: rgba(0,0,0,0.15);
+  flex-wrap: wrap;
 }
 
 .ss-tab {
@@ -333,6 +207,7 @@
   letter-spacing: -0.2px;
   transition: color 0.15s ease, border-color 0.15s ease;
   margin-bottom: -1px;
+  white-space: nowrap;
 }
 
 .ss-tab:hover {
@@ -357,9 +232,160 @@
   color: #ffc207;
 }
 
-/* ── Inline table ─────────────────────────────────────────────── */
+/* ── Tab toolbar (search + filter + add btn) ─────────────────────── */
+.ss-tab-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+  padding: 4px 8px;
+  flex-wrap: wrap;
+}
+
+/* ── Search ───────────────────────────────────────────────────────── */
+.ss-search-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 10px;
+  padding: 5px 10px;
+}
+
+.ss-search-input {
+  background: transparent;
+  border: none;
+  color: #ffffff;
+  font-size: 13px;
+  font-family: "Inter", Helvetica, sans-serif;
+  outline: none;
+  width: 140px;
+}
+
+.ss-search-input::placeholder {
+  color: #555;
+}
+
+/* ── Dropdown ─────────────────────────────────────────────────────── */
+.ss-dropdown-wrap {
+  position: relative;
+}
+
+.ss-dropdown-btn {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  height: 30px;
+  padding: 0 10px;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 8px;
+  color: #929292;
+  font-size: 12px;
+  font-family: "Inter", Helvetica, sans-serif;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.ss-dropdown-btn:hover {
+  border-color: rgba(255,255,255,0.2);
+  background: rgba(255,255,255,0.08);
+  color: #ffffff;
+}
+
+.ss-dropdown-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+}
+
+.ss-dropdown-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 20;
+  background: #1e1e1e;
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 10px;
+  padding: 4px;
+  min-width: 130px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+  animation: ss-modal-in 0.12s ease;
+}
+
+.ss-dropdown-menu--location {
+  min-width: 180px;
+}
+
+.ss-dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 10px;
+  background: transparent;
+  border: none;
+  border-radius: 7px;
+  color: #929292;
+  font-size: 12px;
+  font-family: "Inter", Helvetica, sans-serif;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+
+.ss-dropdown-item:hover {
+  background: rgba(255,255,255,0.06);
+  color: #ffffff;
+}
+
+.ss-dropdown-item--active {
+  background: rgba(255,255,255,0.06);
+  color: #ffffff;
+}
+
+.ss-dropdown-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* ── Add button ───────────────────────────────────────────────────── */
+.ss-add-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 12px;
+  background: #ffc207;
+  border: none;
+  border-radius: 8px;
+  color: #000;
+  font-size: 12px;
+  font-weight: 600;
+  font-family: "Inter", Helvetica, sans-serif;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s ease;
+}
+
+.ss-add-btn:hover {
+  background: #e6ad00;
+}
+
+/* ── Users panel ──────────────────────────────────────────────────── */
+.ss-users-panel {
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Inline table ─────────────────────────────────────────────────── */
 .ss-inline-table {
   padding: 0 0 8px 0;
+  overflow-x: auto;
 }
 
 .ss-users-col-header {
@@ -375,8 +401,9 @@
   padding: 0 16px;
 }
 
-.ss-users-col-header--detail {
-  grid-template-columns: 2fr 2.5fr 1.2fr 1.2fr;
+.ss-users-col-header--4col,
+.ss-users-row--4col {
+  grid-template-columns: 2fr 2fr 1fr 1fr;
 }
 
 .ss-users-col-head {
@@ -409,10 +436,6 @@
   transition: background-color 0.12s ease;
 }
 
-.ss-users-row--4col {
-  grid-template-columns: 2fr 2.5fr 1.2fr 1.2fr;
-}
-
 .ss-users-row:last-child {
   border-bottom: none;
 }
@@ -435,6 +458,27 @@
 
 .ss-user-name-cell {
   gap: 10px;
+}
+
+.ss-user-name-block {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.ss-user-name-block > span:first-child {
+  font-size: 13px;
+  font-weight: 500;
+  color: #ffffff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ss-user-username {
+  font-size: 11px;
+  color: #555;
 }
 
 .ss-email-link {
@@ -468,19 +512,7 @@
   white-space: nowrap;
 }
 
-/* ── Avatar ────────────────────────────────────────────────────── */
-.ss-avatar {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 700;
-  color: #000;
-  flex-shrink: 0;
-  letter-spacing: -0.3px;
-  font-family: "Inter", Helvetica, sans-serif;
-}
-
-/* ── History ───────────────────────────────────────────────────── */
+/* ── History ──────────────────────────────────────────────────────── */
 .ss-history-list {
   display: flex;
   flex-direction: column;
@@ -558,16 +590,33 @@
   letter-spacing: -0.1px;
 }
 
-/* ── Empty state ───────────────────────────────────────────────── */
+/* ── Location pill ────────────────────────────────────────────────── */
+.ss-location-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  color: #07bcd4;
+  background: rgba(7, 188, 212, 0.10);
+  border: 1px solid rgba(7, 188, 212, 0.25);
+  border-radius: 6px;
+  padding: 3px 8px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.ss-location-pill svg {
+  flex-shrink: 0;
+}
+
+/* ── Empty / Loading states ───────────────────────────────────────── */
 .ss-empty {
   text-align: center;
   padding: 24px;
   color: #555;
   font-size: 13px;
-}
-
-.ss-empty-grid {
-  grid-column: 1 / -1;
 }
 
 .ss-loading {
@@ -577,7 +626,12 @@
   font-size: 15px;
 }
 
-/* ── Modal ─────────────────────────────────────────────────────── */
+.ss-loading--inline {
+  padding: 24px;
+  font-size: 13px;
+}
+
+/* ── Modal ────────────────────────────────────────────────────────── */
 .ss-modal-overlay {
   position: fixed;
   inset: 0;
@@ -605,14 +659,8 @@
 }
 
 @keyframes ss-modal-in {
-  from {
-    opacity: 0;
-    transform: scale(0.96) translateY(8px);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1) translateY(0);
-  }
+  from { opacity: 0; transform: scale(0.96) translateY(8px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
 }
 
 .ss-modal-header {
@@ -658,18 +706,9 @@
   scrollbar-color: #3a3a3a transparent;
 }
 
-.ss-modal-body::-webkit-scrollbar {
-  width: 4px;
-}
-
-.ss-modal-body::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.ss-modal-body::-webkit-scrollbar-thumb {
-  background-color: #3a3a3a;
-  border-radius: 2px;
-}
+.ss-modal-body::-webkit-scrollbar { width: 4px; }
+.ss-modal-body::-webkit-scrollbar-track { background: transparent; }
+.ss-modal-body::-webkit-scrollbar-thumb { background-color: #3a3a3a; border-radius: 2px; }
 
 .ss-modal-footer {
   padding: 14px 20px 20px;
@@ -679,7 +718,7 @@
   border-top: 1px solid rgba(255,255,255,0.08);
 }
 
-/* ── Form elements ─────────────────────────────────────────────── */
+/* ── Form elements ────────────────────────────────────────────────── */
 .ss-form-group {
   display: flex;
   flex-direction: column;
@@ -705,6 +744,7 @@
   letter-spacing: -0.2px;
   outline: none;
   transition: border-color 0.15s ease;
+  width: 100%;
 }
 
 .ss-form-select {
@@ -732,7 +772,6 @@
   letter-spacing: -0.1px;
 }
 
-/* Role selector */
 .ss-role-selector {
   display: flex;
   gap: 6px;
@@ -766,7 +805,7 @@
   min-height: 32px;
 }
 
-/* ── Buttons ────────────────────────────────────────────────────── */
+/* ── Buttons ──────────────────────────────────────────────────────── */
 .ss-btn-cancel {
   height: 34px;
   padding: 0 16px;
@@ -810,294 +849,7 @@
   cursor: not-allowed;
 }
 
-/* ── Responsive ────────────────────────────────────────────────── */
-@media (max-width: 700px) {
-  .ss-users-col-header--detail,
-  .ss-users-row--4col {
-    grid-template-columns: 1.5fr 1fr 1fr;
-  }
-  
-  .ss-users-col-head:nth-child(2),
-  .ss-users-cell:nth-child(2) {
-    display: none;
-  }
-  
-  .ss-icon-btn span {
-    display: none;
-  }
-  
-  .ss-companies-header {
-    flex-direction: column;
-    align-items: stretch;
-  }
-  
-  .ss-search-wrapper {
-    width: 100%;
-  }
-  
-  .ss-search-input {
-    width: 100%;
-  }
-}
-/* ── Users Panel ───────────────────────────────────────────────── */
-.ss-users-panel {
-  display: flex;
-  flex-direction: column;
-}
-
-/* ── Tab toolbar (search + filter + add btn) ───────────────────── */
-.ss-tab-toolbar {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-left: auto;
-  padding: 4px 0;
-}
-
-.ss-search-wrapper--sm {
-  padding: 5px 10px;
-}
-
-.ss-search-wrapper--sm .ss-search-input {
-  width: 140px;
-}
-
-/* ── Dropdown ──────────────────────────────────────────────────── */
-.ss-dropdown-wrap {
-  position: relative;
-}
-
-.ss-dropdown-btn {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  height: 30px;
-  padding: 0 10px;
-  background: rgba(255,255,255,0.05);
-  border: 1px solid rgba(255,255,255,0.1);
-  border-radius: 8px;
-  color: #929292;
-  font-size: 12px;
-  font-family: "Inter", Helvetica, sans-serif;
-  cursor: pointer;
-  white-space: nowrap;
-  transition: border-color 0.15s ease, background 0.15s ease;
-}
-
-.ss-dropdown-btn:hover {
-  border-color: rgba(255,255,255,0.2);
-  background: rgba(255,255,255,0.08);
-  color: #ffffff;
-}
-
-.ss-dropdown-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 10;
-}
-
-.ss-dropdown-menu {
-  position: absolute;
-  top: calc(100% + 6px);
-  right: 0;
-  z-index: 20;
-  background: #1e1e1e;
-  border: 1px solid rgba(255,255,255,0.1);
-  border-radius: 10px;
-  padding: 4px;
-  min-width: 130px;
-  box-shadow: 0 8px 24px rgba(0,0,0,0.5);
-  animation: ss-modal-in 0.12s ease;
-}
-
-.ss-dropdown-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-  padding: 7px 10px;
-  background: transparent;
-  border: none;
-  border-radius: 7px;
-  color: #929292;
-  font-size: 12px;
-  font-family: "Inter", Helvetica, sans-serif;
-  cursor: pointer;
-  text-align: left;
-  transition: background 0.12s ease, color 0.12s ease;
-}
-
-.ss-dropdown-item:hover {
-  background: rgba(255,255,255,0.06);
-  color: #ffffff;
-}
-
-.ss-dropdown-item--active {
-  background: rgba(255,255,255,0.06);
-  color: #ffffff;
-}
-
-.ss-dropdown-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
-
-/* ── Add button ────────────────────────────────────────────────── */
-.ss-add-btn {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  height: 30px;
-  padding: 0 12px;
-  background: #ffc207;
-  border: none;
-  border-radius: 8px;
-  color: #000;
-  font-size: 12px;
-  font-weight: 600;
-  font-family: "Inter", Helvetica, sans-serif;
-  cursor: pointer;
-  white-space: nowrap;
-  transition: background 0.15s ease;
-}
-
-.ss-add-btn:hover {
-  background: #e6ad00;
-}
-
-/* ── User name + username subline ──────────────────────────────── */
-.ss-user-name-block {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-  min-width: 0;
-}
-
-.ss-user-name-block > span:first-child {
-  font-size: 13px;
-  font-weight: 500;
-  color: #ffffff;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.ss-user-username {
-  font-size: 11px;
-  color: #555;
-}
-
-/* ─────────────────────────────────────────────────────────────────
-   PATCH — добавить в SystemSettings.css
-   Новые стили: 5-колоночная таблица + location pill + location dropdown
-   ───────────────────────────────────────────────────────────────── */
-
-/* 5-column header (было 4-col) */
-.ss-users-col-header--5col {
-  display: grid;
-  grid-template-columns: 2fr 2fr 1.5fr 1fr 1fr;
-  padding: 0 12px;
-  gap: 8px;
-}
-
-/* 5-column row */
-.ss-users-row--5col {
-  display: grid;
-  grid-template-columns: 2fr 2fr 1.5fr 1fr 1fr;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 12px;
-  border-bottom: 1px solid rgba(255,255,255,0.04);
-  transition: background 0.15s;
-}
-.ss-users-row--5col:hover {
-  background: rgba(255,255,255,0.03);
-}
-
-/* Location pill (badge in the table cell) */
-.ss-location-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  font-size: 12px;
-  color: #07bcd4;
-  background: rgba(7, 188, 212, 0.10);
-  border: 1px solid rgba(7, 188, 212, 0.25);
-  border-radius: 6px;
-  padding: 3px 8px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 100%;
-}
-.ss-location-pill svg {
-  flex-shrink: 0;
-}
-
-/* Location dropdown — slightly wider to fit long location names */
-.ss-dropdown-menu--location {
-  min-width: 180px;
-}
-
-/* ─────────────────────────────────────────────────────────────────
-   PATCH — добавить в SystemSettings.css
-   Новые стили: 5-колоночная таблица + location pill + location dropdown
-   ───────────────────────────────────────────────────────────────── */
-
-/* 5-column header */
-.ss-users-col-header--5col {
-  display: grid;
-  grid-template-columns: 2fr 2fr 1.5fr 1fr 1fr;
-  padding: 0 12px;
-  gap: 8px;
-}
-
-/* 5-column row */
-.ss-users-row--5col {
-  display: grid;
-  grid-template-columns: 2fr 2fr 1.5fr 1fr 1fr;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 12px;
-  border-bottom: 1px solid rgba(255,255,255,0.04);
-  transition: background 0.15s;
-}
-.ss-users-row--5col:hover {
-  background: rgba(255,255,255,0.03);
-}
-
-/* Location pill badge in the table cell */
-.ss-location-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  font-size: 12px;
-  color: #07bcd4;
-  background: rgba(7, 188, 212, 0.10);
-  border: 1px solid rgba(7, 188, 212, 0.25);
-  border-radius: 6px;
-  padding: 3px 8px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 100%;
-}
-.ss-location-pill svg {
-  flex-shrink: 0;
-}
-
-/* Location dropdown — чуть шире для длинных названий */
-.ss-dropdown-menu--location {
-  min-width: 180px;
-}
-
-/* ── Additions to SystemSettings.css ─────────────────────────────
-   Вставь эти стили в конец существующего SystemSettings.css
-   ──────────────────────────────────────────────────────────────── */
-
-/* ── Locations panel ────────────────────────────────────────────── */
+/* ── Locations panel ──────────────────────────────────────────────── */
 .ss-locations-panel {
   display: flex;
   flex-direction: column;
@@ -1110,9 +862,10 @@
   align-items: center;
   gap: 10px;
   padding: 0 2px;
+  flex-wrap: wrap;
 }
 
-/* ── Location cards grid ────────────────────────────────────────── */
+/* ── Location cards grid ──────────────────────────────────────────── */
 .ss-locations-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
@@ -1143,7 +896,6 @@
   box-shadow: 0 0 0 2px rgba(7,188,212,0.2);
 }
 
-/* Card header */
 .ss-location-card-header {
   display: flex;
   align-items: flex-start;
@@ -1190,11 +942,9 @@
   text-overflow: ellipsis;
 }
 
-/* Stats row */
 .ss-location-card-stats {
   display: flex;
   align-items: center;
-  gap: 0;
   background: rgba(255,255,255,0.03);
   border-radius: 8px;
   padding: 8px 0;
@@ -1228,18 +978,15 @@
   background: rgba(255,255,255,0.07);
 }
 
-/* Role pills row */
 .ss-location-card-roles {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
 }
 
-/* Avatars preview */
 .ss-location-card-avatars {
   display: flex;
   align-items: center;
-  gap: -4px;
 }
 
 .ss-location-card-avatars .ss-avatar {
@@ -1262,7 +1009,7 @@
   margin-left: 2px;
 }
 
-/* ── Location detail panel (slide-in overlay) ───────────────────── */
+/* ── Location detail panel (slide-in overlay) ─────────────────────── */
 .ss-location-detail-overlay {
   position: fixed;
   inset: 0;
@@ -1302,12 +1049,14 @@
   padding: 20px 24px 16px;
   border-bottom: 1px solid rgba(255,255,255,0.07);
   flex-shrink: 0;
+  gap: 12px;
 }
 
 .ss-location-detail-title-row {
   display: flex;
   align-items: center;
   gap: 12px;
+  min-width: 0;
 }
 
 .ss-location-detail-icon {
@@ -1327,6 +1076,7 @@
   font-weight: 700;
   color: #e8e8e8;
   margin: 0;
+  word-break: break-word;
 }
 
 .ss-location-detail-meta {
@@ -1336,7 +1086,6 @@
   display: block;
 }
 
-/* Tabs inside detail panel — allow scrolling below */
 .ss-tabs--detail {
   flex-shrink: 0;
 }
@@ -1345,17 +1094,4 @@
 .ss-location-detail-panel .ss-history-list {
   flex: 1;
   overflow-y: auto;
-}
-
-/* ── 4-column user table variant ───────────────────────────────── */
-.ss-users-col-header--4col,
-.ss-users-row--4col {
-  grid-template-columns: 2fr 2fr 1fr 1fr;
-}
-
-/* Card header meta (локации N) */
-.ss-card-header-meta {
-  font-size: 12px;
-  color: #555;
-  margin-left: auto;
 }

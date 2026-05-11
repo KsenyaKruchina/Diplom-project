@@ -579,3 +579,302 @@
   .an-filter-bar { flex-direction: column; align-items: flex-start; }
   .an-dropdown { min-width: 100%; width: 100%; }
 }
+
+/* ─── Hierarchy Filter Section ──────────────────────────────────────────────── */
+
+.an-filter-section {
+  margin-bottom: 20px;
+  background: #111;
+  border: 1px solid #1f1f1f;
+  border-radius: 12px;
+  padding: 16px 20px;
+}
+
+.an-filter-section-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+
+.an-filter-section-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: #929292;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.an-filter-section-hint {
+  font-size: 11px;
+  color: #444;
+}
+
+.an-filter-reset {
+  margin-left: auto;
+  background: none;
+  border: 1px solid #2a2a2a;
+  border-radius: 6px;
+  color: #ff5b5b;
+  font-size: 11px;
+  padding: 4px 10px;
+  cursor: pointer;
+  font-family: inherit;
+  transition: border-color 0.15s, background 0.15s;
+}
+.an-filter-reset:hover {
+  border-color: #ff5b5b44;
+  background: #ff5b5b0d;
+}
+
+/* ─── Hierarchy Selector (filter bar) ───────────────────────────────────────── */
+
+.an-hierarchy-selector {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.an-hier-step {
+  flex: 1;
+  min-width: 160px;
+  max-width: 260px;
+}
+
+.an-hier-sep {
+  display: flex;
+  align-items: center;
+  color: #333;
+  flex-shrink: 0;
+  padding-top: 18px; /* align with dropdown button, offset by label height */
+}
+
+/* ─── HierarchyDropdown ──────────────────────────────────────────────────────── */
+
+.an-hier-dropdown {
+  position: relative;
+}
+
+.an-hier-dropdown--disabled {
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+.an-hier-dropdown-label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 5px;
+  color: #555;
+}
+
+.an-hier-dropdown-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: #161616;
+  border: 1px solid #242424;
+  border-radius: 8px;
+  padding: 7px 10px;
+  color: #ccc;
+  font-size: 12px;
+  font-family: inherit;
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.15s, background 0.15s;
+  min-height: 34px;
+}
+.an-hier-dropdown-btn:hover {
+  border-color: #333;
+  background: #1a1a1a;
+}
+.an-hier-dropdown-btn--active {
+  border-color: #333;
+  background: #1a1a1a;
+}
+
+.an-hier-dropdown-text {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.an-hier-dropdown-placeholder {
+  color: #444;
+}
+
+.an-hier-dropdown-clear {
+  display: flex;
+  align-items: center;
+  padding: 2px;
+  border-radius: 4px;
+  cursor: pointer;
+  flex-shrink: 0;
+  opacity: 0.6;
+  transition: opacity 0.15s;
+}
+.an-hier-dropdown-clear:hover { opacity: 1; }
+
+.an-hier-dropdown-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  background: #181818;
+  border: 1px solid #2a2a2a;
+  border-radius: 8px;
+  z-index: 200;
+  overflow: hidden;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+  max-height: 220px;
+  overflow-y: auto;
+}
+.an-hier-dropdown-menu::-webkit-scrollbar { width: 4px; }
+.an-hier-dropdown-menu::-webkit-scrollbar-track { background: transparent; }
+.an-hier-dropdown-menu::-webkit-scrollbar-thumb { background: #2a2a2a; border-radius: 2px; }
+
+.an-hier-dropdown-item {
+  width: 100%;
+  display: block;
+  text-align: left;
+  background: none;
+  border: none;
+  padding: 8px 12px;
+  font-size: 12px;
+  font-family: inherit;
+  color: #929292;
+  cursor: pointer;
+  transition: background 0.1s, color 0.1s;
+}
+.an-hier-dropdown-item:hover {
+  background: #1f1f1f;
+  color: #ccc;
+}
+.an-hier-dropdown-item--active {
+  background: #1e1e1e;
+}
+
+.an-hier-dropdown-empty {
+  padding: 10px 12px;
+  font-size: 12px;
+  color: #444;
+}
+
+/* ─── Export Hierarchy Selector ──────────────────────────────────────────────── */
+
+.an-export-hierarchy {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  margin: 12px 0 0;
+}
+
+.an-export-hier-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+  position: relative;
+}
+
+.an-export-hier-row--child {
+  padding-left: 20px;
+}
+
+.an-export-hier-row--deep {
+  padding-left: 40px;
+}
+
+.an-export-hier-connector {
+  position: absolute;
+  left: 8px;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: #222;
+}
+
+.an-export-hier-connector--deep {
+  left: 28px;
+}
+
+.an-export-hier-step-label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 90px;
+  font-size: 11px;
+  font-weight: 500;
+  color: #555;
+  flex-shrink: 0;
+}
+
+.an-export-hier-target-badge {
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  background: rgba(255, 193, 7, 0.12);
+  color: #ffc207;
+  border-radius: 4px;
+  padding: 1px 5px;
+  font-weight: 600;
+}
+
+.an-export-hier-row .an-hier-dropdown {
+  flex: 1;
+}
+/* ── Report Type Buttons ─────────────────────────────────────── */
+.an-export-type-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.an-report-type-btn {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 16px;
+  border-radius: 8px;
+  border: 1px solid #2a2a2a;
+  background-color: #111;
+  color: #555;
+  font-size: 13px;
+  font-weight: 500;
+  font-family: "Inter", Helvetica, sans-serif;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background-color 0.15s ease, color 0.15s ease;
+  white-space: nowrap;
+}
+
+.an-report-type-btn:hover:not(.an-report-type-btn--active) {
+  border-color: #3a3a3a;
+  background-color: #161616;
+  color: #888;
+}
+
+.an-report-type-btn--active {
+  font-weight: 600;
+}
+
+.an-report-type-btn svg {
+  flex-shrink: 0;
+}
+
+@media (max-width: 700px) {
+  .an-export-type-row {
+    flex-direction: column;
+  }
+  .an-report-type-btn {
+    width: 100%;
+    justify-content: center;
+  }
+}

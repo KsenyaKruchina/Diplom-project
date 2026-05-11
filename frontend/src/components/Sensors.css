@@ -925,3 +925,433 @@
   .sn-sensors-grid { padding: 12px 16px 16px; }
   .sn-field-grid { grid-template-columns: 1fr; }
 }
+/* ─── Дополнение к Sensors.css — новые стили ─────────────────────────────────
+   Добавьте эти стили в конец вашего Sensors.css
+   ─────────────────────────────────────────────────────────────────────────── */
+
+/* ── Кнопка создать ЦБУ ───────────────────────────────────────────────────── */
+.sn-add-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 14px;
+  border-radius: 8px;
+  border: 1px solid rgba(1, 230, 118, 0.35);
+  background: rgba(1, 230, 118, 0.08);
+  color: #01e676;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+  white-space: nowrap;
+}
+.sn-add-btn:hover {
+  background: rgba(1, 230, 118, 0.14);
+  border-color: rgba(1, 230, 118, 0.55);
+}
+
+/* Secondary — добавить датчик (менее акцентная) */
+.sn-add-btn--secondary {
+  border-color: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.04);
+  color: #929292;
+}
+.sn-add-btn--secondary:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #ccc;
+  border-color: rgba(255, 255, 255, 0.18);
+}
+
+/* ── Subtitle в хэдере модала ──────────────────────────────────────────────── */
+.sn-modal-subtitle {
+  font-size: 11px;
+  color: #555;
+  margin-top: 2px;
+  font-weight: 400;
+}
+
+/* ── Превью карточки ЦБУ / датчика ────────────────────────────────────────── */
+.sn-cbu-preview {
+  background: #111;
+  border: 1px solid #1e1e1e;
+  border-radius: 10px;
+  padding: 14px 16px;
+  margin-bottom: 4px;
+}
+.sn-cbu-preview--sensor {
+  border-color: rgba(7, 188, 212, 0.18);
+  background: rgba(7, 188, 212, 0.04);
+}
+.sn-cbu-preview-row {
+  display: flex;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+.sn-cbu-preview-field {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 80px;
+}
+.sn-cbu-preview-label {
+  font-size: 10px;
+  color: #444;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.sn-cbu-preview-val {
+  font-size: 13px;
+  color: #ccc;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+.sn-cbu-preview-val--id {
+  font-family: monospace;
+  color: #555;
+  font-size: 12px;
+}
+
+/* ── Табы в модале ────────────────────────────────────────────────────────── */
+.sn-modal-tabs {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid #1e1e1e;
+  padding: 0 20px;
+  background: #0d0d0d;
+}
+.sn-modal-tab {
+  padding: 10px 14px;
+  font-size: 12px;
+  color: #555;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+  font-family: inherit;
+  margin-bottom: -1px;
+  white-space: nowrap;
+}
+.sn-modal-tab:hover {
+  color: #aaa;
+}
+.sn-modal-tab--active {
+  color: #01e676;
+  border-bottom-color: #01e676;
+}
+
+/* ── Таблица порогов ─────────────────────────────────────────────────────── */
+.sn-th-table {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.sn-th-header-row {
+  display: flex;
+  align-items: center;
+  padding: 0 10px;
+  gap: 16px;
+}
+.sn-th-col-level {
+  flex: 0 0 140px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.sn-th-col-minmax {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.sn-th-header-row .sn-th-col-level,
+.sn-th-header-row .sn-th-col-minmax span {
+  font-size: 10px;
+  color: #444;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.sn-th-range-sep {
+  font-size: 12px;
+  color: #333;
+  flex-shrink: 0;
+}
+.sn-th-row {
+  display: flex;
+  align-items: center;
+  padding: 10px 12px;
+  gap: 16px;
+  border-radius: 8px;
+  transition: background 0.15s;
+}
+.sn-th-level-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.sn-th-level-label {
+  font-size: 12px;
+  font-weight: 500;
+}
+.sn-th-input {
+  flex: 1;
+  min-width: 0;
+  height: 32px;
+  padding: 0 10px;
+  background: #111;
+  border: 1px solid #222;
+  border-radius: 6px;
+  color: #ccc;
+  font-size: 13px;
+  font-family: inherit;
+  font-variant-numeric: tabular-nums;
+  transition: border-color 0.15s;
+  text-align: center;
+}
+.sn-th-input:focus {
+  outline: none;
+  border-color: var(--inp-focus, #444);
+}
+.sn-th-input::placeholder {
+  color: #333;
+}
+.sn-th-hint {
+  font-size: 10.5px;
+  color: #393939;
+  margin-top: 4px;
+  padding: 0 4px;
+  line-height: 1.5;
+}
+
+/* Адаптив для маленьких экранов */
+@media (max-width: 480px) {
+  .sn-th-col-level {
+    flex: 0 0 90px;
+  }
+  .sn-th-level-label {
+    font-size: 11px;
+  }
+  .sn-cbu-preview-row {
+    gap: 12px;
+  }
+}
+/* ─── Дополнение к Sensors.css — новые стили ─────────────────────────────────
+   Добавьте эти стили в конец вашего Sensors.css
+   ─────────────────────────────────────────────────────────────────────────── */
+
+/* ── Кнопка создать ЦБУ ───────────────────────────────────────────────────── */
+.sn-add-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 14px;
+  border-radius: 8px;
+  border: 1px solid rgba(1, 230, 118, 0.35);
+  background: rgba(1, 230, 118, 0.08);
+  color: #01e676;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+  white-space: nowrap;
+}
+.sn-add-btn:hover {
+  background: rgba(1, 230, 118, 0.14);
+  border-color: rgba(1, 230, 118, 0.55);
+}
+
+/* Secondary — добавить датчик (менее акцентная) */
+.sn-add-btn--secondary {
+  border-color: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.04);
+  color: #929292;
+}
+.sn-add-btn--secondary:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #ccc;
+  border-color: rgba(255, 255, 255, 0.18);
+}
+
+/* ── Subtitle в хэдере модала ──────────────────────────────────────────────── */
+.sn-modal-subtitle {
+  font-size: 11px;
+  color: #555;
+  margin-top: 2px;
+  font-weight: 400;
+}
+
+/* ── Превью карточки ЦБУ / датчика ────────────────────────────────────────── */
+.sn-cbu-preview {
+  background: #111;
+  border: 1px solid #1e1e1e;
+  border-radius: 10px;
+  padding: 14px 16px;
+  margin-bottom: 4px;
+}
+.sn-cbu-preview--sensor {
+  border-color: rgba(7, 188, 212, 0.18);
+  background: rgba(7, 188, 212, 0.04);
+}
+.sn-cbu-preview-row {
+  display: flex;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+.sn-cbu-preview-field {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 80px;
+}
+.sn-cbu-preview-label {
+  font-size: 10px;
+  color: #444;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.sn-cbu-preview-val {
+  font-size: 13px;
+  color: #ccc;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+.sn-cbu-preview-val--id {
+  font-family: monospace;
+  color: #555;
+  font-size: 12px;
+}
+
+/* ── Табы в модале ────────────────────────────────────────────────────────── */
+.sn-modal-tabs {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid #1e1e1e;
+  padding: 0 20px;
+  background: #0d0d0d;
+}
+.sn-modal-tab {
+  padding: 10px 14px;
+  font-size: 12px;
+  color: #555;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+  font-family: inherit;
+  margin-bottom: -1px;
+  white-space: nowrap;
+}
+.sn-modal-tab:hover {
+  color: #aaa;
+}
+.sn-modal-tab--active {
+  color: #01e676;
+  border-bottom-color: #01e676;
+}
+
+/* ── Таблица порогов ─────────────────────────────────────────────────────── */
+.sn-th-table {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.sn-th-header-row {
+  display: flex;
+  align-items: center;
+  padding: 0 10px;
+  gap: 16px;
+}
+.sn-th-col-level {
+  flex: 0 0 140px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.sn-th-col-minmax {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.sn-th-header-row .sn-th-col-level,
+.sn-th-header-row .sn-th-col-minmax span {
+  font-size: 10px;
+  color: #444;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.sn-th-range-sep {
+  font-size: 12px;
+  color: #333;
+  flex-shrink: 0;
+}
+.sn-th-row {
+  display: flex;
+  align-items: center;
+  padding: 10px 12px;
+  gap: 16px;
+  border-radius: 8px;
+  transition: background 0.15s;
+}
+.sn-th-level-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.sn-th-level-label {
+  font-size: 12px;
+  font-weight: 500;
+}
+.sn-th-input {
+  flex: 1;
+  min-width: 0;
+  height: 32px;
+  padding: 0 10px;
+  background: #111;
+  border: 1px solid #222;
+  border-radius: 6px;
+  color: #ccc;
+  font-size: 13px;
+  font-family: inherit;
+  font-variant-numeric: tabular-nums;
+  transition: border-color 0.15s;
+  text-align: center;
+}
+.sn-th-input:focus {
+  outline: none;
+  border-color: var(--inp-focus, #444);
+}
+.sn-th-input::placeholder {
+  color: #333;
+}
+.sn-th-hint {
+  font-size: 10.5px;
+  color: #393939;
+  margin-top: 4px;
+  padding: 0 4px;
+  line-height: 1.5;
+}
+
+/* mono input для ID */
+.sn-field-input--mono {
+  font-family: monospace;
+  letter-spacing: 0.04em;
+  font-size: 13px;
+}
+
+@media (max-width: 480px) {
+  .sn-th-col-level {
+    flex: 0 0 90px;
+  }
+  .sn-th-level-label {
+    font-size: 11px;
+  }
+  .sn-cbu-preview-row {
+    gap: 12px;
+  }
+}

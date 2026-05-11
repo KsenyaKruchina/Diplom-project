@@ -1,98 +1,127 @@
-/* Reports.css */
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+/* =============================================================================
+   Reports.css
+   Стили для страницы «Уведомления» (журнал событий + экспорт данных).
+   Цветовая схема: тёмный фон #0a0a0a, акцентный жёлтый #ffc207.
+   ============================================================================= */
 
+/* ── Сброс базовых отступов для всех элементов ──────────────────────────────── */
+*, *::before, *::after {
+  box-sizing: border-box; /* размеры включают padding и border, не растягивают блок */
+  margin: 0;              /* убирает браузерные внешние отступы */
+  padding: 0;             /* убирает браузерные внутренние отступы */
+}
+
+/* ── Корневой контейнер страницы ─────────────────────────────────────────────── */
 .rp-container {
-  min-height: 100vh;
-  background-color: #0a0a0a;
-  font-family: "Inter", Helvetica, sans-serif;
-  color: #ffffff;
+  min-height: 100vh;                             /* занимает минимум всю высоту экрана */
+  background-color: #0a0a0a;                     /* почти-чёрный фон страницы */
+  font-family: "Inter", Helvetica, sans-serif;   /* основной шрифт, фолбэки на Helvetica и sans-serif */
+  color: #ffffff;                                /* белый цвет текста по умолчанию */
 }
 
+/* ── Основная область контента (колонка с отступами) ────────────────────────── */
 .rp-main {
-  padding: 32px 28px;
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-  min-width: 0;
+  padding: 32px 28px;      /* отступы сверху/снизу 32px, по бокам 28px */
+  display: flex;           /* flex-контейнер — дети выстраиваются в ряд/колонку */
+  flex-direction: column;  /* дочерние блоки идут сверху вниз */
+  gap: 20px;               /* расстояние между дочерними блоками */
+  min-width: 0;            /* разрешает блоку сужаться внутри flex-родителя */
 }
 
+/* ── Заголовок страницы ──────────────────────────────────────────────────────── */
 .rp-page-title {
-  font-size: 30px;
-  font-weight: 700;
-  letter-spacing: -0.2px;
-  margin: 0 0 4px;
-  color: #ffffff;
+  font-size: 30px;         /* крупный заголовок */
+  font-weight: 700;        /* жирный */
+  letter-spacing: -0.2px;  /* лёгкое сближение букв — современный типографский приём */
+  margin: 0 0 4px;         /* нижний отступ 4px, остальные нули */
+  color: #ffffff;          /* явно белый цвет */
 }
 
-/* ── Card ─────────────────────────────────────────────────── */
+/* ── Шапка страницы (заголовок + кнопка «Обновить» в одной строке) ──────────── */
+.rp-page-header {
+  display: flex;                   /* дети в одну строку */
+  align-items: center;             /* вертикальное выравнивание по центру */
+  justify-content: space-between;  /* заголовок слева, кнопка справа */
+}
+
+/* ── Карточка (общий стиль для всех «плашек») ───────────────────────────────── */
 .rp-card {
-  background-color: rgba(49,49,49,0.30);
-  backdrop-filter: blur(2px);
-  border-radius: 15px;
+  background-color: rgba(49, 49, 49, 0.30); /* полупрозрачный тёмно-серый фон */
+  backdrop-filter: blur(2px);               /* размытие фона под карточкой (frosted-glass) */
+  border-radius: 15px;                      /* скруглённые углы */
+  /* box-shadow создаёт иллюзию выпуклости через внутренние подсветки и тени: */
   box-shadow:
-    inset 0 1px 0 rgba(255,255,255,0.4),
-    inset 1px 0 0 rgba(255,255,255,0.32),
-    inset 0 -1px 1px rgba(0,0,0,0.13),
-    inset -1px 0 1px rgba(0,0,0,0.11);
-  padding: 20px;
+    inset 0 1px 0 rgba(255, 255, 255, 0.4),   /* верхняя светлая линия — «блик» */
+    inset 1px 0 0 rgba(255, 255, 255, 0.32),   /* левая светлая линия */
+    inset 0 -1px 1px rgba(0, 0, 0, 0.13),      /* нижняя тёмная линия — «тень» */
+    inset -1px 0 1px rgba(0, 0, 0, 0.11);      /* правая тёмная линия */
+  padding: 20px;                            /* внутренние отступы со всех сторон */
 }
 
+/* ── Заголовок внутри карточки ───────────────────────────────────────────────── */
 .rp-card-title {
-  font-size: 20px;
-  font-weight: 600;
-  letter-spacing: -0.2px;
+  font-size: 20px;         /* средний заголовок */
+  font-weight: 600;        /* полужирный */
+  letter-spacing: -0.2px;  /* лёгкое сближение букв */
   color: #ffffff;
 }
 
-/* ── Table card ───────────────────────────────────────────── */
+/* ── Карточка таблицы (расширяет .rp-card) ──────────────────────────────────── */
 .rp-table-card {
   display: flex;
   flex-direction: column;
-  padding: 20px 22px 0;
+  padding: 20px 22px 0; /* низ 0 — пагинация добавит свой отступ */
 }
 
+/* ── Верхняя панель таблицы (заголовок + контролы) ─────────────────────────── */
 .rp-table-topbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 10px;
+  margin-bottom: 10px; /* отступ до чипов фильтров / заголовков колонок */
 }
 
+/* ── Группа контролов (поиск + фильтр + выбор локации) ─────────────────────── */
 .rp-table-controls {
   display: flex;
   align-items: center;
   gap: 8px;
 }
 
-/* ── Search ───────────────────────────────────────────────── */
+/* ── Поле поиска ─────────────────────────────────────────────────────────────── */
 .rp-search-box {
-  display: flex;
+  display: flex;                            /* иконка + input + крестик в одну строку */
   align-items: center;
   gap: 8px;
-  background-color: rgba(49,49,49,0.30);
+  background-color: rgba(49, 49, 49, 0.30);
   backdrop-filter: blur(2px);
   border-radius: 15px;
   box-shadow:
-    inset 0 1px 0 rgba(255,255,255,0.4),
-    inset 1px 0 0 rgba(255,255,255,0.32),
-    inset 0 -1px 1px rgba(0,0,0,0.13),
-    inset -1px 0 1px rgba(0,0,0,0.11);
+    inset 0 1px 0 rgba(255, 255, 255, 0.4),
+    inset 1px 0 0 rgba(255, 255, 255, 0.32),
+    inset 0 -1px 1px rgba(0, 0, 0, 0.13),
+    inset -1px 0 1px rgba(0, 0, 0, 0.11);
   padding: 0 14px;
-  height: 42px;
-  width: 340px;
+  height: 42px;    /* фиксированная высота */
+  width: 340px;    /* фиксированная ширина */
 }
 
+/* ── Текстовый input внутри .rp-search-box ──────────────────────────────────── */
 .rp-search-input {
-  flex: 1;
+  flex: 1;           /* занимает оставшееся место */
   background: transparent;
   border: none;
-  outline: none;
+  outline: none;     /* убирает синюю обводку при фокусе */
   color: #ffffff;
   font-size: 14px;
   font-family: "Inter", Helvetica, sans-serif;
 }
-.rp-search-input::placeholder { color: #929292; }
 
+.rp-search-input::placeholder {
+  color: #929292; /* серый цвет подсказки */
+}
+
+/* ── Кнопка очистки поиска (крестик) ────────────────────────────────────────── */
 .rp-search-clear {
   background: none;
   border: none;
@@ -102,101 +131,117 @@
   padding: 2px;
   opacity: 0.6;
 }
-.rp-search-clear:hover { opacity: 1; }
 
-/* ── Filter wrap + button ─────────────────────────────────── */
+.rp-search-clear:hover {
+  opacity: 1;
+}
+
+/* ── Обёртка кнопки фильтра (нужна для position: relative дочерних слоёв) ───── */
 .rp-filter-wrap {
   position: relative;
 }
 
+/* ── Кнопка открытия панели фильтров ────────────────────────────────────────── */
 .rp-filter-btn {
-  position: relative;
+  position: relative;                       /* для значка-бейджа */
   width: 42px;
   height: 42px;
   border-radius: 10px;
   border: 1px solid #3a3a3a;
-  background-color: rgba(49,49,49,0.30);
+  background-color: rgba(49, 49, 49, 0.30);
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   transition: border-color 0.15s, background-color 0.15s;
-  flex-shrink: 0;
+  flex-shrink: 0; /* не сужается в flex-строке */
 }
-.rp-filter-btn:hover { border-color: #666; background-color: rgba(255,255,255,0.06); }
-.rp-filter-btn--active { border-color: #ffc207; background-color: rgba(255,194,7,0.1); }
-.rp-filter-btn--active svg path { stroke: #ffc207; }
 
+.rp-filter-btn:hover {
+  border-color: #666;
+  background-color: rgba(255, 255, 255, 0.06);
+}
+
+/* ── Активное состояние (хотя бы один фильтр выбран) ────────────────────────── */
+.rp-filter-btn--active {
+  border-color: #ffc207;
+  background-color: rgba(255, 194, 7, 0.1);
+}
+
+.rp-filter-btn--active svg path {
+  stroke: #ffc207; /* перекрашивает иконку в жёлтый */
+}
+
+/* ── Бейдж с числом активных фильтров ───────────────────────────────────────── */
 .rp-filter-badge {
   position: absolute;
-  top: -5px; right: -5px;
-  width: 16px; height: 16px;
-  border-radius: 8px;
+  top: -5px;
+  right: -5px;
+  width: 16px;
+  height: 16px;
+  border-radius: 8px;  /* круг */
   background: #ffc207;
   color: #000;
   font-size: 10px;
   font-weight: 700;
-  display: flex; align-items: center; justify-content: center;
-}
-
-/* ── Filter panel — fixed overlay, always on top ─────────── */
-.rp-filter-panel-fixed {
-  position: fixed;   /* fixed so it escapes any overflow:hidden parent */
-  top: 80px;         /* adjust if your topbar height differs */
-  right: 28px;
-  z-index: 9999;     /* above everything */
-  width: 280px;
-  background: #1e1e1e;
-  border: 1px solid #3a3a3a;
-  border-radius: 14px;
-  box-shadow: 0 16px 48px rgba(0,0,0,0.7);
-  padding: 16px 16px 18px;
   display: flex;
-  flex-direction: column;
-  gap: 10px;
-  max-height: calc(100vh - 120px);
+  align-items: center;
+  justify-content: center;
+}
+
+/* ── Панель фильтров (рендерится через портал в <body>) ──────────────────────── */
+.rp-filter-panel-fixed {
+  width: 260px;
+  max-height: 80vh;        /* не выходит за 80% высоты экрана */
   overflow-y: auto;
-  scrollbar-width: thin;
-  scrollbar-color: #3a3a3a transparent;
-  animation: rp-filter-in 0.15s ease;
+  background: #1a1a1a;
+  border: 1px solid #2e2e2e;
+  border-radius: 10px;
+  padding: 16px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.55);
+  position: fixed;         /* фиксируется относительно вьюпорта */
+  z-index: 9999;           /* выше всего */
+  transition: opacity 0.12s ease;
 }
 
-.rp-filter-panel-fixed::-webkit-scrollbar { width: 4px; }
+.rp-filter-panel-fixed::-webkit-scrollbar       { width: 4px; }
 .rp-filter-panel-fixed::-webkit-scrollbar-track { background: transparent; }
-.rp-filter-panel-fixed::-webkit-scrollbar-thumb { background-color: #3a3a3a; border-radius: 2px; }
-
-@keyframes rp-filter-in {
-  from { opacity: 0; transform: translateY(-6px); }
-  to   { opacity: 1; transform: translateY(0); }
+.rp-filter-panel-fixed::-webkit-scrollbar-thumb {
+  background: #3a3a3a;
+  border-radius: 2px;
 }
 
+/* ── Заголовок секции внутри панели фильтров ─────────────────────────────────── */
 .rp-filter-section-title {
   font-size: 14px;
   font-weight: 600;
   color: #fff;
   padding-bottom: 10px;
-  border-bottom: 1px solid rgba(255,255,255,0.1);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1); /* тонкая линия-разделитель */
 }
 
+/* ── Подпись группы фильтров (СЕРЬЁЗНОСТЬ, ТИП и т.д.) ─────────────────────── */
 .rp-filter-label {
   font-size: 11px;
   font-weight: 600;
   color: #929292;
-  text-transform: uppercase;
+  text-transform: uppercase;  /* заглавные буквы */
   letter-spacing: 0.5px;
   margin-top: 2px;
 }
 
+/* ── Строка с двумя input для диапазона ID ───────────────────────────────────── */
 .rp-filter-id-row {
   display: flex;
   align-items: center;
   gap: 6px;
 }
 
+/* ── Input для ввода ID (от/до) ──────────────────────────────────────────────── */
 .rp-filter-id-input {
   flex: 1;
   height: 30px;
-  background: rgba(255,255,255,0.06);
+  background: rgba(255, 255, 255, 0.06);
   border: 1px solid #3a3a3a;
   border-radius: 6px;
   color: #fff;
@@ -206,16 +251,29 @@
   outline: none;
   width: 60px;
 }
-.rp-filter-id-input:focus { border-color: #ffc207; }
-.rp-filter-id-input::placeholder { color: #555; }
 
+.rp-filter-id-input:focus {
+  border-color: #ffc207; /* жёлтая рамка при фокусе */
+}
+
+.rp-filter-id-input::placeholder {
+  color: #555;
+}
+
+/* ── Список опций фильтра (горизонтальный) ───────────────────────────────────── */
 .rp-filter-options {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
 }
-.rp-filter-options--col { flex-direction: column; gap: 4px; }
 
+/* ── Модификатор: вертикальный список опций ──────────────────────────────────── */
+.rp-filter-options--col {
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* ── Кнопка-опция фильтра ────────────────────────────────────────────────────── */
 .rp-filter-option {
   padding: 4px 10px;
   border-radius: 6px;
@@ -225,13 +283,23 @@
   cursor: pointer;
   transition: border-color 0.12s, color 0.12s, background-color 0.12s;
 }
-.rp-filter-option:hover { border-color: #666; color: #fff; }
-.rp-filter-option--active { border-color: #ffc207; color: #ffc207; background: rgba(255,194,7,0.1); }
 
+.rp-filter-option:hover {
+  border-color: #666;
+  color: #fff;
+}
+
+.rp-filter-option--active {
+  border-color: #ffc207;
+  color: #ffc207;
+  background: rgba(255, 194, 7, 0.1);
+}
+
+/* ── Кнопка «Сбросить все» фильтры ──────────────────────────────────────────── */
 .rp-filter-clear-all {
   margin-top: 4px;
-  background: rgba(255,82,82,0.1);
-  border: 1px solid rgba(255,82,82,0.3);
+  background: rgba(255, 82, 82, 0.1);
+  border: 1px solid rgba(255, 82, 82, 0.3);
   border-radius: 6px;
   color: #ff5252;
   font-size: 12px;
@@ -240,9 +308,12 @@
   cursor: pointer;
   transition: background-color 0.15s;
 }
-.rp-filter-clear-all:hover { background: rgba(255,82,82,0.2); }
 
-/* ── Active filter chips ──────────────────────────────────── */
+.rp-filter-clear-all:hover {
+  background: rgba(255, 82, 82, 0.2);
+}
+
+/* ── Активные чипы-фильтры (над таблицей) ───────────────────────────────────── */
 .rp-filter-chips {
   display: flex;
   flex-wrap: wrap;
@@ -250,18 +321,20 @@
   margin-bottom: 10px;
 }
 
+/* ── Один чип (жёлтая таблетка с названием фильтра и крестиком) ─────────────── */
 .rp-filter-chip {
   display: flex;
   align-items: center;
   gap: 5px;
-  background: rgba(255,194,7,0.12);
-  border: 1px solid rgba(255,194,7,0.3);
-  border-radius: 20px;
+  background: rgba(255, 194, 7, 0.12);
+  border: 1px solid rgba(255, 194, 7, 0.3);
+  border-radius: 20px;   /* «таблетка» */
   padding: 3px 10px 3px 12px;
   font-size: 12px;
   color: #ffc207;
 }
 
+/* ── Кнопка удаления чипа (крестик) ─────────────────────────────────────────── */
 .rp-filter-chip-x {
   background: none;
   border: none;
@@ -271,29 +344,45 @@
   padding: 0;
   opacity: 0.7;
 }
-.rp-filter-chip-x:hover { opacity: 1; }
 
-/* ── Dropdown ─────────────────────────────────────────────── */
-.rp-dropdown-wrap { position: relative; }
+.rp-filter-chip-x:hover {
+  opacity: 1;
+}
+
+/* ── Прозрачный backdrop за выпадающим меню ─────────────────────────────────── */
+/* Закрывает меню при клике вне него, не перекрывая кнопки внутри меню */
+.rp-dropdown-backdrop {
+  position: fixed; /* на весь вьюпорт */
+  inset: 0;        /* top/right/bottom/left: 0 */
+  z-index: 1000;   /* под меню, над остальным контентом */
+  background: transparent;
+}
+
+/* ── Выпадающее меню ─────────────────────────────────────────────────────────── */
+.rp-dropdown-wrap {
+  position: relative; /* дочерние absolute-элементы привязываются сюда */
+}
 
 .rp-dropdown-menu {
   position: absolute;
-  top: calc(100% + 6px);
-  left: 0;
-  z-index: 200;
+  z-index: 1001;           /* выше backdrop */
   min-width: 180px;
   background: #1e1e1e;
   border: 1px solid #3a3a3a;
   border-radius: 10px;
-  box-shadow: 0 8px 32px rgba(0,0,0,0.5);
-  overflow: hidden;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+  overflow: hidden;        /* контент не вылезает за скруглённые углы */
+  top: calc(100% + 6px);  /* сразу под триггером */
+  left: 0;
 }
 
+/* ── Меню открывается вверх ──────────────────────────────────────────────────── */
 .rp-dropdown-menu--up {
   top: auto;
-  bottom: calc(100% + 6px);
+  bottom: calc(100% + 6px); /* над триггером */
 }
 
+/* ── Пункт выпадающего меню ─────────────────────────────────────────────────── */
 .rp-dropdown-item {
   display: flex;
   align-items: center;
@@ -305,41 +394,58 @@
   transition: background-color 0.1s;
   white-space: nowrap;
 }
-.rp-dropdown-item:hover { background-color: rgba(255,255,255,0.06); }
-.rp-dropdown-item--active { color: #ffc207; }
 
-/* ── Col headers / rows ───────────────────────────────────── */
+.rp-dropdown-item:hover {
+  background-color: rgba(255, 255, 255, 0.06);
+}
+
+/* ── Активный (выбранный) пункт меню ─────────────────────────────────────────── */
+.rp-dropdown-item--active {
+  color: #ffc207;
+}
+
+/* ── Заголовки колонок таблицы ───────────────────────────────────────────────── */
 .rp-col-header {
   display: grid;
+  /* 8 колонок: ID, серьёзность, тип, датчик, описание, статус, время, устранено */
   grid-template-columns: 60px 100px 1fr 160px 180px 140px 120px 140px;
-  background-color: rgba(75,75,75,0.2);
+  background-color: rgba(75, 75, 75, 0.2);
   box-shadow:
-    inset 0 1px 0 rgba(255,255,255,0.4),
-    inset 1px 0 0 rgba(255,255,255,0.32),
-    inset 0 -1px 1px rgba(0,0,0,0.13),
-    inset -1px 0 1px rgba(0,0,0,0.11);
+    inset 0 1px 0 rgba(255, 255, 255, 0.4),
+    inset 1px 0 0 rgba(255, 255, 255, 0.32),
+    inset 0 -1px 1px rgba(0, 0, 0, 0.13),
+    inset -1px 0 1px rgba(0, 0, 0, 0.11);
   height: 38px;
   align-items: center;
-  margin: 0 -22px;
-  padding: 0 22px;
+  margin: 0 -22px;   /* «выходит» за края карточки, компенсируя её padding */
+  padding: 0 22px;   /* возвращает внутренние отступы */
   gap: 4px;
 }
 
+/* ── Один заголовок колонки ──────────────────────────────────────────────────── */
 .rp-col-head {
   display: flex;
   align-items: center;
   gap: 3px;
   font-size: 13px;
   color: #929292;
-  cursor: pointer;
-  user-select: none;
+  cursor: pointer;    /* кликабельный для сортировки */
+  user-select: none;  /* не выделяется при двойном клике */
   white-space: nowrap;
   overflow: hidden;
 }
-.rp-col-head:hover { color: #ffffff; }
 
-.rp-table-body { display: flex; flex-direction: column; }
+.rp-col-head:hover {
+  color: #ffffff;
+}
 
+/* ── Контейнер строк таблицы ─────────────────────────────────────────────────── */
+.rp-table-body {
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Одна строка таблицы ─────────────────────────────────────────────────────── */
 .rp-table-row {
   display: grid;
   grid-template-columns: 60px 100px 1fr 160px 180px 140px 120px 140px;
@@ -348,75 +454,70 @@
   min-height: 52px;
   align-items: center;
   gap: 4px;
-  border-bottom: 1px solid rgba(255,255,255,0.06);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06); /* разделитель строк */
   transition: background-color 0.12s;
 }
-.rp-table-row:hover { background-color: rgba(255,255,255,0.03); }
-.rp-table-row:last-child { border-bottom: none; }
 
+.rp-table-row:hover {
+  background-color: rgba(255, 255, 255, 0.03); /* едва заметная подсветка */
+}
+
+.rp-table-row:last-child {
+  border-bottom: none; /* у последней строки нет разделителя */
+}
+
+/* ── Ячейка таблицы ──────────────────────────────────────────────────────────── */
 .rp-td {
   font-size: 13px;
   color: #ffffff;
   white-space: nowrap;
   overflow: hidden;
-  text-overflow: ellipsis;
+  text-overflow: ellipsis; /* «…» при обрезке */
   display: flex;
   align-items: center;
 }
-.rp-td--gap { gap: 5px; }
 
-/* ── Editable description cell ────────────────────────────── */
+/* ── Ячейка с gap между иконкой и текстом ────────────────────────────────────── */
+.rp-td--gap {
+  gap: 5px;
+}
+
+/* ── Кликабельная ячейка «Описание/Комментарий» ──────────────────────────────── */
 .rp-editable-cell {
   display: flex;
   align-items: center;
-  gap: 5px;
+  gap: 8px;
   cursor: pointer;
-  min-width: 0;
+  padding: 4px 6px;
+  border-radius: 6px;
+  border: 1px solid transparent; /* рамка есть, но прозрачная — нет прыжка при hover */
+  transition: background-color 0.12s, border-color 0.12s;
+  min-width: 0;   /* позволяет ячейке сужаться */
   overflow: hidden;
   width: 100%;
-  padding: 3px 6px;
-  border-radius: 6px;
-  transition: background-color 0.12s;
-  border: 1px solid transparent;
 }
+
 .rp-editable-cell:hover {
-  background-color: rgba(255,255,255,0.06);
-  border-color: rgba(255,255,255,0.12);
+  background-color: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.12);
 }
-.rp-editable-cell span {
+
+/* ── Текст описания внутри ячейки ────────────────────────────────────────────── */
+.rp-description-text {
+  flex: 1;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   color: #d0d0d0;
 }
 
-/* ── Assignee trigger ─────────────────────────────────────── */
-.rp-assignee-trigger {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  cursor: pointer;
-  padding: 3px 6px;
-  border-radius: 6px;
-  border: 1px solid transparent;
-  transition: background-color 0.12s, border-color 0.12s;
-  min-width: 0;
-  overflow: hidden;
-}
-.rp-assignee-trigger:hover {
-  background-color: rgba(255,255,255,0.06);
-  border-color: rgba(255,255,255,0.12);
-}
-.rp-assignee-name {
-  font-size: 13px;
-  color: #d0d0d0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  max-width: 110px;
+.rp-editable-cell:hover .rp-description-text {
+  text-decoration: underline;        /* подчёркивание при hover */
+  text-decoration-style: dotted;     /* пунктирный стиль */
+  text-underline-offset: 2px;
 }
 
-/* ── Status pill ──────────────────────────────────────────── */
+/* ── «Таблетка» статуса тревоги ──────────────────────────────────────────────── */
 .rp-status-pill {
   display: inline-flex;
   align-items: center;
@@ -427,14 +528,18 @@
   font-weight: 400;
   white-space: nowrap;
 }
+
 .rp-status-pill--clickable {
   cursor: pointer;
   border-radius: 6px;
   transition: opacity 0.12s, filter 0.12s;
 }
-.rp-status-pill--clickable:hover { filter: brightness(1.2); }
 
-/* ── Empty state ──────────────────────────────────────────── */
+.rp-status-pill--clickable:hover {
+  filter: brightness(1.2); /* немного светлее при наведении */
+}
+
+/* ── Сообщение «нет данных» ──────────────────────────────────────────────────── */
 .rp-empty-state {
   text-align: center;
   color: #929292;
@@ -442,87 +547,112 @@
   font-size: 14px;
 }
 
-/* ── Pagination ───────────────────────────────────────────── */
+/* ── Полоса пагинации ────────────────────────────────────────────────────────── */
 .rp-pagination {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: flex-end; /* кнопки справа */
   gap: 4px;
   padding: 12px 0 16px;
 }
 
+/* ── Счётчик «N записей» (прижат к левому краю) ─────────────────────────────── */
 .rp-pagination-count {
   font-size: 12px;
   color: #929292;
-  margin-right: auto;
+  margin-right: auto; /* прижимает к левому краю */
 }
 
+/* ── Кнопки «Пред» / «След» ─────────────────────────────────────────────────── */
 .rp-page-btn {
-  width: 35px; height: 35px;
-  border-radius: 8px; border: none;
-  background-color: rgba(49,49,49,0.30);
+  width: 35px;
+  height: 35px;
+  border-radius: 8px;
+  border: none;
+  background-color: rgba(49, 49, 49, 0.30);
   backdrop-filter: blur(2px);
   box-shadow:
-    inset 0 1px 0 rgba(255,255,255,0.4),
-    inset 1px 0 0 rgba(255,255,255,0.32),
-    inset 0 -1px 1px rgba(0,0,0,0.13),
-    inset -1px 0 1px rgba(0,0,0,0.11);
+    inset 0 1px 0 rgba(255, 255, 255, 0.4),
+    inset 1px 0 0 rgba(255, 255, 255, 0.32),
+    inset 0 -1px 1px rgba(0, 0, 0, 0.13),
+    inset -1px 0 1px rgba(0, 0, 0, 0.11);
   cursor: pointer;
-  display: flex; align-items: center; justify-content: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   transition: background-color 0.12s;
 }
-.rp-page-btn:hover { background-color: rgba(255,255,255,0.08); }
 
+.rp-page-btn:hover {
+  background-color: rgba(255, 255, 255, 0.08);
+}
+
+/* ── Кнопки-номера страниц ───────────────────────────────────────────────────── */
 .rp-page-num {
-  width: 35px; height: 35px;
-  border-radius: 8px; border: none;
-  background-color: rgba(49,49,49,0.30);
+  width: 35px;
+  height: 35px;
+  border-radius: 8px;
+  border: none;
+  background-color: rgba(49, 49, 49, 0.30);
   backdrop-filter: blur(2px);
   box-shadow:
-    inset 0 1px 0 rgba(255,255,255,0.4),
-    inset 1px 0 0 rgba(255,255,255,0.32),
-    inset 0 -1px 1px rgba(0,0,0,0.13),
-    inset -1px 0 1px rgba(0,0,0,0.11);
+    inset 0 1px 0 rgba(255, 255, 255, 0.4),
+    inset 1px 0 0 rgba(255, 255, 255, 0.32),
+    inset 0 -1px 1px rgba(0, 0, 0, 0.13),
+    inset -1px 0 1px rgba(0, 0, 0, 0.11);
   cursor: pointer;
   font-family: "Inter", Helvetica, sans-serif;
   font-size: 18px;
   font-weight: 600;
   color: #929292;
-  display: flex; align-items: center; justify-content: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   transition: background-color 0.12s, color 0.12s;
 }
-.rp-page-num--active { background-color: #ffc207; color: #000; }
-.rp-page-num:hover:not(.rp-page-num--active) { background-color: rgba(255,255,255,0.08); color: #ffffff; }
 
-/* ── Bottom row ───────────────────────────────────────────── */
+/* ── Активная страница ───────────────────────────────────────────────────────── */
+.rp-page-num--active {
+  background-color: #ffc207; /* жёлтый фон */
+  color: #000;               /* чёрный номер */
+}
+
+.rp-page-num:hover:not(.rp-page-num--active) {
+  background-color: rgba(255, 255, 255, 0.08);
+  color: #ffffff;
+}
+
+/* ── Нижняя секция: экспорт + история (2-колоночная сетка) ─────────────────── */
 .rp-bottom-row {
   display: grid;
-  grid-template-columns: 2fr 1fr;
+  grid-template-columns: 2fr 1fr; /* левая колонка вдвое шире правой */
   gap: 20px;
 }
 
-/* ── Export card ──────────────────────────────────────────── */
+/* ── Карточка экспорта ────────────────────────────────────────────────────────── */
 .rp-export-card {
   display: flex;
   flex-direction: column;
   gap: 14px;
 }
 
+/* ── Строка с кнопками «PDF / Excel» ────────────────────────────────────────── */
 .rp-format-row {
   display: flex;
   gap: 14px;
 }
 
+/* ── Кнопка выбора формата (PDF или Excel) ───────────────────────────────────── */
 .rp-format-btn {
-  flex: 1;
+  flex: 1;                   /* обе кнопки одинаковой ширины */
   display: flex;
-  flex-direction: column;
+  flex-direction: column;    /* иконка сверху, текст снизу */
   align-items: center;
   gap: 8px;
   padding: 18px 10px;
   border-radius: 15px;
   border: 1px solid #3a3a3a;
-  background-color: rgba(49,49,49,0.30);
+  background-color: rgba(49, 49, 49, 0.30);
   cursor: pointer;
   transition: border-color 0.15s, background-color 0.15s;
   color: #929292;
@@ -530,24 +660,89 @@
   font-weight: 600;
   font-family: "Inter", Helvetica, sans-serif;
 }
-.rp-format-btn:hover:not(.rp-format-btn--active) { border-color: #555; background-color: rgba(255,255,255,0.04); }
-.rp-format-btn--active { background-color: rgba(255,82,82,0.15); border-color: #ff5252; color: #ff5252; }
-.rp-format-btn--active.rp-format-btn--excel { background-color: rgba(1,230,118,0.12); border-color: #01e676; color: #01e676; }
 
+.rp-format-btn:hover:not(.rp-format-btn--active) {
+  border-color: #555;
+  background-color: rgba(255, 255, 255, 0.04);
+}
+
+/* ── Активный PDF-формат ─────────────────────────────────────────────────────── */
+.rp-format-btn--active.rp-format-btn--pdf {
+  background-color: rgba(255, 82, 82, 0.15);
+  border-color: #ff5252;
+  color: #ff5252;
+}
+
+/* ── Активный Excel-формат ───────────────────────────────────────────────────── */
+.rp-format-btn--active.rp-format-btn--excel {
+  background-color: rgba(1, 230, 118, 0.15);
+  border-color: #01e676;
+  color: #01e676;
+}
+
+/* ── Строка кнопок «По локации / По ЦБУ / По датчику» ─────────────────────── */
+.rp-report-type-row {
+  display: flex;
+  gap: 10px; /* промежуток между тремя кнопками */
+}
+
+/* ── Кнопка выбора типа отчёта ───────────────────────────────────────────────── */
+.rp-report-type-btn {
+  flex: 1;                   /* три кнопки делят строку поровну */
+  display: flex;
+  flex-direction: column;    /* иконка сверху, текст снизу */
+  align-items: center;
+  gap: 6px;
+  padding: 12px 8px;         /* чуть компактнее, чем у .rp-format-btn */
+  border-radius: 12px;
+  border: 1px solid #3a3a3a;
+  background-color: rgba(49, 49, 49, 0.30);
+  cursor: pointer;
+  transition: border-color 0.15s, background-color 0.15s, color 0.15s;
+  color: #929292;            /* серый по умолчанию */
+  font-size: 13px;
+  font-weight: 500;
+  font-family: "Inter", Helvetica, sans-serif;
+  text-align: center;
+}
+
+.rp-report-type-btn:hover:not(.rp-report-type-btn--active) {
+  border-color: #555;
+  background-color: rgba(255, 255, 255, 0.04);
+  color: #d0d0d0; /* немного светлее текст */
+}
+
+/* ── Активный тип отчёта (жёлтый акцент) ────────────────────────────────────── */
+.rp-report-type-btn--active {
+  border-color: #ffc207;
+  background-color: rgba(255, 194, 7, 0.1);
+  color: #ffc207;
+}
+
+/* Перекрашивает SVG-иконку внутри активной кнопки в жёлтый */
+.rp-report-type-btn--active svg path,
+.rp-report-type-btn--active svg circle,
+.rp-report-type-btn--active svg rect,
+.rp-report-type-btn--active svg line {
+  stroke: #ffc207;
+}
+
+/* ── Чипы быстрого выбора периода ────────────────────────────────────────────── */
 .rp-period-quick {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
 }
 
+/* ── Один чип периода ────────────────────────────────────────────────────────── */
 .rp-period-chip {
   display: flex;
   align-items: center;
   gap: 4px;
   padding: 6px 14px;
-  border-radius: 20px;
+  border-radius: 20px; /* «таблетка» */
   border: 1px solid #3a3a3a;
-  background: rgba(49,49,49,0.30);
+  background: rgba(49, 49, 49, 0.30);
   color: #929292;
   font-size: 13px;
   font-weight: 500;
@@ -555,33 +750,55 @@
   cursor: pointer;
   transition: border-color 0.12s, color 0.12s, background 0.12s;
 }
-.rp-period-chip:hover:not(.rp-period-chip--active) { border-color: #666; color: #fff; }
-.rp-period-chip--active { border-color: #ffc207; color: #ffc207; background: rgba(255,194,7,0.12); }
 
+.rp-period-chip:hover:not(.rp-period-chip--active) {
+  border-color: #666;
+  color: #fff;
+}
+
+.rp-period-chip--active {
+  border-color: #ffc207;
+  color: #ffc207;
+  background: rgba(255, 194, 7, 0.12);
+}
+
+/* ── Поле с отображением выбранного периода ──────────────────────────────────── */
 .rp-period-field {
   display: flex;
   align-items: center;
   gap: 10px;
-  background-color: rgba(49,49,49,0.30);
+  background-color: rgba(49, 49, 49, 0.30);
   border-radius: 6px;
   box-shadow:
-    inset 0 1px 0 rgba(255,255,255,0.4),
-    inset 1px 0 0 rgba(255,255,255,0.32),
-    inset 0 -1px 1px rgba(0,0,0,0.13),
-    inset -1px 0 1px rgba(0,0,0,0.11);
+    inset 0 1px 0 rgba(255, 255, 255, 0.4),
+    inset 1px 0 0 rgba(255, 255, 255, 0.32),
+    inset 0 -1px 1px rgba(0, 0, 0, 0.13),
+    inset -1px 0 1px rgba(0, 0, 0, 0.11);
   padding: 0 12px;
   height: 45px;
 }
-.rp-period-dates { font-size: 12px; color: #929292; flex: 1; }
-.rp-period-label { font-size: 13px; color: #929292; }
 
+/* ── Строка с датами внутри поля периода ─────────────────────────────────────── */
+.rp-period-dates {
+  font-size: 12px;
+  color: #929292;
+  flex: 1; /* занимает оставшееся место, сдвигая лейбл вправо */
+}
+
+/* ── Подпись «Выбранный период» ──────────────────────────────────────────────── */
+.rp-period-label {
+  font-size: 13px;
+  color: #929292;
+}
+
+/* ── Кнопка «Экспортировать» ─────────────────────────────────────────────────── */
 .rp-export-btn {
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 10px;
   height: 45px;
-  background-color: #453813;
+  background-color: #453813; /* тёмно-жёлтый фон */
   border: 1px solid #ffc207;
   border-radius: 6px;
   cursor: pointer;
@@ -591,9 +808,17 @@
   font-family: "Inter", Helvetica, sans-serif;
   transition: background-color 0.15s;
 }
-.rp-export-btn:hover { background-color: #5a4a1a; }
 
-/* ── Calendar ─────────────────────────────────────────────── */
+.rp-export-btn:hover {
+  background-color: #5a4a1a;
+}
+
+.rp-export-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ── Виджет-календарь ────────────────────────────────────────────────────────── */
 .rp-calendar {
   background: #181818;
   border: 1px solid #3a3a3a;
@@ -612,23 +837,40 @@
   justify-content: space-between;
 }
 
-.rp-calendar-range-label { color: #ffc207; font-weight: 600; }
+.rp-calendar-range-label {
+  color: #ffc207;
+  font-weight: 600;
+}
 
+/* ── Навигация по месяцам (стрелки + название) ───────────────────────────────── */
 .rp-calendar-nav {
   display: flex;
   align-items: center;
   justify-content: space-between;
 }
 
-.rp-calendar-month { font-size: 14px; font-weight: 600; color: #fff; }
+.rp-calendar-month {
+  font-size: 14px;
+  font-weight: 600;
+  color: #fff;
+}
 
 .rp-cal-nav-btn {
-  background: none; border: none; cursor: pointer;
-  display: flex; align-items: center; padding: 4px;
-  border-radius: 6px; transition: background-color 0.12s;
+  background: none;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  padding: 4px;
+  border-radius: 6px;
+  transition: background-color 0.12s;
 }
-.rp-cal-nav-btn:hover { background-color: rgba(255,255,255,0.08); }
 
+.rp-cal-nav-btn:hover {
+  background-color: rgba(255, 255, 255, 0.08);
+}
+
+/* ── CSS-сетка календаря (7 дней в неделе) ───────────────────────────────────── */
 .rp-calendar-grid {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
@@ -636,60 +878,120 @@
 }
 
 .rp-cal-dayname {
-  font-size: 11px; color: #929292;
-  text-align: center; padding: 4px 0; font-weight: 600;
+  font-size: 11px;
+  color: #929292;
+  text-align: center;
+  padding: 4px 0;
+  font-weight: 600;
 }
 
+/* ── Ячейка дня в календаре ─────────────────────────────────────────────────── */
 .rp-cal-day {
-  width: 32px; height: 32px;
-  display: flex; align-items: center; justify-content: center;
-  font-size: 12px; color: #d0d0d0; border-radius: 6px;
-  cursor: pointer; transition: background-color 0.1s, color 0.1s; margin: auto;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  color: #d0d0d0;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background-color 0.1s, color 0.1s;
+  margin: auto;
 }
-.rp-cal-day:hover { background-color: rgba(255,255,255,0.1); }
-.rp-cal-day--start, .rp-cal-day--end { background-color: #ffc207 !important; color: #000 !important; font-weight: 700; }
-.rp-cal-day--range { background-color: rgba(255,194,7,0.2); color: #ffc207; }
 
-/* ── History card ─────────────────────────────────────────── */
+.rp-cal-day:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+/* ── Начало / конец диапазона ────────────────────────────────────────────────── */
+.rp-cal-day--start,
+.rp-cal-day--end {
+  background-color: #ffc207 !important; /* приоритет над --range */
+  color: #000 !important;
+  font-weight: 700;
+}
+
+/* ── Дни внутри диапазона ────────────────────────────────────────────────────── */
+.rp-cal-day--range {
+  background-color: rgba(255, 194, 7, 0.2);
+  color: #ffc207;
+}
+
+/* ── Список истории экспорта ──────────────────────────────────────────────────── */
 .rp-history-list {
-  list-style: none; margin-top: 14px;
-  display: flex; flex-direction: column;
+  list-style: none; /* убирает маркеры */
+  margin-top: 14px;
+  display: flex;
+  flex-direction: column;
 }
 
-.rp-history-item { display: flex; gap: 14px; align-items: flex-start; }
+.rp-history-item {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+}
 
+/* ── Вертикальная временна́я шкала ────────────────────────────────────────────── */
 .rp-history-timeline {
-  display: flex; flex-direction: column;
-  align-items: center; padding-top: 3px; flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-top: 3px;
+  flex-shrink: 0;
 }
 
-.rp-history-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+.rp-history-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
 
 .rp-history-line {
-  width: 1px; min-height: 28px;
-  background-color: rgba(255,255,255,0.1);
-  margin: 4px 0; flex: 1;
+  width: 1px;
+  min-height: 28px;
+  background-color: rgba(255, 255, 255, 0.1);
+  margin: 4px 0;
+  flex: 1;
 }
 
 .rp-history-text {
-  display: flex; flex-direction: column; gap: 3px;
-  padding-bottom: 16px; min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding-bottom: 16px;
+  min-width: 0;
 }
 
 .rp-history-label-row {
-  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
-.rp-history-label { font-size: 14px; font-weight: 600; color: #ffffff; }
+.rp-history-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: #ffffff;
+}
 
 .rp-history-fmt-tag {
-  font-size: 10px; font-weight: 700;
-  padding: 1px 6px; border-radius: 4px; border: 1px solid; flex-shrink: 0;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 4px;
+  border: 1px solid; /* цвет задаётся inline-стилем */
+  flex-shrink: 0;
 }
 
-.rp-history-date { font-size: 12px; color: #929292; }
+.rp-history-date {
+  font-size: 12px;
+  color: #929292;
+}
 
-/* ── Description edit modal ───────────────────────────────── */
+/* ── Оверлей модального окна ─────────────────────────────────────────────────── */
 .rp-modal-overlay {
   position: fixed;
   inset: 0;
@@ -702,20 +1004,21 @@
   padding: 20px;
 }
 
+/* ── Само модальное окно ─────────────────────────────────────────────────────── */
 .rp-modal {
   background: #161616;
   border-radius: 16px;
   width: 100%;
   max-width: 520px;
   box-shadow:
-    0 24px 64px rgba(0,0,0,0.6),
-    inset 0 1px 0 rgba(255,255,255,0.1);
+    0 24px 64px rgba(0, 0, 0, 0.6),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
   overflow: hidden;
   animation: rp-modal-in 0.18s ease;
 }
 
 @keyframes rp-modal-in {
-  from { opacity: 0; transform: scale(0.96) translateY(8px); }
+  from { opacity: 0; transform: scale(0.96) translateY(8px); } /* появляется снизу */
   to   { opacity: 1; transform: scale(1) translateY(0); }
 }
 
@@ -724,7 +1027,7 @@
   align-items: center;
   justify-content: space-between;
   padding: 18px 20px 14px;
-  border-bottom: 1px solid rgba(255,255,255,0.08);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .rp-modal-title {
@@ -735,71 +1038,102 @@
 }
 
 .rp-modal-close {
-  background: transparent; border: none; cursor: pointer;
-  display: flex; align-items: center; justify-content: center;
-  padding: 4px; border-radius: 6px; opacity: 0.6;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  border-radius: 6px;
+  opacity: 0.6;
   transition: opacity 0.12s;
 }
-.rp-modal-close:hover { opacity: 1; }
+
+.rp-modal-close:hover {
+  opacity: 1;
+}
 
 .rp-modal-body {
   padding: 16px 20px;
 }
 
+/* ── Textarea комментария ─────────────────────────────────────────────────────── */
 .rp-desc-textarea {
   width: 100%;
-  background: rgba(255,255,255,0.05);
-  border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 10px;
   color: #ffffff;
   font-size: 14px;
   font-family: "Inter", Helvetica, sans-serif;
-  line-height: 1.6;
+  line-height: 1.6;   /* межстрочный интервал */
   padding: 12px 14px;
-  resize: vertical;
+  resize: vertical;   /* только вертикальное изменение размера */
   outline: none;
   transition: border-color 0.15s;
   min-height: 120px;
 }
-.rp-desc-textarea:focus { border-color: #ffc207; background: rgba(255,194,7,0.04); }
+
+.rp-desc-textarea:focus {
+  border-color: #ffc207;
+  background: rgba(255, 194, 7, 0.04);
+}
 
 .rp-modal-footer {
   padding: 12px 20px 18px;
   display: flex;
   justify-content: flex-end;
   gap: 10px;
-  border-top: 1px solid rgba(255,255,255,0.08);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
 }
 
+/* ── Кнопка «Отмена» ─────────────────────────────────────────────────────────── */
 .rp-btn-cancel {
-  height: 34px; padding: 0 16px; border-radius: 8px;
-  border: 1px solid rgba(255,255,255,0.1);
-  background: transparent; color: #929292;
-  font-size: 13px; font-family: "Inter", Helvetica, sans-serif;
-  cursor: pointer; letter-spacing: -0.2px;
-  transition: all 0.15s ease;
-}
-.rp-btn-cancel:hover { border-color: rgba(255,255,255,0.2); color: #ffffff; }
-
-.rp-btn-save {
-  height: 34px; padding: 0 20px; border-radius: 8px;
-  border: none; background: #ffc207; color: #000;
-  font-size: 13px; font-weight: 600;
+  height: 34px;
+  padding: 0 16px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: transparent;
+  color: #929292;
+  font-size: 13px;
   font-family: "Inter", Helvetica, sans-serif;
-  cursor: pointer; letter-spacing: -0.2px;
-  transition: background 0.15s ease;
+  cursor: pointer;
+  letter-spacing: -0.2px;
+  transition: border-color 0.15s, color 0.15s;
 }
-.rp-btn-save:hover { background: #e6ad00; }
 
-/* ── Responsive ───────────────────────────────────────────── */
-@media (max-width: 1300px) {
-  .rp-bottom-row { grid-template-columns: 1fr; }
-  .rp-filter-panel-fixed { right: 16px; }
+.rp-btn-cancel:hover {
+  border-color: rgba(255, 255, 255, 0.2);
+  color: #ffffff;
 }
-@media (max-width: 960px) {
-  .rp-search-box { width: 200px; }
+
+/* ── Кнопка «Сохранить» ──────────────────────────────────────────────────────── */
+.rp-btn-save {
+  height: 34px;
+  padding: 0 20px;
+  border-radius: 8px;
+  border: none;
+  background: #ffc207;
+  color: #000;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: "Inter", Helvetica, sans-serif;
+  cursor: pointer;
+  letter-spacing: -0.2px;
+  transition: background 0.15s;
 }
-/* ── Refresh Button ──────────────────────────────────────────────────────────── */
+
+.rp-btn-save:hover {
+  background: #e6ad00;
+}
+
+.rp-btn-save:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* ── Кнопка «Обновить» ───────────────────────────────────────────────────────── */
 .rp-refresh-btn {
   display: flex;
   align-items: center;
@@ -823,7 +1157,7 @@
 
 .rp-refresh-btn:hover svg path,
 .rp-refresh-btn:hover svg line {
-  stroke: #ffffff;
+  stroke: #ffffff; /* иконка белеет при hover */
 }
 
 .rp-refresh-btn:disabled {
@@ -832,80 +1166,87 @@
 }
 
 .rp-refresh-btn:disabled svg {
-  animation: rp-spin 1s linear infinite;
+  animation: rp-spin 1s linear infinite; /* крутится пока идёт загрузка */
 }
 
+/* ── Анимация вращения ────────────────────────────────────────────────────────── */
 @keyframes rp-spin {
   from { transform: rotate(0deg); }
   to   { transform: rotate(360deg); }
 }
 
-/* ── Добавить в Reports.css ──────────────────────────────────────────────────
-   Backdrop для StatusPicker dropdown.
-   Закрывает меню при клике вне него, не мешая кликам по пунктам меню.
-   ─────────────────────────────────────────────────────────────────────────── */
+/* ── Обёртка дропдауна выбора локации в topbar ───────────────────────────────── */
+.rp-table-location-wrap {
+  display: flex;
+  align-items: center;
+}
 
-   .rp-dropdown-backdrop {
-    position: fixed;
-    inset: 0;
-    z-index: 1000;
-    background: transparent;
+/* ── Триггер-кнопка для EntitySelector / LocationSelector ───────────────────── */
+.rp-location-trigger {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 12px;
+  height: 42px;
+  border-radius: 15px;
+  background-color: rgba(49, 49, 49, 0.30);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.4),
+    inset 1px 0 0 rgba(255, 255, 255, 0.32),
+    inset 0 -1px 1px rgba(0, 0, 0, 0.13),
+    inset -1px 0 1px rgba(0, 0, 0, 0.11);
+  cursor: pointer;
+  transition: background-color 0.12s;
+  min-width: 140px; /* минимальная ширина */
+  max-width: 200px; /* не растягивается слишком широко */
+}
+
+.rp-location-trigger:hover {
+  background-color: rgba(255, 255, 255, 0.06);
+}
+
+.rp-location-trigger-label {
+  flex: 1;
+  font-size: 13px;
+  color: #d0d0d0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── Состояния загрузки / ошибки / пустоты в селекторах ─────────────────────── */
+.rp-location-loading,
+.rp-location-error,
+.rp-location-empty {
+  font-size: 13px;
+  color: #929292;
+  padding: 8px 0;
+}
+
+.rp-location-error {
+  color: #ff5252; /* красный для ошибок */
+}
+
+/* ── Баннер с ошибкой загрузки ────────────────────────────────────────────────── */
+.rp-error-banner {
+  background: rgba(255, 82, 82, 0.1);
+  border: 1px solid rgba(255, 82, 82, 0.3);
+  border-radius: 8px;
+  padding: 10px 16px;
+  color: #ff5252;
+  font-size: 13px;
+}
+
+/* ── Адаптив: история под экспортом на узких экранах ────────────────────────── */
+@media (max-width: 1300px) {
+  .rp-bottom-row {
+    grid-template-columns: 1fr; /* одна колонка */
   }
-  
-  /* Убедиться, что само меню всегда выше backdrop */
-  .rp-dropdown-menu {
-    position: absolute;
-    z-index: 1001;
+}
+
+/* ── Адаптив: узкое поле поиска на средних экранах ──────────────────────────── */
+@media (max-width: 960px) {
+  .rp-search-box {
+    width: 200px; /* сужается с 340px до 200px */
   }
-
-  /* ── Добавить / заменить в Reports.css ───────────────────────────────────────
-
-   1. Backdrop для StatusPicker dropdown
-   2. Стили для портальной панели фильтров
-   ─────────────────────────────────────────────────────────────────────────── */
-
-/* StatusPicker backdrop */
-.rp-dropdown-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 1000;
-  background: transparent;
-}
-.rp-dropdown-menu {
-  position: absolute;
-  z-index: 1001;
-}
-
-/* ── Портальная панель фильтров ──────────────────────────────────────────────
-   Панель рендерится через ReactDOM.createPortal прямо в document.body,
-   поэтому position: fixed работает относительно вьюпорта,
-   а не какого-либо родителя. z-index: 9999 гарантирует,
-   что панель будет выше любых карточек, таблиц и блоков страницы.
-   ─────────────────────────────────────────────────────────────────────────── */
-.rp-filter-panel-fixed {
-  width: 260px;
-  max-height: 80vh;
-  overflow-y: auto;
-
-  background: #1a1a1a;
-  border: 1px solid #2e2e2e;
-  border-radius: 10px;
-  padding: 16px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.55);
-
-  position: fixed;
-  z-index: 9999;
-
-  transition: opacity 0.12s ease;
-}
-
-.rp-filter-panel-fixed::-webkit-scrollbar {
-  width: 4px;
-}
-.rp-filter-panel-fixed::-webkit-scrollbar-track {
-  background: transparent;
-}
-.rp-filter-panel-fixed::-webkit-scrollbar-thumb {
-  background: #3a3a3a;
-  border-radius: 2px;
 }

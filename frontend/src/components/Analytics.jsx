@@ -1,17 +1,175 @@
 // frontend/src/components/Analytics.jsx
 // ─── Аналитика с реальными данными из API ────────────────────────────────────
-//
-// Изменения по сравнению со старой версией:
-//   1. Список датчиков и локаций загружается из API
-//   2. График строится по реальной телеметрии
-//   3. Кнопка "Скачать" вызывает реальный endpoint /reports/download-period/
 
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import "./Analytics.css";
 import { useAnalyticsData } from "../hooks/useAnalyticsData";
-import { downloadPeriodReport, downloadRangeReport, PERIOD_MAP } from "../services/reportsService";
 
-// ── Icons (без изменений) ──────────────────────────────────────────────────
+// ── API helpers ───────────────────────────────────────────────────────────────
+
+const API_BASE = "http://157.90.127.202:3000/api/v1";
+
+const authHeaders = () => ({
+  Authorization: `Bearer ${localStorage.getItem("token")}`,
+});
+
+/** Получить текущего пользователя */
+const fetchCurrentUser = async () => {
+  const res = await fetch(`${API_BASE}/users/me`, { headers: authHeaders() });
+  if (!res.ok) throw new Error("Не удалось получить данные пользователя");
+  return res.json();
+};
+
+/**
+ * GET /api/v1/telemetry/{sensor_id}/history
+ * Params: start_time, end_time (ISO strings), limit?
+ */
+const fetchSensorHistory = async (sensorId, startTime, endTime) => {
+  const params = new URLSearchParams({ start_time: startTime, end_time: endTime });
+  const res = await fetch(
+    `${API_BASE}/telemetry/${sensorId}/history?${params}`,
+    { headers: authHeaders() }
+  );
+  if (!res.ok) throw new Error(`Ошибка получения истории: ${res.status}`);
+  return res.json(); // ожидаем массив { timestamp, temperature, humidity, ... }
+};
+
+/**
+ * GET /api/v1/telemetry/{sensor_id}/last-24h
+ */
+const fetchSensorLast24h = async (sensorId) => {
+  const res = await fetch(
+    `${API_BASE}/telemetry/${sensorId}/last-24h`,
+    { headers: authHeaders() }
+  );
+  if (!res.ok) throw new Error(`Ошибка получения данных за 24ч: ${res.status}`);
+  return res.json();
+};
+
+/**
+ * GET /api/v1/telemetry/{sensor_id}/latest
+ */
+const fetchSensorLatest = async (sensorId) => {
+  const res = await fetch(
+    `${API_BASE}/telemetry/${sensorId}/latest`,
+    { headers: authHeaders() }
+  );
+  if (!res.ok) throw new Error(`Ошибка получения последних данных: ${res.status}`);
+  return res.json();
+};
+
+/**
+ * Скачать отчёт по произвольному endpoint.
+ */
+const downloadReport = async (url, fallbackName = "report.pdf") => {
+  const res = await fetch(url, { headers: authHeaders() });
+  if (res.status === 403) throw new Error("Нет доступа к этой сущности");
+  if (!res.ok) throw new Error(`Ошибка сервера: ${res.status}`);
+
+  const blob = await res.blob();
+  const disposition = res.headers.get("Content-Disposition") || "";
+  const match = disposition.match(/filename[^;=\n]*=["']?([^"';\n]+)["']?/i);
+  const filename = match ? match[1].trim() : fallbackName;
+
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(blob);
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(link.href);
+};
+
+/** Построить URL для скачивания отчёта */
+const buildReportUrl = ({ reportType, entityId, period, customRange }) => {
+  const endpointMap = {
+    location:     `${API_BASE}/reports/download-events-location/${entityId}`,
+    control_unit: `${API_BASE}/reports/download-events-control-unit/${entityId}`,
+    sensor:       `${API_BASE}/reports/download-events-sensor/${entityId}`,
+  };
+  const base = endpointMap[reportType];
+  if (!base) throw new Error("Неизвестный тип отчёта");
+
+  const params = new URLSearchParams();
+  if (customRange) {
+    params.set("period", "custom");
+    params.set("start_date", customRange.from);
+    params.set("end_date", customRange.to);
+  } else {
+    params.set("period", period);
+  }
+  return `${base}?${params.toString()}`;
+};
+
+// ── Period helpers ────────────────────────────────────────────────────────────
+
+const PERIOD_API_MAP = {
+  day:   "last_24_hours",
+  week:  "last_week",
+  month: "last_month",
+  year:  "last_year",
+};
+
+/**
+ * Вычислить start_time / end_time для запроса истории по выбранному периоду
+ */
+const getPeriodRange = (period) => {
+  const now = new Date();
+  const end = now.toISOString();
+  const starts = {
+    day:   new Date(now - 24 * 60 * 60 * 1000).toISOString(),
+    week:  new Date(now - 7  * 24 * 60 * 60 * 1000).toISOString(),
+    month: new Date(now - 30 * 24 * 60 * 60 * 1000).toISOString(),
+    year:  new Date(now - 365* 24 * 60 * 60 * 1000).toISOString(),
+  };
+  return { start: starts[period] || starts.month, end };
+};
+
+const MONTH_LABELS = ["Янв","Фев","Мар","Апр","Май","Июн","Июл","Авг","Сен","Окт","Ноя","Дек"];
+const PERIODS = [
+  { key: "day",   label: "День" },
+  { key: "week",  label: "Нед"  },
+  { key: "month", label: "Мес"  },
+  { key: "year",  label: "Год"  },
+];
+
+const getLabels = (period) => {
+  if (period === "day")   return Array.from({length:24},(_,i)=>`${i}:00`).filter((_,i)=>i%3===0);
+  if (period === "week")  return ["Пн","Вт","Ср","Чт","Пт","Сб","Вс"];
+  if (period === "month") return Array.from({length:30},(_,i)=>`${i+1}`).filter((_,i)=>i%4===0);
+  return MONTH_LABELS;
+};
+
+const genFallback = (n) => Array.from({ length: n }, (_, i) => 20 + Math.sin(i / 2) * 5);
+
+/**
+ * Преобразовать массив телеметрии в массив значений для графика.
+ * Делаем downsample до нужного кол-ва точек.
+ * @param {Array} data    — массив объектов с полями timestamp + поле value
+ * @param {string} field  — "temperature" | "humidity"
+ * @param {number} points — желаемое кол-во точек на графике
+ */
+const extractChartData = (data, field, points) => {
+  if (!data || data.length === 0) return [];
+
+  // Фильтруем только записи с нужным полем
+  const valid = data.filter(d => d[field] != null);
+  if (valid.length === 0) return [];
+
+  if (valid.length <= points) {
+    return valid.map(d => d[field]);
+  }
+
+  // Downsample: берём равномерно распределённые точки
+  const step = (valid.length - 1) / (points - 1);
+  return Array.from({ length: points }, (_, i) => {
+    const idx = Math.round(i * step);
+    return valid[Math.min(idx, valid.length - 1)][field];
+  });
+};
+
+// ── Icons ─────────────────────────────────────────────────────────────────────
+
 const IconDownloadArrow = ({ color = "#ffc207" }) => (
   <svg width="18" height="20" viewBox="0 0 20 22" fill="none">
     <path d="M10 2v13M10 15l-5-5M10 15l5-5" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
@@ -37,24 +195,25 @@ const IconClose = () => (
     <line x1="12" y1="4" x2="4" y2="12" stroke="#929292" strokeWidth="1.6" strokeLinecap="round"/>
   </svg>
 );
-const IconSensor = () => (
+const IconSensor = ({ color = "#ffc207" }) => (
   <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-    <circle cx="8" cy="8" r="3" fill="#ffc207" fillOpacity="0.3" stroke="#ffc207" strokeWidth="1.3"/>
-    <circle cx="8" cy="8" r="1.5" fill="#ffc207"/>
-    <path d="M4 4a5.66 5.66 0 0 0 0 8M12 4a5.66 5.66 0 0 1 0 8" stroke="#ffc207" strokeWidth="1.2" strokeLinecap="round"/>
+    <circle cx="8" cy="8" r="3" fill={color} fillOpacity="0.3" stroke={color} strokeWidth="1.3"/>
+    <circle cx="8" cy="8" r="1.5" fill={color}/>
+    <path d="M4 4a5.66 5.66 0 0 0 0 8M12 4a5.66 5.66 0 0 1 0 8" stroke={color} strokeWidth="1.2" strokeLinecap="round"/>
   </svg>
 );
-const IconLocation = () => (
+const IconLocation = ({ color = "#07bcd4" }) => (
   <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-    <path d="M8 1.5a4.5 4.5 0 0 1 4.5 4.5c0 3.5-4.5 8.5-4.5 8.5S3.5 9.5 3.5 6A4.5 4.5 0 0 1 8 1.5z" stroke="#07bcd4" strokeWidth="1.3" fill="#07bcd4" fillOpacity="0.15"/>
-    <circle cx="8" cy="6" r="1.5" fill="#07bcd4"/>
+    <path d="M8 1.5a4.5 4.5 0 0 1 4.5 4.5c0 3.5-4.5 8.5-4.5 8.5S3.5 9.5 3.5 6A4.5 4.5 0 0 1 8 1.5z" stroke={color} strokeWidth="1.3" fill={color} fillOpacity="0.15"/>
+    <circle cx="8" cy="6" r="1.5" fill={color}/>
   </svg>
 );
-const IconXLS = () => (
-  <svg width="44" height="44" viewBox="0 0 44 44" fill="none">
-    <rect x="6" y="3" width="24" height="30" rx="2.5" fill="#1a1a1a" stroke="#01e676" strokeWidth="1.4"/>
-    <path d="M30 3l8 8h-8V3z" fill="#01e676" fillOpacity="0.5"/>
-    <text x="22" y="41" textAnchor="middle" fill="#01e676" fontSize="8" fontFamily="Inter, sans-serif" fontWeight="700">XLSX</text>
+const IconControlUnit = ({ color = "#a78bfa" }) => (
+  <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+    <rect x="2" y="4" width="12" height="8" rx="1.5" stroke={color} strokeWidth="1.3" fill={color} fillOpacity="0.1"/>
+    <circle cx="5.5" cy="8" r="1" fill={color}/>
+    <circle cx="8" cy="8" r="1" fill={color}/>
+    <circle cx="10.5" cy="8" r="1" fill={color}/>
   </svg>
 );
 const IconPDF = () => (
@@ -64,59 +223,6 @@ const IconPDF = () => (
     <text x="22" y="41" textAnchor="middle" fill="#ff5252" fontSize="8" fontFamily="Inter, sans-serif" fontWeight="700">PDF</text>
   </svg>
 );
-
-// ── Периоды ───────────────────────────────────────────────────────────────────
-const PERIODS = [
-  { key: "day",   label: "День" },
-  { key: "week",  label: "Нед" },
-  { key: "month", label: "Мес" },
-  { key: "year",  label: "Год" },
-];
-const PERIOD_LABELS_FULL = { day: "день", week: "неделю", month: "месяц", year: "год" };
-const MONTH_LABELS = ["Янв","Фев","Мар","Апр","Май","Июн","Июл","Авг","Сен","Окт","Ноя","Дек"];
-
-const getLabels = (period) => {
-  if (period === "day")   return Array.from({length:24},(_,i)=>`${i}:00`).filter((_,i)=>i%3===0);
-  if (period === "week")  return ["Пн","Вт","Ср","Чт","Пт","Сб","Вс"];
-  if (period === "month") return Array.from({length:30},(_,i)=>`${i+1}`).filter((_,i)=>i%4===0);
-  return MONTH_LABELS;
-};
-
-// Заглушка графика когда нет реальных данных
-const genFallback = (n) => Array.from({ length: n }, (_, i) => 20 + Math.sin(i / 2) * 5);
-
-const FORMAT_CONFIG = {
-  xlsx: { label: "Excel (XLSX)", icon: <IconXLS />, color: "#01e676", accentBg: "rgba(1,230,118,0.08)", borderColor: "#01e676", btnBg: "#1a1410" },
-  pdf:  { label: "PDF",          icon: <IconPDF />, color: "#ff5252", accentBg: "rgba(255,82,82,0.08)",  borderColor: "#ff5252", btnBg: "#1a1010" },
-};
-
-// ── Chart ─────────────────────────────────────────────────────────────────────
-const LineChart = ({ data, color, height = 130 }) => {
-  if (!data || data.length < 2) return <div style={{height, background:"#111", borderRadius:8}}/>;
-  const W = 520, H = height;
-  const min = Math.min(...data), max = Math.max(...data);
-  const range = max - min || 1;
-  const step = W / (data.length - 1);
-  const toY = v => H - 8 - ((v - min) / range) * (H - 20);
-  const pts = data.map((v, i) => `${i * step},${toY(v)}`).join(" ");
-  const fill = `0,${H} ${pts} ${(data.length-1)*step},${H}`;
-  const gradId = `grad-${color.replace("#","")}`;
-  return (
-    <svg width="100%" height={H} viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none">
-      <defs>
-        <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor={color} stopOpacity="0.28"/>
-          <stop offset="100%" stopColor={color} stopOpacity="0"/>
-        </linearGradient>
-      </defs>
-      <polygon points={fill} fill={`url(#${gradId})`}/>
-      <polyline points={pts} fill="none" stroke={color} strokeWidth="2" strokeLinejoin="round"/>
-      {data.map((v, i) => i % Math.ceil(data.length / 8) === 0 &&
-        <circle key={i} cx={i*step} cy={toY(v)} r="3.5" fill={color} fillOpacity="0.9"/>
-      )}
-    </svg>
-  );
-};
 
 // ── Dropdown ──────────────────────────────────────────────────────────────────
 const Dropdown = ({ icon, options, value, onChange, placeholder }) => {
@@ -144,7 +250,9 @@ const Dropdown = ({ icon, options, value, onChange, placeholder }) => {
       </button>
       {open && (
         <div className="an-dropdown-menu">
-          {options.length === 0 && <div style={{padding:"12px 14px", color:"#555", fontSize:"13px"}}>Нет данных</div>}
+          {options.length === 0 && (
+            <div style={{padding:"12px 14px", color:"#555", fontSize:"13px"}}>Нет данных</div>
+          )}
           {options.map(o => (
             <button key={o.value}
               className={`an-dropdown-item ${value === o.value ? "an-dropdown-item--active" : ""}`}
@@ -183,105 +291,251 @@ const DatePickerModal = ({ onClose, onApply }) => {
         </div>
         <div className="an-modal-footer">
           <button className="an-btn-cancel" onClick={onClose}>Отмена</button>
-          <button className="an-btn-save" onClick={()=>{ if(from&&to){ onApply(from,to); onClose(); } }}>Применить</button>
+          <button
+            className="an-btn-save"
+            disabled={!from || !to}
+            onClick={() => { if (from && to) { onApply(from, to); onClose(); } }}>
+            Применить
+          </button>
         </div>
       </div>
     </div>
   );
 };
 
+// ── LineChart ─────────────────────────────────────────────────────────────────
+const LineChart = ({ data, color, height = 130 }) => {
+  if (!data || data.length < 2) return <div style={{height, background:"#111", borderRadius:8}}/>;
+  const W = 520, H = height;
+  const min = Math.min(...data), max = Math.max(...data);
+  const range = max - min || 1;
+  const step = W / (data.length - 1);
+  const toY = v => H - 8 - ((v - min) / range) * (H - 20);
+  const pts = data.map((v, i) => `${i * step},${toY(v)}`).join(" ");
+  const fill = `0,${H} ${pts} ${(data.length-1)*step},${H}`;
+  const gradId = `grad-${color.replace("#","")}`;
+  return (
+    <svg width="100%" height={H} viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none">
+      <defs>
+        <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={color} stopOpacity="0.28"/>
+          <stop offset="100%" stopColor={color} stopOpacity="0"/>
+        </linearGradient>
+      </defs>
+      <polygon points={fill} fill={`url(#${gradId})`}/>
+      <polyline points={pts} fill="none" stroke={color} strokeWidth="2" strokeLinejoin="round"/>
+      {data.map((v, i) => i % Math.ceil(data.length / 8) === 0 &&
+        <circle key={i} cx={i*step} cy={toY(v)} r="3.5" fill={color} fillOpacity="0.9"/>
+      )}
+    </svg>
+  );
+};
+
+// ── Конфиг типов отчётов ──────────────────────────────────────────────────────
+const REPORT_TYPES = [
+  {
+    key:         "location",
+    label:       "По локации",
+    placeholder: "Выбрать локацию",
+    icon:        <IconLocation />,
+    color:       "#07bcd4",
+  },
+  {
+    key:         "control_unit",
+    label:       "По ЦБУ",
+    placeholder: "Выбрать ЦБУ",
+    icon:        <IconControlUnit />,
+    color:       "#a78bfa",
+  },
+  {
+    key:         "sensor",
+    label:       "По датчику",
+    placeholder: "Выбрать датчик",
+    icon:        <IconSensor />,
+    color:       "#ffc207",
+  },
+];
+
 // ── Main ──────────────────────────────────────────────────────────────────────
 export const Analytics = () => {
   const {
     sensorOptions,
     locationOptions,
-    history,
-    histLoading,
+    controlUnitOptions,
     loading,
-    fetchHistory,
   } = useAnalyticsData();
 
+  // ── Chart state ──
   const [filterSensor,   setFilterSensor]   = useState(null);
   const [filterLocation, setFilterLocation] = useState(null);
   const [chartPeriod,    setChartPeriod]    = useState("month");
   const [customRange,    setCustomRange]    = useState(null);
   const [showCal,        setShowCal]        = useState(false);
-  const [exportFormat,   setExportFormat]   = useState("xlsx");
+
+  // ── Telemetry state ──
+  const [chartTemp,    setChartTemp]    = useState([]);
+  const [chartHum,     setChartHum]     = useState([]);
+  const [histLoading,  setHistLoading]  = useState(false);
+  const [histError,    setHistError]    = useState("");
+  const [latestData,   setLatestData]   = useState(null); // { temperature, humidity, timestamp }
+
+  // ── Export state ──
+  const [reportType,     setReportType]     = useState("sensor");
+  const [exportEntityId, setExportEntityId] = useState(null);
+  const [exportPeriod,   setExportPeriod]   = useState("month");
+  const [exportCustom,   setExportCustom]   = useState(null);
+  const [showExportCal,  setShowExportCal]  = useState(false);
   const [exportHistory,  setExportHistory]  = useState([]);
   const [exportLoading,  setExportLoading]  = useState(false);
   const [exportError,    setExportError]    = useState("");
 
-  const labels = getLabels(chartPeriod);
+  // ── User / role ──
+  const [currentUser, setCurrentUser] = useState(null);
+  const isAdmin = currentUser?.role === "admin";
 
-  // Когда выбран датчик — загружаем его историю
   useEffect(() => {
-    if (filterSensor) {
-      const apiPeriod = PERIOD_MAP[chartPeriod] || "30d";
-      if (customRange) {
-        fetchHistory(Number(filterSensor), {
-          period: null,
-          dateFrom: customRange.from + "T00:00:00",
-          dateTo:   customRange.to   + "T23:59:59",
-        });
-      } else {
-        fetchHistory(Number(filterSensor), { period: apiPeriod });
-      }
+    fetchCurrentUser().then(setCurrentUser).catch(() => {});
+  }, []);
+
+  // Синхронизируем период экспорта с периодом графика
+  useEffect(() => {
+    setExportPeriod(chartPeriod);
+    setExportCustom(customRange);
+  }, [chartPeriod, customRange]);
+
+  // Сбросить выбранную сущность при смене типа отчёта
+  useEffect(() => {
+    setExportEntityId(null);
+    setExportError("");
+  }, [reportType]);
+
+  // ── Загрузка телеметрии при выборе датчика / смене периода ──
+  useEffect(() => {
+    if (!filterSensor) {
+      // Нет выбранного датчика — сбрасываем данные
+      setChartTemp([]);
+      setChartHum([]);
+      setLatestData(null);
+      setHistError("");
+      return;
     }
-  }, [filterSensor, chartPeriod, customRange, fetchHistory]);
 
-  // Данные для графика: реальные если загружены, иначе заглушка
-  const periodCounts = { day: 24, week: 7, month: 30, year: 12 };
-  const n = periodCounts[chartPeriod];
-  const chartTemp = history.temp.length > 0 ? history.temp : genFallback(n);
-  const chartHum  = history.hum.length  > 0 ? history.hum  : genFallback(n);
+    const load = async () => {
+      setHistLoading(true);
+      setHistError("");
 
-  const currentFmt = FORMAT_CONFIG[exportFormat];
+      const periodCounts = { day: 24, week: 7, month: 30, year: 12 };
+      const points = periodCounts[chartPeriod] || 30;
 
-  const periodLabel = customRange
-    ? `${customRange.from} – ${customRange.to}`
-    : PERIOD_LABELS_FULL[chartPeriod];
+      try {
+        let rawData;
 
-  const exportContextPeriod = customRange
-    ? `${customRange.from} – ${customRange.to}`
-    : { day: "День", week: "Неделя", month: "Месяц", year: "Год" }[chartPeriod];
+        if (customRange) {
+          // Произвольный диапазон — используем /history с start_time / end_time
+          const startTime = `${customRange.from}T00:00:00`;
+          const endTime   = `${customRange.to}T23:59:59`;
+          rawData = await fetchSensorHistory(filterSensor, startTime, endTime);
+        } else if (chartPeriod === "day") {
+          // Последние 24 часа — специализированный endpoint
+          rawData = await fetchSensorLast24h(filterSensor);
+        } else {
+          // Остальные периоды — /history с вычисленным диапазоном
+          const { start, end } = getPeriodRange(chartPeriod);
+          rawData = await fetchSensorHistory(filterSensor, start, end);
+        }
 
-  const sensorLabel = filterSensor
-    ? sensorOptions.find(s => s.value === filterSensor)?.label
+        // Нормализуем: API может вернуть как массив, так и { data: [...] }
+        const list = Array.isArray(rawData) ? rawData : (rawData?.data ?? []);
+
+        setChartTemp(extractChartData(list, "temperature", points));
+        setChartHum (extractChartData(list, "humidity",    points));
+
+        // Последнее значение для подписи
+        if (list.length > 0) {
+          const last = list[list.length - 1];
+          setLatestData({
+            temperature: last.temperature ?? null,
+            humidity:    last.humidity    ?? null,
+            timestamp:   last.timestamp   ?? null,
+          });
+        }
+      } catch (err) {
+        setHistError(err.message || "Ошибка загрузки данных");
+        setChartTemp([]);
+        setChartHum([]);
+      } finally {
+        setHistLoading(false);
+      }
+    };
+
+    load();
+  }, [filterSensor, chartPeriod, customRange]);
+
+  // При смене локации — сбрасываем датчик и данные
+  useEffect(() => {
+    setFilterSensor(null);
+  }, [filterLocation]);
+
+  // ── Опции для селектора экспорта с учётом роли ──
+  const exportOptions = useCallback(() => {
+    const userLocationId = currentUser?.location_id ?? null;
+
+    const filterByLocation = (options) => {
+      if (isAdmin || !userLocationId) return options;
+      return options.filter(o => o.location_id === userLocationId);
+    };
+
+    if (reportType === "location") {
+      if (!isAdmin && userLocationId) {
+        return locationOptions.filter(o => o.value === String(userLocationId));
+      }
+      return locationOptions;
+    }
+    if (reportType === "control_unit") {
+      return filterByLocation(controlUnitOptions || []);
+    }
+    return filterByLocation(sensorOptions);
+  }, [reportType, isAdmin, currentUser, locationOptions, sensorOptions, controlUnitOptions]);
+
+  const currentReportTypeCfg = REPORT_TYPES.find(r => r.key === reportType);
+
+  const exportPeriodLabel = exportCustom
+    ? `${exportCustom.from} – ${exportCustom.to}`
+    : { day: "День", week: "Неделя", month: "Месяц", year: "Год" }[exportPeriod];
+
+  const entityLabel = exportEntityId
+    ? exportOptions().find(o => o.value === exportEntityId)?.label
     : null;
 
-  // ─── Экспорт ────────────────────────────────────────────────────────────────
-
+  // ── Экспорт ───────────────────────────────────────────────────────────────────
   const doExport = async () => {
-    if (!filterSensor) {
-      setExportError("Выберите датчик для экспорта");
+    if (!exportEntityId) {
+      setExportError(`Выберите ${currentReportTypeCfg.label.toLowerCase().replace("по ", "")}`);
       return;
     }
     setExportError("");
     setExportLoading(true);
+
     const now = new Date();
-    const dateStr = now.toLocaleDateString("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric" });
-    const timeStr = now.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
+    const dateStr = now.toLocaleDateString("ru-RU", { day:"2-digit", month:"2-digit", year:"numeric" });
+    const timeStr = now.toLocaleTimeString("ru-RU", { hour:"2-digit", minute:"2-digit" });
 
     try {
-      if (customRange) {
-        await downloadRangeReport(
-          Number(filterSensor),
-          customRange.from + "T00:00:00",
-          customRange.to   + "T23:59:59",
-          exportFormat
-        );
-      } else {
-        await downloadPeriodReport(
-          Number(filterSensor),
-          PERIOD_MAP[chartPeriod] || "30d",
-          exportFormat
-        );
-      }
+      const url = buildReportUrl({
+        reportType,
+        entityId:    exportEntityId,
+        period:      PERIOD_API_MAP[exportPeriod] || "last_month",
+        customRange: exportCustom,
+      });
+
+      const fallbackName = `report_${reportType}_${exportEntityId}_${now.toISOString().slice(0,10)}.pdf`;
+      await downloadReport(url, fallbackName);
 
       setExportHistory(prev => [{
-        label:  `Отчёт за ${periodLabel}${sensorLabel ? ", " + sensorLabel.split(" ")[0] : ""}`,
-        format: currentFmt.label,
-        color:  currentFmt.color,
+        label:  `Отчёт за ${exportPeriodLabel}${entityLabel ? ", " + entityLabel.split(" ")[0] : ""}`,
+        format: "PDF",
+        color:  "#ff5252",
+        type:   currentReportTypeCfg.label,
         date:   dateStr,
         time:   timeStr,
       }, ...prev]);
@@ -292,6 +546,24 @@ export const Analytics = () => {
     }
   };
 
+  // ── Chart data ────────────────────────────────────────────────────────────────
+  const labels = getLabels(chartPeriod);
+  const periodCounts = { day: 24, week: 7, month: 30, year: 12 };
+  const n = periodCounts[chartPeriod];
+
+  // Используем реальные данные, фоллбэк только если датчик не выбран
+  const displayTemp = chartTemp.length > 0 ? chartTemp : (!filterSensor ? genFallback(n) : []);
+  const displayHum  = chartHum.length  > 0 ? chartHum  : (!filterSensor ? genFallback(n) : []);
+
+  const selectedSensorLabel  = sensorOptions.find(s => s.value === filterSensor)?.label;
+  const selectedLocationLabel = locationOptions.find(l => l.value === filterLocation)?.label;
+  const chartSubLabel = filterSensor
+    ? selectedSensorLabel
+    : filterLocation
+      ? selectedLocationLabel
+      : "Все датчики (демо)";
+
+  // ── Render ────────────────────────────────────────────────────────────────────
   return (
     <div className="an-container">
       <main className="an-main">
@@ -318,11 +590,34 @@ export const Analytics = () => {
             onChange={setFilterLocation}
           />
           {(filterSensor || filterLocation) && (
-            <button className="an-filter-reset" onClick={() => { setFilterSensor(null); setFilterLocation(null); }}>
+            <button className="an-filter-reset" onClick={() => {
+              setFilterSensor(null);
+              setFilterLocation(null);
+            }}>
               Сбросить
             </button>
           )}
-          {histLoading && <span style={{fontSize:"12px", color:"#929292"}}>Загрузка данных...</span>}
+          {histLoading && (
+            <span style={{fontSize:"12px", color:"#929292"}}>Загрузка данных...</span>
+          )}
+          {histError && (
+            <span style={{fontSize:"12px", color:"#ff5252"}}>{histError}</span>
+          )}
+          {/* Последние показания */}
+          {latestData && !histLoading && (
+            <span style={{fontSize:"12px", color:"#929292", marginLeft:"auto"}}>
+              {latestData.temperature != null && (
+                <span style={{marginRight:12}}>
+                  🌡 <span style={{color:"#07bcd4", fontWeight:600}}>{latestData.temperature.toFixed(1)}°C</span>
+                </span>
+              )}
+              {latestData.humidity != null && (
+                <span>
+                  💧 <span style={{color:"#ffc207", fontWeight:600}}>{latestData.humidity.toFixed(1)}%</span>
+                </span>
+              )}
+            </span>
+          )}
         </div>
 
         {/* ── Charts ── */}
@@ -332,13 +627,7 @@ export const Analytics = () => {
             <div className="an-chart-header">
               <div>
                 <h2 className="an-card-title">Температура</h2>
-                <p className="an-chart-sub">
-                  {filterSensor
-                    ? sensorOptions.find(s => s.value === filterSensor)?.label
-                    : filterLocation
-                      ? locationOptions.find(l => l.value === filterLocation)?.label
-                      : "Все датчики"}
-                </p>
+                <p className="an-chart-sub">{chartSubLabel}</p>
               </div>
               <div className="an-period-bar">
                 {PERIODS.map(p => (
@@ -357,7 +646,10 @@ export const Analytics = () => {
             </div>
             <div className="an-chart-labels">{labels.map(l => <span key={l}>{l}</span>)}</div>
             <div className="an-chart-area">
-              <LineChart data={chartTemp} color="#07bcd4" />
+              {histLoading
+                ? <div style={{height:130, display:"flex", alignItems:"center", justifyContent:"center", color:"#555", fontSize:"13px"}}>Загрузка...</div>
+                : <LineChart data={displayTemp} color="#07bcd4" />
+              }
             </div>
           </div>
 
@@ -366,13 +658,7 @@ export const Analytics = () => {
             <div className="an-chart-header">
               <div>
                 <h2 className="an-card-title">Влажность</h2>
-                <p className="an-chart-sub">
-                  {filterSensor
-                    ? sensorOptions.find(s => s.value === filterSensor)?.label
-                    : filterLocation
-                      ? locationOptions.find(l => l.value === filterLocation)?.label
-                      : "Все датчики"}
-                </p>
+                <p className="an-chart-sub">{chartSubLabel}</p>
               </div>
               <div className="an-period-bar">
                 {PERIODS.map(p => (
@@ -391,7 +677,10 @@ export const Analytics = () => {
             </div>
             <div className="an-chart-labels">{labels.map(l => <span key={l}>{l}</span>)}</div>
             <div className="an-chart-area">
-              <LineChart data={chartHum} color="#ffc207" />
+              {histLoading
+                ? <div style={{height:130, display:"flex", alignItems:"center", justifyContent:"center", color:"#555", fontSize:"13px"}}>Загрузка...</div>
+                : <LineChart data={displayHum} color="#ffc207" />
+              }
             </div>
           </div>
         </div>
@@ -401,36 +690,79 @@ export const Analytics = () => {
           {/* Export card */}
           <div className="an-card an-export-card">
             <h2 className="an-card-title">Экспортировать данные</h2>
+
+            {/* Тип отчёта */}
+            <div className="an-export-type-row">
+              {REPORT_TYPES.map(rt => (
+                <button key={rt.key}
+                  className={`an-report-type-btn ${reportType === rt.key ? "an-report-type-btn--active" : ""}`}
+                  style={reportType === rt.key
+                    ? { borderColor: rt.color, color: rt.color, backgroundColor: `${rt.color}14` }
+                    : {}
+                  }
+                  onClick={() => setReportType(rt.key)}>
+                  {rt.icon}
+                  <span>{rt.label}</span>
+                </button>
+              ))}
+            </div>
+
+            {/* Сущность */}
             <div className="an-export-context">
               <div className="an-export-context-row">
-                <IconSensor />
-                <span className="an-export-context-key">Датчик:</span>
-                <span className="an-export-context-val">{sensorLabel || "Не выбран"}</span>
+                {currentReportTypeCfg.icon}
+                <span className="an-export-context-key">{currentReportTypeCfg.label}:</span>
+                <div style={{ flex: 1 }}>
+                  <Dropdown
+                    icon={currentReportTypeCfg.icon}
+                    placeholder={loading ? "Загрузка..." : currentReportTypeCfg.placeholder}
+                    options={exportOptions()}
+                    value={exportEntityId}
+                    onChange={setExportEntityId}
+                  />
+                </div>
               </div>
-              <div className="an-export-context-row">
-                <IconLocation />
-                <span className="an-export-context-key">Локация:</span>
-                <span className="an-export-context-val">
-                  {filterLocation ? locationOptions.find(l => l.value === filterLocation)?.label : "Все локации"}
-                </span>
-              </div>
+
+              {/* Период */}
               <div className="an-export-context-row">
                 <IconCalendar />
                 <span className="an-export-context-key">Период:</span>
-                <span className="an-export-context-val">{exportContextPeriod}</span>
+                <div className="an-period-bar an-period-bar--inline">
+                  {PERIODS.map(p => (
+                    <button key={p.key}
+                      className={`an-period-btn ${exportPeriod === p.key && !exportCustom ? "an-period-btn--active" : ""}`}
+                      onClick={() => { setExportPeriod(p.key); setExportCustom(null); }}>
+                      {p.label}
+                    </button>
+                  ))}
+                  <button
+                    className={`an-period-btn an-period-btn--cal ${exportCustom ? "an-period-btn--active" : ""}`}
+                    onClick={() => setShowExportCal(true)} title="Произвольный период">
+                    <IconCalendar />
+                  </button>
+                </div>
               </div>
+
+              {exportCustom && (
+                <div className="an-export-context-row">
+                  <span style={{fontSize:"12px", color:"#929292"}}>
+                    {exportCustom.from} – {exportCustom.to}
+                  </span>
+                  <button style={{background:"none", border:"none", cursor:"pointer", padding:"2px"}}
+                    onClick={() => setExportCustom(null)}>
+                    <IconClose />
+                  </button>
+                </div>
+              )}
             </div>
 
+            {/* Формат — только PDF */}
             <div className="an-format-row">
-              {Object.entries(FORMAT_CONFIG).map(([key, cfg]) => (
-                <button key={key}
-                  className={`an-format-btn ${exportFormat === key ? "an-format-btn--active" : ""}`}
-                  style={exportFormat === key ? { borderColor: cfg.borderColor, backgroundColor: cfg.accentBg, color: cfg.color } : {}}
-                  onClick={() => setExportFormat(key)}>
-                  {cfg.icon}
-                  <span>{cfg.label}</span>
-                </button>
-              ))}
+              <div className="an-format-btn an-format-btn--active"
+                style={{ borderColor:"#ff5252", backgroundColor:"rgba(255,82,82,0.08)", color:"#ff5252" }}>
+                <IconPDF />
+                <span>PDF</span>
+              </div>
             </div>
 
             {exportError && (
@@ -439,12 +771,16 @@ export const Analytics = () => {
 
             <button
               className="an-export-btn"
-              style={{ borderColor: currentFmt.color, color: currentFmt.color, backgroundColor: currentFmt.btnBg, opacity: exportLoading ? 0.7 : 1 }}
+              style={{
+                borderColor:     "#ff5252",
+                color:           "#ff5252",
+                backgroundColor: "#1a1010",
+                opacity:         exportLoading ? 0.7 : 1,
+              }}
               onClick={doExport}
-              disabled={exportLoading}
-            >
-              <IconDownloadArrow color={currentFmt.color} />
-              <span>{exportLoading ? "Загрузка..." : `Скачать  ${currentFmt.label}`}</span>
+              disabled={exportLoading}>
+              <IconDownloadArrow color="#ff5252" />
+              <span>{exportLoading ? "Загрузка..." : "Скачать PDF"}</span>
             </button>
           </div>
 
@@ -464,9 +800,16 @@ export const Analytics = () => {
                     <div className="an-history-text">
                       <span className="an-history-label">
                         {item.label}
-                        <span className="an-history-badge" style={{ background: `${item.color}22`, color: item.color }}>
+                        <span className="an-history-badge"
+                          style={{ background:`${item.color}22`, color: item.color }}>
                           {item.format}
                         </span>
+                        {item.type && (
+                          <span className="an-history-badge"
+                            style={{ background:"rgba(255,255,255,0.05)", color:"#929292", marginLeft:4 }}>
+                            {item.type}
+                          </span>
+                        )}
                       </span>
                       <span className="an-history-meta">{item.date} в {item.time}</span>
                     </div>
@@ -478,10 +821,19 @@ export const Analytics = () => {
         </div>
       </main>
 
+      {/* Календарь для графика */}
       {showCal && (
         <DatePickerModal
           onClose={() => setShowCal(false)}
           onApply={(from, to) => { setCustomRange({ from, to }); }}
+        />
+      )}
+
+      {/* Календарь для экспорта */}
+      {showExportCal && (
+        <DatePickerModal
+          onClose={() => setShowExportCal(false)}
+          onApply={(from, to) => { setExportCustom({ from, to }); }}
         />
       )}
     </div>

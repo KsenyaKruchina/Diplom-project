@@ -99,14 +99,15 @@ const IconTrash = () => <svg width="13" height="13" viewBox="0 0 24 24" fill="no
 const IconChevronDown = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="6 9 12 15 18 9"/></svg>;
 
 // ─── Status helpers ───────────────────────────────────────────────────────────
-const SENSOR_COLORS = { normal: "#01e676", warning: "#ffd550", problem: "#ff5b5b" };
-const SENSOR_BG     = { normal: "#19282b", warning: "#312c1c", problem: "#321c1b" };
-const STATUS_LABELS = { normal: "Норма", warning: "Внимание", problem: "Тревога" };
-const STATUS_TEXT   = { normal: "#01e676", warning: "#ffd550", problem: "#ff5b5b" };
+// "nodata" — нет данных (не online, не offline — просто нет телеметрии)
+const SENSOR_COLORS = { normal: "#01e676", warning: "#ffd550", problem: "#ff5b5b", nodata: "#555" };
+const SENSOR_BG     = { normal: "#19282b", warning: "#312c1c", problem: "#321c1b", nodata: "#161616" };
+const STATUS_LABELS = { normal: "Норма",   warning: "Внимание", problem: "Тревога", nodata: "Нет данных" };
+const STATUS_TEXT   = { normal: "#01e676", warning: "#ffd550",  problem: "#ff5b5b", nodata: "#555" };
 
 const getTempStatus = (v, sensor) => {
   const n = parseFloat(v);
-  if (isNaN(n)) return "normal";
+  if (isNaN(n) || v == null) return "nodata";   // ← было "normal"
   if (sensor) {
     if ((sensor.alarm_min_temp != null && n < sensor.alarm_min_temp) || (sensor.alarm_max_temp != null && n > sensor.alarm_max_temp)) return "problem";
     if ((sensor.warning_min_temp != null && n < sensor.warning_min_temp) || (sensor.warning_max_temp != null && n > sensor.warning_max_temp)) return "warning";
@@ -117,7 +118,7 @@ const getTempStatus = (v, sensor) => {
 
 const getHumStatus = (v, sensor) => {
   const n = parseFloat(v);
-  if (isNaN(n)) return "normal";
+  if (isNaN(n) || v == null) return "nodata";   // ← было "normal"
   if (sensor) {
     if ((sensor.alarm_min_hum != null && n < sensor.alarm_min_hum) || (sensor.alarm_max_hum != null && n > sensor.alarm_max_hum)) return "problem";
     if ((sensor.warning_min_hum != null && n < sensor.warning_min_hum) || (sensor.warning_max_hum != null && n > sensor.warning_max_hum)) return "warning";
@@ -127,25 +128,121 @@ const getHumStatus = (v, sensor) => {
 };
 
 // ─── MiniChart ────────────────────────────────────────────────────────────────
-const MiniChart = ({ data, color }) => {
-  const w = 200, h = 48;
-  if (!data || data.length < 2) return (
-    <div style={{ height: h, display: "flex", alignItems: "center", justifyContent: "center", color: "#333", fontSize: 10 }}>нет данных</div>
-  );
-  const vals = data.map(Number);
-  const min = Math.min(...vals), max = Math.max(...vals), range = max - min || 1;
+// Все расчёты (toY, диапазон) происходят ДО ветвления — пороги рисуются всегда.
+// Не использует вложенные компоненты (вызывают проблемы с рендерингом в SVG).
+const MiniChart = ({ data, color, isOffline = false, thresholds = {} }) => {
+  const W = 200, H = 48;
+
+  // 1. Собираем пороги
+  const tEntries = [
+    { val: thresholds.alarmMin,   col: "#ff5b5b" },
+    { val: thresholds.alarmMax,   col: "#ff5b5b" },
+    { val: thresholds.warningMin, col: "#ffd550" },
+    { val: thresholds.warningMax, col: "#ffd550" },
+  ].filter(t => t.val != null && !isNaN(Number(t.val)));
+
+  // 2. История: фильтруем null/NaN
+  const vals = Array.isArray(data)
+    ? data.map(Number).filter(n => !isNaN(n))
+    : [];
+  const hasHistory = vals.length >= 2;
+
+  // 3. Диапазон оси Y — объединяем историю и пороги, добавляем отступ 10%
+  const allNums = [...vals, ...tEntries.map(t => Number(t.val))];
+  let yMin, yMax;
+  if (allNums.length === 0) {
+    yMin = 0; yMax = 100;
+  } else {
+    const rMin = Math.min(...allNums);
+    const rMax = Math.max(...allNums);
+    const pad  = (rMax - rMin) * 0.15 || 5;
+    yMin = rMin - pad;
+    yMax = rMax + pad;
+  }
+  const yRange = yMax - yMin || 1;
+
+  // 4. Перевод значения → координата Y (0 = верх SVG, H = низ)
+  const toY = (v) => H - ((Number(v) - yMin) / yRange) * (H - 10) - 5;
+
+  // 5. Строим путь истории
+  const ptsStr = hasHistory
+    ? vals.map((v, i) => `${(i / (vals.length - 1)) * W},${toY(v)}`).join("L")
+    : null;
+
+  // 6. Строим линии порогов (чистые SVG-элементы, без вложенных компонентов)
+  const thresholdSvg = tEntries.map((t, i) => {
+    const y = toY(t.val);
+    // Разрешаем небольшой выход за края (1px) — пороги у границ всё равно видны
+    if (y < -2 || y > H + 2) return null;
+    const clampedY = Math.max(1, Math.min(H - 1, y));
+    return (
+      <g key={`th-${i}`}>
+        <line
+          x1="0" y1={clampedY} x2={W} y2={clampedY}
+          stroke={t.col} strokeWidth="1.2" strokeDasharray="5,3" opacity="0.8"
+        />
+        <rect
+          x={W - 27} y={clampedY - 9} width={26} height={10} rx="2"
+          fill="#0a0a0a" opacity="0.9"
+        />
+        <text
+          x={W - 2} y={clampedY - 1}
+          fill={t.col} fontSize="6.5" textAnchor="end"
+          opacity="1" fontFamily="monospace" fontWeight="600"
+        >
+          {Number(t.val).toFixed(1)}
+        </text>
+      </g>
+    );
+  });
+
+  // ── OFFLINE: мёртвая линия + пороги ───────────────────────────────────────
+  if (isOffline) {
+    const deadY = H - 6;
+    return (
+      <div>
+        <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: H }} preserveAspectRatio="none">
+          <path d={`M0,${deadY} L${W},${deadY} L${W},${H} L0,${H}Z`}
+            fill="#ff5b5b" opacity="0.07"/>
+          <line x1="0" y1={deadY} x2={W} y2={deadY}
+            stroke="#ff5b5b" strokeWidth="1.5" strokeDasharray="6,4" opacity="0.6"/>
+          {thresholdSvg}
+        </svg>
+        <div style={{ display:"flex", justifyContent:"center", fontSize:9, color:"#ff5b5b", marginTop:2, opacity:0.75 }}>
+          нет связи
+        </div>
+      </div>
+    );
+  }
+
+  // ── НЕТ ИСТОРИИ: только пороги (или пустое поле) ──────────────────────────
+  if (!hasHistory) {
+    return (
+      <div>
+        <svg viewBox={`0 0 ${W} ${H}`} style={{ width:"100%", height:H }} preserveAspectRatio="none">
+          <rect x="0" y="0" width={W} height={H} fill="#0e0e0e" rx="3"/>
+          {thresholdSvg}
+        </svg>
+        <div style={{ display:"flex", justifyContent:"center", fontSize:9, color:"#3a3a3a", marginTop:2 }}>
+          {tEntries.length > 0 ? "нет истории" : "нет данных"}
+        </div>
+      </div>
+    );
+  }
+
+  // ── ПОЛНЫЙ ГРАФИК + пороги ─────────────────────────────────────────────────
   const avg = (vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(1);
-  const pts = vals.map((v, i) => `${(i / (vals.length - 1)) * w},${h - ((v - min) / range) * (h - 6) - 3}`);
   return (
     <div>
-      <svg viewBox={`0 0 ${w} ${h}`} style={{ width: "100%", height: h }} preserveAspectRatio="none">
-        <path d={`M0,${h} L${pts.join("L")} L${w},${h}Z`} fill={color} opacity="0.12"/>
-        <path d={`M${pts.join("L")}`} fill="none" stroke={color} strokeWidth="1.5"/>
+      <svg viewBox={`0 0 ${W} ${H}`} style={{ width:"100%", height:H }} preserveAspectRatio="none">
+        <path d={`M0,${H} L${ptsStr} L${W},${H}Z`} fill={color} opacity="0.12"/>
+        <path d={`M${ptsStr}`} fill="none" stroke={color} strokeWidth="1.5"/>
+        {thresholdSvg}
       </svg>
-      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 9, color: "#555", marginTop: 2 }}>
-        <span>↓<span style={{ color }}>{min.toFixed(1)}</span></span>
+      <div style={{ display:"flex", justifyContent:"space-between", fontSize:9, color:"#555", marginTop:2 }}>
+        <span>↓<span style={{ color }}>{Math.min(...vals).toFixed(1)}</span></span>
         <span>~<span style={{ color }}>{avg}</span></span>
-        <span>↑<span style={{ color }}>{max.toFixed(1)}</span></span>
+        <span>↑<span style={{ color }}>{Math.max(...vals).toFixed(1)}</span></span>
       </div>
     </div>
   );
@@ -166,7 +263,7 @@ const useSensorHistory = (sensorId) => {
 // ─── useUserLocation ──────────────────────────────────────────────────────────
 const useUserLocation = (role, sensors) => {
   const [location, setLocation] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading]   = useState(true);
 
   useEffect(() => {
     if (role !== "editor" && role !== "viewer") {
@@ -189,10 +286,10 @@ const useUserLocation = (role, sensors) => {
         setLocation(loc);
       } catch (e) {
         if (sensors.length > 0 && sensors[0]?.group_id) {
-          setLocation({ 
-            id: sensors[0].group_id, 
-            name: "Моя локация", 
-            image_url: null 
+          setLocation({
+            id: sensors[0].group_id,
+            name: "Моя локация",
+            image_url: null,
           });
         }
         console.warn("useUserLocation:", e.message);
@@ -208,54 +305,107 @@ const useUserLocation = (role, sensors) => {
 };
 
 // ─── SensorCard ───────────────────────────────────────────────────────────────
-const SensorCard = ({ sensor, telemetryData }) => {
-  const temp    = telemetryData?.temperature ?? null;
-  const hum     = telemetryData?.humidity    ?? null;
-  const battery = sensor.battery_level ?? 75;
-  const bc      = battery > 50 ? "#01e676" : battery > 20 ? "#ffd550" : "#ff5b5b";
+// isOffline=true        → connection_lost тревога → красный
+// telemetryData==null   → нет телеметрии совсем  → серый "Нет данных"
+// telemetryData!=null   → есть данные            → по значению
+const SensorCard = ({ sensor, telemetryData, isOffline = false }) => {
+  const temp = (!isOffline && telemetryData != null) ? telemetryData.temperature ?? null : null;
+  const hum  = (!isOffline && telemetryData != null) ? telemetryData.humidity    ?? null : null;
+
+  const battery = sensor.battery_level ?? null;
+  const bc = battery == null ? "#555" : battery > 50 ? "#01e676" : battery > 20 ? "#ffd550" : "#ff5b5b";
+
+  // История загружается ВСЕГДА — чтобы пороги были видны даже без живых данных
   const history = useSensorHistory(sensor.id);
-  const tempH   = history?.measurements?.map(m => m.temperature) ?? null;
-  const humH    = history?.measurements?.map(m => m.humidity)    ?? null;
-  const tSt     = getTempStatus(temp, sensor);
-  const hSt     = getHumStatus(hum, sensor);
+  const tempH = history?.measurements?.map(m => m.temperature) ?? null;
+  const humH  = history?.measurements?.map(m => m.humidity)    ?? null;
+
+  // Статус определяем явно: offline → problem, нет телеметрии → nodata, иначе по значению
+  const tSt = isOffline
+    ? "problem"
+    : (telemetryData == null ? "nodata" : getTempStatus(temp, sensor));
+  const hSt = isOffline
+    ? "problem"
+    : (telemetryData == null ? "nodata" : getHumStatus(hum, sensor));
+
+  // Цвет числа значения
+  const numColor = (st) =>
+    st === "nodata" ? "#3a3a3a" : st === "problem" ? "#ff5b5b" : "#fff";
+
+  const tempThresholds = {
+    warningMin: sensor.warning_min_temp ?? null,
+    warningMax: sensor.warning_max_temp ?? null,
+    alarmMin:   sensor.alarm_min_temp   ?? null,
+    alarmMax:   sensor.alarm_max_temp   ?? null,
+  };
+  const humThresholds = {
+    warningMin: sensor.warning_min_hum ?? null,
+    warningMax: sensor.warning_max_hum ?? null,
+    alarmMin:   sensor.alarm_min_hum   ?? null,
+    alarmMax:   sensor.alarm_max_hum   ?? null,
+  };
 
   return (
-    <div className="sensor-card">
+    <div className="sensor-card" style={isOffline ? { borderColor: "#ff5b5b44", opacity: 0.92 } : {}}>
       <div className="sensor-card-header">
-        <div className="sensor-card-title">{sensor.name}</div>
-        <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
-          <IconBattery level={battery}/>
-          <span style={{ fontSize: 10, color: bc, fontWeight: 500 }}>{battery}%</span>
+        <div className="sensor-card-title" style={{ display:"flex", alignItems:"center", gap:6 }}>
+          {sensor.name}
+          {isOffline && (
+            <span style={{
+              fontSize:8, fontWeight:700, letterSpacing:"0.4px",
+              color:"#ff5b5b", border:"1px solid #ff5b5b55",
+              background:"#321c1b", borderRadius:3, padding:"1px 5px",
+              textTransform:"uppercase",
+            }}>нет связи</span>
+          )}
+        </div>
+        <div style={{ display:"flex", alignItems:"center", gap:5 }}>
+          {(isOffline || battery == null)
+            ? <span style={{ fontSize:10, color:"#555" }}>—%</span>
+            : <><IconBattery level={battery}/><span style={{ fontSize:10, color:bc, fontWeight:500 }}>{battery}%</span></>
+          }
         </div>
       </div>
 
       <div className="sensor-metrics-row">
-        <div className="sensor-metric-half" style={{ borderColor: SENSOR_COLORS[tSt] + "44", background: SENSOR_BG[tSt] }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-            <span style={{ fontSize: 9, color: "#666" }}>🌡 Темп.</span>
-            <span style={{ fontSize: 8, background: "transparent", color: STATUS_TEXT[tSt], border: `1px solid ${SENSOR_COLORS[tSt]}44`, borderRadius: 3, padding: "1px 4px" }}>{STATUS_LABELS[tSt]}</span>
+        {/* ── Температура ── */}
+        <div className="sensor-metric-half" style={{
+          borderColor: SENSOR_COLORS[tSt] + "44",
+          background:  SENSOR_BG[tSt],
+        }}>
+          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:6 }}>
+            <span style={{ fontSize:9, color:"#666" }}>🌡 Темп.</span>
+            <span style={{ fontSize:8, color:STATUS_TEXT[tSt], border:`1px solid ${SENSOR_COLORS[tSt]}44`, borderRadius:3, padding:"1px 4px" }}>
+              {isOffline ? "Нет связи" : STATUS_LABELS[tSt]}
+            </span>
           </div>
-          <div style={{ display: "flex", alignItems: "baseline", gap: 1, marginBottom: 6 }}>
-            <span style={{ fontSize: 24, fontWeight: 500, color: "#fff", lineHeight: 1 }}>{temp != null ? parseFloat(temp).toFixed(1) : "—"}</span>
-            <span style={{ fontSize: 11, fontWeight: 700, color: SENSOR_COLORS[tSt] }}>°C</span>
+          <div style={{ display:"flex", alignItems:"baseline", gap:1, marginBottom:6 }}>
+            <span style={{ fontSize:24, fontWeight:500, color:numColor(tSt), lineHeight:1 }}>
+              {temp != null ? parseFloat(temp).toFixed(1) : "—"}
+            </span>
+            <span style={{ fontSize:11, fontWeight:700, color:SENSOR_COLORS[tSt] }}>°C</span>
           </div>
-          <div style={{ flex: 1 }}>
-            <MiniChart data={tempH} color={SENSOR_COLORS[tSt]}/>
-          </div>
+          <MiniChart data={tempH} color={SENSOR_COLORS[tSt]} isOffline={isOffline} thresholds={tempThresholds}/>
         </div>
 
-        <div className="sensor-metric-half" style={{ borderColor: SENSOR_COLORS[hSt] + "44", background: SENSOR_BG[hSt] }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-            <span style={{ fontSize: 9, color: "#666" }}>💧 Влажн.</span>
-            <span style={{ fontSize: 8, background: "transparent", color: STATUS_TEXT[hSt], border: `1px solid ${SENSOR_COLORS[hSt]}44`, borderRadius: 3, padding: "1px 4px" }}>{STATUS_LABELS[hSt]}</span>
+        {/* ── Влажность ── */}
+        <div className="sensor-metric-half" style={{
+          borderColor: SENSOR_COLORS[hSt] + "44",
+          background:  SENSOR_BG[hSt],
+        }}>
+          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:6 }}>
+            <span style={{ fontSize:9, color:"#666" }}>💧 Влажн.</span>
+            <span style={{ fontSize:8, color:STATUS_TEXT[hSt], border:`1px solid ${SENSOR_COLORS[hSt]}44`, borderRadius:3, padding:"1px 4px" }}>
+              {isOffline ? "Нет связи" : STATUS_LABELS[hSt]}
+            </span>
           </div>
-          <div style={{ display: "flex", alignItems: "baseline", gap: 1, marginBottom: 6 }}>
-            <span style={{ fontSize: 24, fontWeight: 500, color: "#fff", lineHeight: 1 }}>{hum != null ? parseFloat(hum).toFixed(1) : "—"}</span>
-            <span style={{ fontSize: 11, fontWeight: 700, color: SENSOR_COLORS[hSt] }}>%</span>
+          <div style={{ display:"flex", alignItems:"baseline", gap:1, marginBottom:6 }}>
+            <span style={{ fontSize:24, fontWeight:500, color:numColor(hSt), lineHeight:1 }}>
+              {hum != null ? parseFloat(hum).toFixed(1) : "—"}
+            </span>
+            <span style={{ fontSize:11, fontWeight:700, color:SENSOR_COLORS[hSt] }}>%</span>
           </div>
-          <div style={{ flex: 1 }}>
-            <MiniChart data={humH} color={SENSOR_COLORS[hSt]}/>
-          </div>
+          <MiniChart data={humH} color={SENSOR_COLORS[hSt]} isOffline={isOffline} thresholds={humThresholds}/>
         </div>
       </div>
     </div>
@@ -645,21 +795,43 @@ const FloorPanel = ({
   onUpdateSensor,
   canEdit,
   canCreateLocation,
+  canDragSensors,
   isNonAdmin,
   userLocation,
-  onActiveLocationChange, // ← новый проп: колбэк для передачи активной локации наверх
+  onActiveLocationChange,
 }) => {
-  const [activeLocId,    setActiveLocId]    = useState(null);
+  // FIX #1: activeLocId живёт отдельно и не сбрасывается при обновлении locations.
+  // Инициализируем один раз (lazy initializer), не через useEffect на locations.
+  const [activeLocId,    setActiveLocId]    = useState(() => null);
   const [showAdd,        setShowAdd]        = useState(false);
   const [editingLoc,     setEditingLoc]     = useState(null);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const dropdownRef = useRef(null);
-  
+
   const [editingSensor,   setEditingSensor]   = useState(null);
 
   const [dragAllMode,        setDragAllMode]        = useState(false);
   const [pendingPositions,   setPendingPositions]   = useState({});
   const [saving,             setSaving]             = useState(false);
+
+  // FIX #1: устанавливаем начальную локацию только один раз, когда locations
+  // появляются впервые (activeLocId ещё null). Последующие refetch не трогают выбор.
+  const initializedRef = useRef(false);
+  useEffect(() => {
+    if (initializedRef.current) return;        // уже инициализировано — выходим
+    if (!isNonAdmin && locations.length > 0) {
+      initializedRef.current = true;
+      const initId = locations[0]?.id ?? null;
+      setActiveLocId(initId);
+      onActiveLocationChange?.(initId);
+    }
+  }, [locations, isNonAdmin]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (isNonAdmin && userLocation?.id) {
+      onActiveLocationChange?.(userLocation.id);
+    }
+  }, [isNonAdmin, userLocation]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -669,32 +841,16 @@ const FloorPanel = ({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // При первой загрузке локаций уведомляем Dashboard об активной локации
-  useEffect(() => {
-    if (!isNonAdmin && locations.length > 0) {
-      const initId = activeLocId ?? locations[0]?.id ?? null;
-      onActiveLocationChange?.(initId);
-    }
-  }, [locations]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Для editor/viewer уведомляем об их единственной локации
-  useEffect(() => {
-    if (isNonAdmin && userLocation?.id) {
-      onActiveLocationChange?.(userLocation.id);
-    }
-  }, [isNonAdmin, userLocation]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const effectiveId = isNonAdmin 
+  const effectiveId = isNonAdmin
     ? (userLocation?.id ?? null)
     : (activeLocId ?? (locations[0]?.id || null));
-    
+
   const activeLoc = isNonAdmin
     ? userLocation
     : (locations.find(l => l.id === effectiveId) || locations[0]);
-    
+
   const locSensors = sensors.filter(s => s.group_id === activeLoc?.id);
 
-  // Смена локации через дропдаун — уведомляем Dashboard
   const handleLocationSelect = (locId) => {
     setActiveLocId(locId);
     setIsDropdownOpen(false);
@@ -726,6 +882,8 @@ const FloorPanel = ({
       setSaving(false);
       setPendingPositions({});
       setDragAllMode(false);
+      // FIX #1: не вызываем refetch здесь напрямую, а только через onUpdateSensor,
+      // который уже вызывает refetch в Dashboard. activeLocId при этом не сбросится.
     }
   };
 
@@ -739,12 +897,6 @@ const FloorPanel = ({
     locSensors.forEach(s => { initialPositions[s.id] = { x: s.pos_x ?? 50, y: s.pos_y ?? 50 }; });
     setPendingPositions(initialPositions);
     setDragAllMode(true);
-  };
-
-  const handleSensorClick = (sensor) => {
-    if (canEdit && !dragAllMode) {
-      setEditingSensor(sensor);
-    }
   };
 
   return (
@@ -834,7 +986,7 @@ const FloorPanel = ({
               <span><span className="legend-dot" style={{ background: "#ff5b5b" }}/> Тревога</span>
             </div>
             <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-              {canEdit && activeLoc && (
+              {canDragSensors && activeLoc && (
                 <button
                   className="btn-location-name"
                   onClick={enterDragAllMode}
@@ -880,7 +1032,15 @@ const FloorPanel = ({
           location={editingLoc}
           onClose={() => setEditingLoc(null)}
           onSave={async (id, n, f) => { await onEditLocation(id, n, f); setEditingLoc(null); }}
-          onDelete={async (id) => { await onDeleteLocation(id); setEditingLoc(null); if (activeLocId === id) setActiveLocId(null); }}
+          onDelete={async (id) => {
+            await onDeleteLocation(id);
+            setEditingLoc(null);
+            // FIX #1: если удалили активную локацию — сбрасываем выбор
+            if (activeLocId === id) {
+              setActiveLocId(null);
+              initializedRef.current = false; // разрешаем повторную инициализацию
+            }
+          }}
         />
       )}
     </>
@@ -891,28 +1051,24 @@ const FloorPanel = ({
 const Dashboard = () => {
   const { canEdit, canCreateLocation, role } = useAuth();
 
+  const canDragSensors = role === "admin";
+
   const { locations: rawLocations, sensors, telemetry, alarms, loading, error, refetch } = useDashboardData();
 
   const { location: userLocation, loading: locationLoading } = useUserLocation(role, sensors);
 
   const isNonAdmin = role === "editor" || role === "viewer";
-  
+
   const locations = isNonAdmin
     ? (userLocation ? [userLocation] : [])
     : (rawLocations ?? []);
 
-  // ─── Активная локация для фильтрации уведомлений (только для admin) ──────────
   const [activeLocationId, setActiveLocationId] = useState(null);
 
-  // Фильтруем уведомления по датчикам активной локации (только для admin)
-  // Для editor/viewer алармы уже приходят только по их локации
   const filteredAlarms = useMemo(() => {
-    // Для не-admin фильтрация не нужна — показываем все
     if (isNonAdmin) return alarms;
-    // Если активная локация не выбрана — показываем все
     if (!activeLocationId) return alarms;
 
-    // Собираем id датчиков, принадлежащих активной локации
     const locationSensorIds = new Set(
       sensors
         .filter(s => s.group_id === activeLocationId)
@@ -921,6 +1077,18 @@ const Dashboard = () => {
 
     return alarms.filter(a => locationSensorIds.has(a.sensor_id));
   }, [alarms, sensors, activeLocationId, isNonAdmin]);
+
+  // Множество sensor_id с активной тревогой connection_lost
+  const offlineSensorIds = useMemo(() => {
+    return new Set(
+      alarms
+        .filter(a =>
+          a.alarm_type === "connection_lost" &&
+          (a.status === "new" || a.status === "acknowledged")
+        )
+        .map(a => a.sensor_id)
+    );
+  }, [alarms]);
 
   const handleAddLocation = async (name, file) => {
     await apiCreateLocation(name, file);
@@ -951,7 +1119,14 @@ const Dashboard = () => {
 
   const notifications = filteredAlarms.map(alarmToNotification);
   const alarmCounts   = countAlarms(filteredAlarms);
-  const sensorCards   = sensors.slice(0, 4);
+
+  // FIX #2: карточки датчиков — только из активной локации.
+  // Если activeLocationId ещё null (не выбрано) — показываем пустой список,
+  // чтобы не путать данные разных локаций.
+  const sensorCards = useMemo(() => {
+    if (!activeLocationId) return [];
+    return sensors.filter(s => s.group_id === activeLocationId);
+  }, [sensors, activeLocationId]);
 
   if (loading || (isNonAdmin && locationLoading)) return (
     <div style={{ minHeight: "100vh", background: "#0a0a0a", display: "flex", alignItems: "center", justifyContent: "center", color: "#929292", fontFamily: '"Inter",sans-serif', fontSize: 14 }}>
@@ -987,6 +1162,7 @@ const Dashboard = () => {
             onUpdateSensor={handleUpdateSensor}
             canEdit={canEdit}
             canCreateLocation={canCreateLocation}
+            canDragSensors={canDragSensors}
             isNonAdmin={isNonAdmin}
             userLocation={userLocation}
             onActiveLocationChange={setActiveLocationId}
@@ -1011,10 +1187,16 @@ const Dashboard = () => {
           </section>
         </div>
 
+        {/* Карточки датчиков текущей локации с флагом isOffline */}
         {sensorCards.length > 0 && (
           <div className="dashboard-bottom-row">
             {sensorCards.map(sensor => (
-              <SensorCard key={sensor.id} sensor={sensor} telemetryData={telemetry.get(sensor.id)}/>
+              <SensorCard
+                key={sensor.id}
+                sensor={sensor}
+                telemetryData={telemetry.get(sensor.id)}
+                isOffline={offlineSensorIds.has(sensor.id)}
+              />
             ))}
           </div>
         )}

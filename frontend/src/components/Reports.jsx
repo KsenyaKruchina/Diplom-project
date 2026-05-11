@@ -1,13 +1,42 @@
-import React, { useState, useRef, useEffect, useCallback } from "react";
+import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import ReactDOM from "react-dom";
 import "./Reports.css";
 import { apiRequest } from "../services/api";
 import { getToken } from "../services/api";
 import { wsService } from "../services/websocketService";
 
-const BASE_URL = import.meta.env.VITE_API_BASE_URL || "/api/v1";
+const BASE_URL = "http://157.90.127.202/api/v1";
 
-// ── Icons ─────────────────────────────────────────────────────────────────────
+// ── Storage helpers ───────────────────────────────────────────────────────────
+// Ключ хранилища зависит от id и роли пользователя, чтобы история была per-user
+const getStorageKey = (user) => {
+  if (!user) return null;
+  return `rp_export_history_${user.id}_${user.role || "user"}`;
+};
+
+const loadHistory = (user) => {
+  const key = getStorageKey(user);
+  if (!key) return [];
+  try {
+    const raw = localStorage.getItem(key);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+};
+
+const saveHistory = (user, history) => {
+  const key = getStorageKey(user);
+  if (!key) return;
+  try {
+    // Ограничиваем 100 записями, чтобы не засорять localStorage
+    localStorage.setItem(key, JSON.stringify(history.slice(0, 100)));
+  } catch {
+    // localStorage может быть недоступен (приватный режим и т.д.)
+  }
+};
+
+// иконки
 const IconSearch = () => (
   <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
     <circle cx="11" cy="11" r="7" stroke="#929292" strokeWidth="1.8"/>
@@ -121,44 +150,78 @@ const IconRefresh = () => (
     <path d="M12 2.5V5.5H15" stroke="#929292" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
   </svg>
 );
+const IconLocation = () => (
+  <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+    <path d="M7 1a4 4 0 0 1 4 4c0 3-4 8-4 8S3 8 3 5a4 4 0 0 1 4-4z" stroke="#929292" strokeWidth="1.2"/>
+    <circle cx="7" cy="5" r="1.2" fill="#929292"/>
+  </svg>
+);
+const IconBuilding = () => (
+  <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+    <rect x="2" y="2" width="10" height="11" rx="1" stroke="#929292" strokeWidth="1.2"/>
+    <line x1="5" y1="5" x2="5" y2="5.01" stroke="#929292" strokeWidth="1.5" strokeLinecap="round"/>
+    <line x1="9" y1="5" x2="9" y2="5.01" stroke="#929292" strokeWidth="1.5" strokeLinecap="round"/>
+    <line x1="5" y1="8" x2="5" y2="8.01" stroke="#929292" strokeWidth="1.5" strokeLinecap="round"/>
+    <line x1="9" y1="8" x2="9" y2="8.01" stroke="#929292" strokeWidth="1.5" strokeLinecap="round"/>
+    <rect x="5" y="10" width="4" height="3" rx="0.5" stroke="#929292" strokeWidth="1.1"/>
+  </svg>
+);
+const IconSensor = () => (
+  <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+    <circle cx="7" cy="7" r="2" stroke="#929292" strokeWidth="1.2"/>
+    <path d="M3.5 3.5a5 5 0 0 0 0 7M10.5 3.5a5 5 0 0 1 0 7" stroke="#929292" strokeWidth="1.2" strokeLinecap="round"/>
+  </svg>
+);
+const IconTrash = () => (
+  <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+    <path d="M2 4h10M5 4V2h4v2M6 7v4M8 7v4" stroke="#929292" strokeWidth="1.2" strokeLinecap="round"/>
+    <rect x="3" y="4" width="8" height="8" rx="1" stroke="#929292" strokeWidth="1.2"/>
+  </svg>
+);
 
-// ── Маппинг API → UI ──────────────────────────────────────────────────────────
+// словари маппинги
 const STATUS_MAP = {
   new:          { label: "Новая",      color: "#ff5252", bg: "#321c1b" },
   acknowledged: { label: "В работе",   color: "#ffd550", bg: "#312c1c" },
   resolved:     { label: "Устранено",  color: "#01e676", bg: "#19282b" },
 };
-
 const SEVERITY_MAP = {
   critical: { label: "Критическая", color: "#ff5252" },
   warning:  { label: "Внимание",    color: "#ffd550" },
 };
-
 const ALARM_TYPE_MAP = {
   temperature:     "Температура",
   humidity:        "Влажность",
   connection_lost: "Потеря связи",
   low_battery:     "Низкий заряд",
 };
-
 const PERIOD_API_MAP = {
-  "1d": "last_24_hours",
-  "1w": "last_week",
-  "1m": "last_month",
-  "1y": "last_year",
+  "1d":  "last_24_hours",
+  "1w":  "last_week",
+  "1m":  "last_month",
+  "2m":  "last_2_months",
+  "3m":  "last_3_months",
+  "6m":  "last_6_months",
+  "1y":  "last_year",
 };
-
 const PERIOD_OPTIONS = [
   { key: "1d", label: "1 день" },
   { key: "1w", label: "1 неделя" },
   { key: "1m", label: "1 месяц" },
+  { key: "2m", label: "2 месяца" },
+  { key: "3m", label: "3 месяца" },
+  { key: "6m", label: "6 месяцев" },
   { key: "1y", label: "1 год" },
   { key: "custom", label: "Свой диапазон" },
 ];
-
+const REPORT_TYPE_OPTIONS = [
+  { key: "location",     label: "По локации",  icon: <IconLocation />,  endpoint: "download-events-location" },
+  { key: "control_unit", label: "По ЦБУ",      icon: <IconBuilding />,  endpoint: "download-events-control-unit" },
+  { key: "sensor",       label: "По датчику",  icon: <IconSensor />,    endpoint: "download-events-sensor" },
+];
 const COLS = [
   { key: "id",          label: "ID" },
-  { key: "severity",    label: "Критичность" },
+  { key: "severity",    label: "Серьезность" },
   { key: "alarm_type",  label: "Тип события" },
   { key: "sensor_id",   label: "Датчик" },
   { key: "description", label: "Описание" },
@@ -167,7 +230,6 @@ const COLS = [
   { key: "resolved_at", label: "Время устранения" },
 ];
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
 const formatDateTime = (iso) => {
   if (!iso) return "—";
   try {
@@ -178,13 +240,6 @@ const formatDateTime = (iso) => {
   } catch { return iso; }
 };
 
-// ── Dropdown ──────────────────────────────────────────────────────────────────
-// FIX: The original implementation used a mousedown listener on document to close
-// the dropdown. This caused a race condition: mousedown fired and closed the menu
-// BEFORE the click event on a menu item could register — so items were never selectable.
-// Solution: use a transparent backdrop div that closes the menu on click,
-// and let menu items handle their own clicks normally. This guarantees
-// the item's onClick fires before the backdrop's onClick.
 function Dropdown({ trigger, children, open, setOpen }) {
   return (
     <div className="rp-dropdown-wrap">
@@ -193,8 +248,6 @@ function Dropdown({ trigger, children, open, setOpen }) {
       </div>
       {open && (
         <>
-          {/* Backdrop closes menu; pointer-events none on children ensures
-              clicks on menu items reach their onClick handlers first */}
           <div
             className="rp-dropdown-backdrop"
             onClick={(e) => { e.stopPropagation(); setOpen(false); }}
@@ -208,7 +261,6 @@ function Dropdown({ trigger, children, open, setOpen }) {
   );
 }
 
-// ── FilterChip ────────────────────────────────────────────────────────────────
 function FilterChip({ label, onRemove }) {
   return (
     <span className="rp-filter-chip">
@@ -225,22 +277,20 @@ function CommentModal({ alarmId, value, onSave, onClose }) {
   const [error, setError] = useState("");
   const textareaRef = useRef(null);
 
-  useEffect(() => {
-    textareaRef.current?.focus();
-  }, []);
+  useEffect(() => { textareaRef.current?.focus(); }, []);
 
   const handleSave = async () => {
     setSaving(true);
     setError("");
     try {
-      const updated = await apiRequest(`/alarms/${alarmId}`, {
+      const updated = await apiRequest(`/alarms/${alarmId}/comment`, {
         method: "PATCH",
-        body: JSON.stringify({ user_comment: val }),
+        body: JSON.stringify({ comment: val }),
       });
       onSave(updated);
       onClose();
     } catch (err) {
-      setError(err.message || "Ошибка сохранения");
+      setError(err.message || "Ошибка сохранения комментария");
     } finally {
       setSaving(false);
     }
@@ -277,28 +327,17 @@ function CommentModal({ alarmId, value, onSave, onClose }) {
 }
 
 // ── Status picker ─────────────────────────────────────────────────────────────
-// FIX 1: Removed setOpen(false) from handleChange — the backdrop now handles closing,
-//         so calling setOpen(false) before the await caused the menu to vanish
-//         before the item click event fully propagated.
-// FIX 2: Added optimistic UI update — status pill updates immediately on click,
-//         then rolls back to the server response (or original on error).
-// FIX 3: All three statuses (new, acknowledged, resolved) are now always clickable
-//         regardless of the alarm's current status.
 function StatusPicker({ alarm, onUpdate }) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
-  // Optimistic: show the picked status immediately while the request is in-flight
   const [optimisticStatus, setOptimisticStatus] = useState(null);
 
   const currentStatus = optimisticStatus ?? alarm.status;
   const st = STATUS_MAP[currentStatus] || STATUS_MAP.new;
 
   const handleChange = async (newStatus) => {
-    // Close the dropdown via backdrop naturally; just update state here
     setOpen(false);
     if (newStatus === alarm.status) return;
-
-    // Optimistic update so the pill changes instantly
     setOptimisticStatus(newStatus);
     setLoading(true);
     try {
@@ -306,11 +345,9 @@ function StatusPicker({ alarm, onUpdate }) {
         method: "PATCH",
         body: JSON.stringify({ status: newStatus }),
       });
-      // Sync with server response
       setOptimisticStatus(null);
       onUpdate(updated);
     } catch (err) {
-      // Roll back on error
       setOptimisticStatus(null);
       console.error("Ошибка смены статуса:", err.message);
     } finally {
@@ -358,7 +395,7 @@ function DescriptionCell({ alarm, onUpdate }) {
         title="Нажмите для добавления комментария"
       >
         <IconEdit />
-        <span>{displayText}</span>
+        <span className="rp-description-text">{displayText}</span>
       </span>
       {modalOpen && (
         <CommentModal
@@ -403,7 +440,7 @@ function CalendarPicker({ onChange }) {
     return startDate && endDate && date >= startDate && date <= endDate;
   };
   const isStart = (d) => startDate && new Date(year, month, d).toDateString() === startDate.toDateString();
-  const isEnd = (d) => endDate && new Date(year, month, d).toDateString() === endDate.toDateString();
+  const isEnd   = (d) => endDate   && new Date(year, month, d).toDateString() === endDate.toDateString();
   const fmt = (d) => d ? d.toLocaleDateString("ru-RU", { day: "2-digit", month: "2-digit", year: "2-digit" }) : "—";
 
   return (
@@ -436,32 +473,224 @@ function CalendarPicker({ onChange }) {
 }
 
 // ── Скачивание отчёта (blob) ──────────────────────────────────────────────────
-const downloadReport = async (path, filename) => {
+const downloadReport = async (path, fallbackFilename, isXlsx = false) => {
   const token = getToken();
-  const response = await fetch(`${BASE_URL}${path}`, {
-    headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-  });
+
+  const headers = {
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...(isXlsx
+      ? { Accept: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }
+      : { Accept: "application/pdf" }),
+  };
+
+  const response = await fetch(`${BASE_URL}${path}`, { headers });
+
+  if (response.status === 403) {
+    throw new Error("403: Нет доступа к этой сущности");
+  }
+  if (response.status === 422) {
+    let detail = "Неверные параметры запроса (422)";
+    try {
+      const body = await response.json();
+      if (body?.detail) {
+        detail = Array.isArray(body.detail)
+          ? body.detail.map(e => `${e.loc?.join(".")} — ${e.msg}`).join("; ")
+          : String(body.detail);
+      }
+    } catch { /* ignore */ }
+    throw new Error(detail);
+  }
   if (!response.ok) {
     let msg = `Ошибка ${response.status}`;
     try { const e = await response.json(); if (e.detail) msg = e.detail; } catch {}
     throw new Error(msg);
   }
-  let fname = filename;
+
+  let fname = fallbackFilename;
   const cd = response.headers.get("Content-Disposition");
-  if (cd) { const m = cd.match(/filename[^;=\n]*=([^;\n]*)/); if (m) fname = m[1].replace(/['"]/g, "").trim(); }
+  if (cd) {
+    const m = cd.match(/filename[^;=\n]*=([^;\n]*)/);
+    if (m) fname = m[1].replace(/['"]/g, "").trim();
+  }
+
   const blob = await response.blob();
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
-  a.href = url; a.download = fname;
-  document.body.appendChild(a); a.click();
-  document.body.removeChild(a); URL.revokeObjectURL(url);
+  a.href = url;
+  a.download = fname;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
 };
 
-// ── FilterPanel (Portal) ──────────────────────────────────────────────────────
-// Рендерится через ReactDOM.createPortal прямо в document.body.
-// Позиция вычисляется по getBoundingClientRect кнопки-якоря,
-// поэтому панель всегда отображается поверх любых блоков страницы
-// независимо от overflow, z-index или stacking context родителей.
+// ── Generic Selector (Location / ControlUnit / Sensor) ───────────────────────
+function EntitySelector({ value, onChange, items, loading, error, placeholder, icon }) {
+  const [open, setOpen] = useState(false);
+  const triggerRef = useRef(null);
+  const menuRef    = useRef(null);
+  const [menuStyle, setMenuStyle] = useState({});
+
+  useEffect(() => {
+    if (!open || !triggerRef.current) return;
+    const rect = triggerRef.current.getBoundingClientRect();
+    setMenuStyle({
+      position: "fixed",
+      top: rect.bottom + 4,
+      left: rect.left,
+      width: Math.max(rect.width, 200),
+      zIndex: 9999,
+    });
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e) => {
+      if (
+        menuRef.current && !menuRef.current.contains(e.target) &&
+        triggerRef.current && !triggerRef.current.contains(e.target)
+      ) setOpen(false);
+    };
+    const t = setTimeout(() => document.addEventListener("mousedown", handler), 50);
+    return () => { clearTimeout(t); document.removeEventListener("mousedown", handler); };
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    const h = () => setOpen(false);
+    window.addEventListener("scroll", h, true);
+    return () => window.removeEventListener("scroll", h, true);
+  }, [open]);
+
+  const selectedLabel = value
+    ? (value.name || value.serial_number || `#${value.id}`)
+    : placeholder;
+
+  if (loading) return <div className="rp-location-loading">Загрузка...</div>;
+  if (error)   return <div className="rp-location-error">{error}</div>;
+  if (!items || items.length === 0) return <div className="rp-location-empty">Нет доступных элементов</div>;
+
+  return (
+    <>
+      <div ref={triggerRef} className="rp-location-trigger" onClick={() => setOpen(o => !o)}>
+        {icon}
+        <span className="rp-location-trigger-label">{selectedLabel}</span>
+        <IconChevDown />
+      </div>
+      {open && ReactDOM.createPortal(
+        <div
+          ref={menuRef}
+          className="rp-dropdown-menu"
+          style={menuStyle}
+          onMouseDown={e => e.stopPropagation()}
+        >
+          {items.map(item => (
+            <div
+              key={item.id}
+              className={`rp-dropdown-item ${value?.id === item.id ? "rp-dropdown-item--active" : ""}`}
+              onClick={() => { onChange(item); setOpen(false); }}
+              style={{ cursor: "pointer" }}
+            >
+              {value?.id === item.id && <IconCheck />}
+              {item.name || item.serial_number || `#${item.id}`}
+            </div>
+          ))}
+        </div>,
+        document.body
+      )}
+    </>
+  );
+}
+
+// ── LocationSelector ──────────────────────────────────────────────────────────
+function LocationSelector({ value, onChange, locations, loading: loadingLocs, error, allLabel }) {
+  const [open, setOpen] = useState(false);
+  const triggerRef = useRef(null);
+  const menuRef    = useRef(null);
+  const [menuStyle, setMenuStyle] = useState({});
+
+  useEffect(() => {
+    if (!open || !triggerRef.current) return;
+    const rect = triggerRef.current.getBoundingClientRect();
+    setMenuStyle({
+      position: "fixed",
+      top: rect.bottom + 4,
+      left: rect.left,
+      width: rect.width,
+      zIndex: 9999,
+    });
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e) => {
+      if (
+        menuRef.current && !menuRef.current.contains(e.target) &&
+        triggerRef.current && !triggerRef.current.contains(e.target)
+      ) setOpen(false);
+    };
+    const t = setTimeout(() => document.addEventListener("mousedown", handler), 50);
+    return () => { clearTimeout(t); document.removeEventListener("mousedown", handler); };
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    const h = () => setOpen(false);
+    window.addEventListener("scroll", h, true);
+    return () => window.removeEventListener("scroll", h, true);
+  }, [open]);
+
+  const selectedLabel = value
+    ? (value.name || `Локация #${value.id}`)
+    : (allLabel || "Выберите локацию");
+
+  if (loadingLocs) return <div className="rp-location-loading">Загрузка локаций...</div>;
+  if (error)       return <div className="rp-location-error">{error}</div>;
+  if (!locations || locations.length === 0) return <div className="rp-location-empty">Нет доступных локаций</div>;
+
+  return (
+    <>
+      <div ref={triggerRef} className="rp-location-trigger" onClick={() => setOpen(o => !o)}>
+        <IconLocation />
+        <span className="rp-location-trigger-label">{selectedLabel}</span>
+        <IconChevDown />
+      </div>
+      {open && ReactDOM.createPortal(
+        <div
+          ref={menuRef}
+          className="rp-dropdown-menu"
+          style={menuStyle}
+          onMouseDown={e => e.stopPropagation()}
+        >
+          {allLabel && (
+            <div
+              className={`rp-dropdown-item ${!value ? "rp-dropdown-item--active" : ""}`}
+              onClick={() => { onChange(null); setOpen(false); }}
+              style={{ cursor: "pointer" }}
+            >
+              {!value && <IconCheck />}
+              {allLabel}
+            </div>
+          )}
+          {locations.map(loc => (
+            <div
+              key={loc.id}
+              className={`rp-dropdown-item ${value?.id === loc.id ? "rp-dropdown-item--active" : ""}`}
+              onClick={() => { onChange(loc); setOpen(false); }}
+              style={{ cursor: "pointer" }}
+            >
+              {value?.id === loc.id && <IconCheck />}
+              {loc.name || `Локация #${loc.id}`}
+            </div>
+          ))}
+        </div>,
+        document.body
+      )}
+    </>
+  );
+}
+
+// ── FilterPanel ────────────────────────────────────────────────────────────────
 function FilterPanel({
   anchorRef, onClose,
   filterIdRange, setFilterIdRange,
@@ -473,62 +702,36 @@ function FilterPanel({
   const panelRef = useRef(null);
   const [style, setStyle] = useState({ opacity: 0 });
 
-  // Вычисляем позицию под кнопкой после монтирования
   useEffect(() => {
     if (!anchorRef.current) return;
     const rect = anchorRef.current.getBoundingClientRect();
     const panelWidth = 260;
     const viewportWidth = window.innerWidth;
-
     let left = rect.right - panelWidth;
     if (left < 8) left = 8;
     if (left + panelWidth > viewportWidth - 8) left = viewportWidth - panelWidth - 8;
-
-    setStyle({
-      position: "fixed",
-      top: rect.bottom + 8,
-      left,
-      width: panelWidth,
-      zIndex: 9999,
-      opacity: 1,
-    });
+    setStyle({ position: "fixed", top: rect.bottom + 8, left, width: panelWidth, zIndex: 9999, opacity: 1 });
   }, [anchorRef]);
 
-  // Закрываем при клике вне панели и кнопки
   useEffect(() => {
     const handler = (e) => {
       if (
         panelRef.current && !panelRef.current.contains(e.target) &&
         anchorRef.current && !anchorRef.current.contains(e.target)
-      ) {
-        onClose();
-      }
+      ) onClose();
     };
-    // Небольшая задержка чтобы не сработало на сам клик открытия
-    const timeout = setTimeout(() => {
-      document.addEventListener("mousedown", handler);
-    }, 50);
-    return () => {
-      clearTimeout(timeout);
-      document.removeEventListener("mousedown", handler);
-    };
+    const t = setTimeout(() => document.addEventListener("mousedown", handler), 50);
+    return () => { clearTimeout(t); document.removeEventListener("mousedown", handler); };
   }, [onClose, anchorRef]);
 
-  // Закрываем при скролле страницы (позиция уплывёт)
   useEffect(() => {
-    const handler = () => onClose();
-    window.addEventListener("scroll", handler, true);
-    return () => window.removeEventListener("scroll", handler, true);
+    const h = () => onClose();
+    window.addEventListener("scroll", h, true);
+    return () => window.removeEventListener("scroll", h, true);
   }, [onClose]);
 
   return ReactDOM.createPortal(
-    <div
-      ref={panelRef}
-      className="rp-filter-panel-fixed"
-      style={style}
-      // Не даём клику внутри панели дойти до backdrop документа
-      onMouseDown={e => e.stopPropagation()}
-    >
+    <div ref={panelRef} className="rp-filter-panel-fixed" style={style} onMouseDown={e => e.stopPropagation()}>
       <div className="rp-filter-section-title">Фильтрация</div>
 
       <div className="rp-filter-label">ID диапазон</div>
@@ -576,20 +779,323 @@ function FilterPanel({
       </div>
 
       {activeFilters.length > 0 && (
-        <button className="rp-filter-clear-all" onClick={onClearAll}>
-          Сбросить все
-        </button>
+        <button className="rp-filter-clear-all" onClick={onClearAll}>Сбросить все</button>
       )}
     </div>,
     document.body
   );
 }
 
+// ── Export Card ───────────────────────────────────────────────────────────────
+function ExportCard({
+  locations, loadingLocs, locationsError,
+  sensors, controlUnits,
+  currentUser,
+  exportHistory, setExportHistory,
+}) {
+  const [exportFmt, setExportFmt]           = useState("pdf");
+  const [reportType, setReportType]         = useState("location");
+  const [selectedLocation, setSelectedLocation]       = useState(null);
+  const [selectedControlUnit, setSelectedControlUnit] = useState(null);
+  const [selectedSensor, setSelectedSensor]           = useState(null);
+  const [periodKey, setPeriodKey]           = useState("1m");
+  const [showCalendar, setShowCalendar]     = useState(false);
+  const [customRange, setCustomRange]       = useState(null);
+  const [exportLoading, setExportLoading]   = useState(false);
+  const [exportError, setExportError]       = useState("");
+
+  const isAdmin = currentUser?.role === "admin";
+
+  const availableLocations = useMemo(() => {
+    if (isAdmin) return locations;
+    if (!currentUser?.location_id) return [];
+    return locations.filter(l => l.id === currentUser.location_id);
+  }, [locations, isAdmin, currentUser]);
+
+  // FIX: расширенная фильтрация ЦБУ — проверяем все возможные поля привязки к локации
+  const availableControlUnits = useMemo(() => {
+    if (isAdmin) return controlUnits;
+    if (!currentUser?.location_id) return [];
+    const locId = Number(currentUser.location_id);
+    return controlUnits.filter(cu => {
+      // Проверяем все возможные поля, по которым ЦБУ может быть привязан к локации
+      return (
+        Number(cu.location_id) === locId ||
+        Number(cu.group_id)    === locId ||
+        Number(cu.site_id)     === locId
+      );
+    });
+  }, [controlUnits, isAdmin, currentUser]);
+
+  const availableSensors = useMemo(() => {
+    if (isAdmin) return sensors;
+    if (!currentUser?.location_id) return [];
+    const locId = Number(currentUser.location_id);
+    return sensors.filter(s =>
+      Number(s.location_id) === locId ||
+      Number(s.group_id)    === locId
+    );
+  }, [sensors, isAdmin, currentUser]);
+
+  const handleReportTypeChange = (key) => {
+    setReportType(key);
+    setSelectedLocation(null);
+    setSelectedControlUnit(null);
+    setSelectedSensor(null);
+    setExportError("");
+  };
+
+  useEffect(() => {
+    if (reportType === "location" && !selectedLocation && availableLocations.length > 0)
+      setSelectedLocation(availableLocations[0]);
+  }, [availableLocations, reportType]);
+
+  useEffect(() => {
+    if (reportType === "control_unit" && !selectedControlUnit && availableControlUnits.length > 0)
+      setSelectedControlUnit(availableControlUnits[0]);
+  }, [availableControlUnits, reportType]);
+
+  useEffect(() => {
+    if (reportType === "sensor" && !selectedSensor && availableSensors.length > 0)
+      setSelectedSensor(availableSensors[0]);
+  }, [availableSensors, reportType]);
+
+  const getPeriodLabel = () => {
+    if (periodKey === "custom" && customRange) {
+      const fmt = d => d.toLocaleDateString("ru-RU", { day: "2-digit", month: "2-digit", year: "2-digit" });
+      return `${fmt(customRange.start)} – ${fmt(customRange.end)}`;
+    }
+    return PERIOD_OPTIONS.find(p => p.key === periodKey)?.label || "—";
+  };
+
+  const getPeriodDescription = () => {
+    const map = {
+      "1d": "за 24 часа", "1w": "за неделю", "1m": "за месяц",
+      "2m": "за 2 месяца", "3m": "за 3 месяца", "6m": "за 6 месяцев",
+      "1y": "за год", "custom": "за выбранный период",
+    };
+    return map[periodKey] || "за период";
+  };
+
+  const handleExport = async () => {
+    setExportLoading(true);
+    setExportError("");
+
+    try {
+      const rtConfig = REPORT_TYPE_OPTIONS.find(r => r.key === reportType);
+      let entityId, entityName;
+
+      if (reportType === "location") {
+        if (!selectedLocation) throw new Error("Выберите локацию");
+        entityId   = selectedLocation.id;
+        entityName = selectedLocation.name || `Локация #${entityId}`;
+      } else if (reportType === "control_unit") {
+        if (!selectedControlUnit) throw new Error("Выберите ЦБУ");
+        entityId   = selectedControlUnit.id;
+        entityName = selectedControlUnit.name || selectedControlUnit.serial_number || `ЦБУ #${entityId}`;
+      } else {
+        if (!selectedSensor) throw new Error("Выберите датчик");
+        entityId   = selectedSensor.id;
+        entityName = selectedSensor.name || selectedSensor.serial_number || `Датчик #${entityId}`;
+      }
+
+      const isXlsx = exportFmt === "xlsx";
+
+      let params;
+      if (periodKey === "custom") {
+        if (!customRange?.start || !customRange?.end) throw new Error("Выберите диапазон дат");
+        params = new URLSearchParams({
+          period:     "custom",
+          start_date: customRange.start.toISOString().slice(0, 10),
+          end_date:   customRange.end.toISOString().slice(0, 10),
+          format:     isXlsx ? "xlsx" : "pdf",
+        });
+      } else {
+        params = new URLSearchParams({
+          period: PERIOD_API_MAP[periodKey] || "last_month",
+          format: isXlsx ? "xlsx" : "pdf",
+        });
+      }
+
+      const ext = isXlsx ? "xlsx" : "pdf";
+      const now = new Date();
+      const dateStr = now.toLocaleDateString("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric" });
+      const timeStr = now.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
+      const fallbackFilename = `report_${rtConfig.key}_${entityId}_${now.toISOString().slice(0,10)}.${ext}`;
+
+      const path = `/reports/${rtConfig.endpoint}/${entityId}?${params}`;
+
+      await downloadReport(path, fallbackFilename, isXlsx);
+
+      const newEntry = {
+        label: `${rtConfig.label} ${getPeriodDescription()} · ${entityName}`,
+        fmt:   isXlsx ? "XLSX" : "PDF",
+        date:  dateStr,
+        time:  timeStr,
+        color: isXlsx ? "#01e676" : "#ff5252",
+        icon:  rtConfig.key,
+      };
+
+      // FIX: обновляем историю и сразу сохраняем в localStorage
+      setExportHistory(prev => {
+        const updated = [newEntry, ...prev];
+        saveHistory(currentUser, updated);
+        return updated;
+      });
+
+    } catch (err) {
+      if (err.message?.startsWith("403")) {
+        setExportError("Нет доступа к этой сущности");
+      } else {
+        setExportError(err.message || "Ошибка экспорта");
+      }
+    } finally {
+      setExportLoading(false);
+    }
+  };
+
+  const hasSelection = (
+    (reportType === "location"     && selectedLocation)     ||
+    (reportType === "control_unit" && selectedControlUnit)  ||
+    (reportType === "sensor"       && selectedSensor)
+  );
+
+  const exportBtnLabel = exportLoading
+    ? "Загрузка..."
+    : exportFmt === "xlsx" ? "Экспортировать Excel" : "Экспортировать PDF";
+
+  return (
+    <div className="rp-card rp-export-card">
+      <h2 className="rp-card-title">Экспортировать данные</h2>
+
+      <div className="rp-format-row">
+        <button
+          className={`rp-format-btn rp-format-btn--pdf ${exportFmt === "pdf" ? "rp-format-btn--active" : ""}`}
+          onClick={() => setExportFmt("pdf")}
+        >
+          <IconPDF />
+          <span>PDF формат</span>
+        </button>
+        <button
+          className={`rp-format-btn rp-format-btn--excel ${exportFmt === "xlsx" ? "rp-format-btn--active" : ""}`}
+          onClick={() => setExportFmt("xlsx")}
+        >
+          <IconExcel />
+          <span>Excel формат</span>
+        </button>
+      </div>
+
+      <div className="rp-filter-label" style={{ marginTop: 14 }}>Тип отчёта</div>
+      <div className="rp-report-type-row">
+        {REPORT_TYPE_OPTIONS.map(opt => (
+          <button
+            key={opt.key}
+            className={`rp-report-type-btn ${reportType === opt.key ? "rp-report-type-btn--active" : ""}`}
+            onClick={() => handleReportTypeChange(opt.key)}
+          >
+            {opt.icon}
+            <span>{opt.label}</span>
+          </button>
+        ))}
+      </div>
+
+      <div className="rp-filter-label" style={{ marginTop: 12 }}>
+        {reportType === "location"     && "Локация"}
+        {reportType === "control_unit" && "ЦБУ (Центральный блок управления)"}
+        {reportType === "sensor"       && "Датчик"}
+      </div>
+
+      {reportType === "location" && (
+        <EntitySelector
+          value={selectedLocation}
+          onChange={setSelectedLocation}
+          items={availableLocations}
+          loading={loadingLocs}
+          error={locationsError}
+          placeholder="Выберите локацию"
+          icon={<IconLocation />}
+        />
+      )}
+      {reportType === "control_unit" && (
+        <EntitySelector
+          value={selectedControlUnit}
+          onChange={setSelectedControlUnit}
+          items={availableControlUnits}
+          loading={false}
+          error={null}
+          placeholder="Выберите ЦБУ"
+          icon={<IconBuilding />}
+        />
+      )}
+      {reportType === "sensor" && (
+        <EntitySelector
+          value={selectedSensor}
+          onChange={setSelectedSensor}
+          items={availableSensors}
+          loading={false}
+          error={null}
+          placeholder="Выберите датчик"
+          icon={<IconSensor />}
+        />
+      )}
+
+      <div className="rp-filter-label" style={{ marginTop: 12 }}>Период</div>
+      <div className="rp-period-quick">
+        {PERIOD_OPTIONS.filter(p => p.key !== "custom").map(p => (
+          <button key={p.key}
+            className={`rp-period-chip ${periodKey === p.key ? "rp-period-chip--active" : ""}`}
+            onClick={() => { setPeriodKey(p.key); setShowCalendar(false); setCustomRange(null); }}>
+            {p.label}
+          </button>
+        ))}
+        <button
+          className={`rp-period-chip ${periodKey === "custom" ? "rp-period-chip--active" : ""}`}
+          onClick={() => { setPeriodKey("custom"); setShowCalendar(s => !s); }}>
+          <IconCalendar />&nbsp;Свой диапазон
+        </button>
+      </div>
+
+      {showCalendar && periodKey === "custom" && (
+        <CalendarPicker onChange={range => { setCustomRange(range); setShowCalendar(false); }} />
+      )}
+
+      <div className="rp-period-field">
+        <IconEventNote />
+        <span className="rp-period-dates">{getPeriodLabel()}</span>
+        <span className="rp-period-label">Выбранный период</span>
+      </div>
+
+      {exportError && (
+        <div style={{ fontSize: "12px", color: "#ff5252", marginTop: 4 }}>{exportError}</div>
+      )}
+
+      <button
+        className="rp-export-btn"
+        onClick={handleExport}
+        disabled={exportLoading || !hasSelection}
+        title={!hasSelection ? "Выберите сущность для отчёта" : undefined}
+      >
+        <IconDownload />
+        <span>{exportBtnLabel}</span>
+      </button>
+    </div>
+  );
+}
+
 // ── Main Component ────────────────────────────────────────────────────────────
 export const Reports = () => {
-  const [alarms, setAlarms]         = useState([]);
-  const [loading, setLoading]       = useState(true);
-  const [loadError, setLoadError]   = useState("");
+  const [alarms, setAlarms]       = useState([]);
+  const [loading, setLoading]     = useState(true);
+  const [loadError, setLoadError] = useState("");
+
+  const [locations, setLocations]             = useState([]);
+  const [loadingLocs, setLoadingLocs]         = useState(true);
+  const [locationsError, setLocationsError]   = useState("");
+  const [sensors, setSensors]                 = useState([]);
+  const [controlUnits, setControlUnits]       = useState([]);
+  const [currentUser, setCurrentUser]         = useState(null);
+
+  const [tableLocation, setTableLocation] = useState(null);
 
   const [search, setSearch]                 = useState("");
   const [filterSeverity, setFilterSeverity] = useState("");
@@ -599,12 +1105,7 @@ export const Reports = () => {
   const [filterOpen, setFilterOpen]         = useState(false);
   const filterRef = useRef(null);
 
-  const [exportFmt, setExportFmt]         = useState("pdf");
-  const [periodKey, setPeriodKey]         = useState("1m");
-  const [showCalendar, setShowCalendar]   = useState(false);
-  const [customRange, setCustomRange]     = useState(null);
-  const [exportLoading, setExportLoading] = useState(false);
-  const [exportError, setExportError]     = useState("");
+  // FIX: история инициализируется из localStorage после загрузки пользователя
   const [exportHistory, setExportHistory] = useState([]);
 
   const [page, setPage]       = useState(1);
@@ -612,6 +1113,58 @@ export const Reports = () => {
   const [sortDir, setSortDir] = useState("desc");
 
   const ROWS_PER_PAGE = 10;
+
+  useEffect(() => {
+    const load = async () => {
+      setLoadingLocs(true);
+      setLocationsError("");
+      try {
+        const [locData, sensorData, userData] = await Promise.all([
+          apiRequest("/locations/"),
+          apiRequest("/sensors/"),
+          apiRequest("/users/me"),
+        ]);
+        setLocations(Array.isArray(locData) ? locData : []);
+        setSensors(Array.isArray(sensorData) ? sensorData : []);
+
+        const user = userData || null;
+        setCurrentUser(user);
+
+        // FIX: загружаем историю из localStorage сразу после получения данных пользователя
+        if (user) {
+          setExportHistory(loadHistory(user));
+        }
+
+        // FIX: пробуем загрузить ЦБУ сначала из /control-units/, потом из /groups/
+        // и логируем структуру для диагностики
+        try {
+          const cuData = await apiRequest("/control-units/");
+          const arr = Array.isArray(cuData) ? cuData : [];
+          if (arr.length > 0) {
+            console.debug("[Reports] ЦБУ поля первой записи:", Object.keys(arr[0]));
+          }
+          setControlUnits(arr);
+        } catch {
+          try {
+            const grpData = await apiRequest("/groups/");
+            const arr = Array.isArray(grpData) ? grpData : [];
+            if (arr.length > 0) {
+              console.debug("[Reports] Groups поля первой записи:", Object.keys(arr[0]));
+            }
+            setControlUnits(arr);
+          } catch {
+            setControlUnits([]);
+          }
+        }
+      } catch (err) {
+        setLocationsError("Не удалось загрузить данные");
+        console.error("Ошибка загрузки:", err.message);
+      } finally {
+        setLoadingLocs(false);
+      }
+    };
+    load();
+  }, []);
 
   const loadAlarms = useCallback(async () => {
     setLoading(true);
@@ -629,17 +1182,20 @@ export const Reports = () => {
   useEffect(() => { loadAlarms(); }, [loadAlarms]);
 
   useEffect(() => {
-    const unsub = wsService.on("alarm_updated", (event) => {
+    const unsubStatus = wsService.on("alarm_updated", (event) => {
       setAlarms(prev => prev.map(a =>
         a.id === event.alarm_id
           ? { ...a, status: event.new_status, resolved_at: event.resolved_at, user_comment: event.user_comment ?? a.user_comment }
           : a
       ));
     });
-    return () => unsub();
+    const unsubComment = wsService.on("alarm_comment_updated", (event) => {
+      setAlarms(prev => prev.map(a =>
+        a.id === event.alarm_id ? { ...a, user_comment: event.user_comment } : a
+      ));
+    });
+    return () => { unsubStatus(); unsubComment(); };
   }, []);
-
-  // Закрытие фильтр-панели при клике вне обрабатывается внутри FilterPanel (портал)
 
   const updateAlarm = useCallback((updated) => {
     if (!updated) return;
@@ -652,15 +1208,25 @@ export const Reports = () => {
     setPage(1);
   };
 
+  const locationSensorIds = useMemo(() => {
+    if (!tableLocation) return null;
+    return new Set(
+      sensors
+        .filter(s => Number(s.group_id) === Number(tableLocation.id))
+        .map(s => s.id)
+    );
+  }, [tableLocation, sensors]);
+
   const filtered = alarms.filter(a => {
+    if (locationSensorIds && !locationSensorIds.has(Number(a.sensor_id))) return false;
     if (search) {
       const q = search.toLowerCase();
       const typeLabel = ALARM_TYPE_MAP[a.alarm_type] || a.alarm_type || "";
       if (![String(a.id), typeLabel, a.description || "", a.user_comment || ""].some(v => v.toLowerCase().includes(q))) return false;
     }
-    if (filterSeverity && a.severity !== filterSeverity) return false;
-    if (filterStatus   && a.status   !== filterStatus)   return false;
-    if (filterType     && a.alarm_type !== filterType)   return false;
+    if (filterSeverity && a.severity    !== filterSeverity) return false;
+    if (filterStatus   && a.status      !== filterStatus)   return false;
+    if (filterType     && a.alarm_type  !== filterType)     return false;
     if (filterIdRange.from && a.id < parseInt(filterIdRange.from)) return false;
     if (filterIdRange.to   && a.id > parseInt(filterIdRange.to))   return false;
     return true;
@@ -675,7 +1241,7 @@ export const Reports = () => {
   });
 
   const totalPages = Math.max(1, Math.ceil(sorted.length / ROWS_PER_PAGE));
-  const pageData = sorted.slice((page - 1) * ROWS_PER_PAGE, page * ROWS_PER_PAGE);
+  const pageData   = sorted.slice((page - 1) * ROWS_PER_PAGE, page * ROWS_PER_PAGE);
 
   const activeFilters = [
     filterSeverity && { key: "severity", label: `Критичность: ${SEVERITY_MAP[filterSeverity]?.label}`, clear: () => setFilterSeverity("") },
@@ -684,62 +1250,10 @@ export const Reports = () => {
     (filterIdRange.from || filterIdRange.to) && { key: "id", label: `ID: ${filterIdRange.from || "—"} – ${filterIdRange.to || "—"}`, clear: () => setFilterIdRange({ from: "", to: "" }) },
   ].filter(Boolean);
 
-  const getPeriodLabel = () => {
-    if (periodKey === "custom" && customRange) {
-      const fmt = d => d.toLocaleDateString("ru-RU", { day: "2-digit", month: "2-digit", year: "2-digit" });
-      return `${fmt(customRange.start)} – ${fmt(customRange.end)}`;
-    }
-    return PERIOD_OPTIONS.find(p => p.key === periodKey)?.label || "—";
-  };
-
-  const getPeriodDescription = () => {
-    const map = { "1d": "за день", "1w": "за неделю", "1m": "за месяц", "1y": "за год", "custom": "за выбранный период" };
-    return map[periodKey] || "за период";
-  };
-
-  const handleExport = async () => {
-    setExportLoading(true);
-    setExportError("");
-    const fmt = exportFmt === "excel" ? "xlsx" : "pdf";
-    const now = new Date();
-    const dateStr = now.toLocaleDateString("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric" });
-    const timeStr = now.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
-
-    try {
-      if (periodKey === "custom" && customRange) {
-        const sensorId = alarms[0]?.sensor_id;
-        if (sensorId) {
-          const start = customRange.start.toISOString().slice(0, 10);
-          const end   = customRange.end.toISOString().slice(0, 10);
-          const params = new URLSearchParams({ period: "custom", start_date: start, end_date: end, format: fmt });
-          await downloadReport(`/reports/download-period/${sensorId}?${params}`, `report_alarms_${start}_${end}.${fmt}`);
-        } else {
-          throw new Error("Нет данных для экспорта");
-        }
-      } else {
-        const apiPeriod = PERIOD_API_MAP[periodKey] || "last_month";
-        const sensorId = alarms[0]?.sensor_id;
-        if (sensorId) {
-          const params = new URLSearchParams({ period: apiPeriod, format: fmt });
-          await downloadReport(`/reports/download-period/${sensorId}?${params}`, `report_alarms_${periodKey}.${fmt}`);
-        } else {
-          throw new Error("Нет данных для экспорта");
-        }
-      }
-
-      const color = exportFmt === "pdf" ? "#ff5252" : "#01e676";
-      setExportHistory(prev => [{
-        label: `Журнал событий ${getPeriodDescription()}`,
-        fmt: fmt.toUpperCase(),
-        date: dateStr,
-        time: timeStr,
-        color,
-      }, ...prev]);
-    } catch (err) {
-      setExportError(err.message || "Ошибка экспорта");
-    } finally {
-      setExportLoading(false);
-    }
+  // FIX: очистка истории с удалением из localStorage
+  const handleClearHistory = () => {
+    setExportHistory([]);
+    saveHistory(currentUser, []);
   };
 
   return (
@@ -753,17 +1267,22 @@ export const Reports = () => {
           </button>
         </div>
 
-        {loadError && (
-          <div className="rp-error-banner">{loadError}</div>
-        )}
+        {loadError && <div className="rp-error-banner">{loadError}</div>}
 
         <div className="rp-card rp-table-card">
           <div className="rp-table-topbar">
-            <h2 className="rp-card-title">
-              Журнал событий
-              {!loading && <span className="rp-alarm-count">{alarms.length}</span>}
-            </h2>
+            <h2 className="rp-card-title">Журнал событий</h2>
             <div className="rp-table-controls">
+              <div className="rp-table-location-wrap">
+                <LocationSelector
+                  value={tableLocation}
+                  onChange={(loc) => { setTableLocation(loc); setPage(1); }}
+                  locations={locations}
+                  loading={loadingLocs}
+                  error={locationsError}
+                  allLabel="Все локации"
+                />
+              </div>
               <div className="rp-search-box">
                 <IconSearch />
                 <input
@@ -774,7 +1293,6 @@ export const Reports = () => {
                 />
                 {search && <button className="rp-search-clear" onClick={() => setSearch("")}><IconX /></button>}
               </div>
-
               <div className="rp-filter-wrap" ref={filterRef}>
                 <button
                   className={`rp-filter-btn ${activeFilters.length ? "rp-filter-btn--active" : ""}`}
@@ -783,29 +1301,22 @@ export const Reports = () => {
                   <IconFilter />
                   {activeFilters.length > 0 && <span className="rp-filter-badge">{activeFilters.length}</span>}
                 </button>
-
-                {/* Portal: рендерим панель прямо в document.body,
-                    позицию вычисляем по координатам кнопки.
-                    Это гарантирует, что никакой overflow/z-index родителя
-                    не обрежет панель и она всегда будет поверх всех блоков. */}
-                {filterOpen && <FilterPanel
-                  anchorRef={filterRef}
-                  onClose={() => setFilterOpen(false)}
-                  filterIdRange={filterIdRange}
-                  setFilterIdRange={setFilterIdRange}
-                  filterSeverity={filterSeverity}
-                  setFilterSeverity={setFilterSeverity}
-                  filterType={filterType}
-                  setFilterType={setFilterType}
-                  filterStatus={filterStatus}
-                  setFilterStatus={setFilterStatus}
-                  activeFilters={activeFilters}
-                  setPage={setPage}
-                  onClearAll={() => {
-                    setFilterSeverity(""); setFilterStatus(""); setFilterType("");
-                    setFilterIdRange({ from: "", to: "" }); setPage(1);
-                  }}
-                />}
+                {filterOpen && (
+                  <FilterPanel
+                    anchorRef={filterRef}
+                    onClose={() => setFilterOpen(false)}
+                    filterIdRange={filterIdRange}   setFilterIdRange={setFilterIdRange}
+                    filterSeverity={filterSeverity} setFilterSeverity={setFilterSeverity}
+                    filterType={filterType}         setFilterType={setFilterType}
+                    filterStatus={filterStatus}     setFilterStatus={setFilterStatus}
+                    activeFilters={activeFilters}
+                    setPage={setPage}
+                    onClearAll={() => {
+                      setFilterSeverity(""); setFilterStatus(""); setFilterType("");
+                      setFilterIdRange({ from: "", to: "" }); setPage(1);
+                    }}
+                  />
+                )}
               </div>
             </div>
           </div>
@@ -826,9 +1337,7 @@ export const Reports = () => {
           </div>
 
           <div className="rp-table-body">
-            {loading && (
-              <div className="rp-empty-state">Загрузка событий...</div>
-            )}
+            {loading && <div className="rp-empty-state">Загрузка событий...</div>}
             {!loading && pageData.length === 0 && (
               <div className="rp-empty-state">
                 {alarms.length === 0 ? "Нет тревог" : "Нет событий, соответствующих фильтрам"}
@@ -841,19 +1350,10 @@ export const Reports = () => {
                 <div key={row.id} className="rp-table-row">
                   <div className="rp-td">{row.id}</div>
                   <div className="rp-td" style={{ color: sev.color }}>{sev.label}</div>
-                  <div className="rp-td rp-td--gap">
-                    <IconMessage />
-                    {typeLabel}
-                  </div>
-                  <div className="rp-td" style={{ color: "#929292" }}>
-                    #{row.sensor_id}
-                  </div>
-                  <div className="rp-td">
-                    <DescriptionCell alarm={row} onUpdate={updateAlarm} />
-                  </div>
-                  <div className="rp-td">
-                    <StatusPicker alarm={row} onUpdate={updateAlarm} />
-                  </div>
+                  <div className="rp-td rp-td--gap"><IconMessage />{typeLabel}</div>
+                  <div className="rp-td" style={{ color: "#929292" }}>#{row.sensor_id}</div>
+                  <div className="rp-td"><DescriptionCell alarm={row} onUpdate={updateAlarm} /></div>
+                  <div className="rp-td"><StatusPicker alarm={row} onUpdate={updateAlarm} /></div>
                   <div className="rp-td">{formatDateTime(row.timestamp)}</div>
                   <div className="rp-td">{formatDateTime(row.resolved_at)}</div>
                 </div>
@@ -872,60 +1372,34 @@ export const Reports = () => {
         </div>
 
         <div className="rp-bottom-row">
-          <div className="rp-card rp-export-card">
-            <h2 className="rp-card-title">Экспортировать данные</h2>
-
-            <div className="rp-format-row">
-              <button className={`rp-format-btn ${exportFmt === "pdf" ? "rp-format-btn--active" : ""}`}
-                onClick={() => setExportFmt("pdf")}>
-                <IconPDF />
-                <span>PDF формат</span>
-              </button>
-              <button className={`rp-format-btn ${exportFmt === "excel" ? "rp-format-btn--active rp-format-btn--excel" : ""}`}
-                onClick={() => setExportFmt("excel")}>
-                <IconExcel />
-                <span>Excel формат</span>
-              </button>
-            </div>
-
-            <div className="rp-filter-label" style={{ marginTop: 4 }}>Период</div>
-            <div className="rp-period-quick">
-              {PERIOD_OPTIONS.filter(p => p.key !== "custom").map(p => (
-                <button key={p.key}
-                  className={`rp-period-chip ${periodKey === p.key ? "rp-period-chip--active" : ""}`}
-                  onClick={() => { setPeriodKey(p.key); setShowCalendar(false); setCustomRange(null); }}>
-                  {p.label}
-                </button>
-              ))}
-              <button
-                className={`rp-period-chip ${periodKey === "custom" ? "rp-period-chip--active" : ""}`}
-                onClick={() => { setPeriodKey("custom"); setShowCalendar(s => !s); }}>
-                <IconCalendar />&nbsp;Свой диапазон
-              </button>
-            </div>
-
-            {showCalendar && periodKey === "custom" && (
-              <CalendarPicker onChange={range => { setCustomRange(range); setShowCalendar(false); }} />
-            )}
-
-            <div className="rp-period-field">
-              <IconEventNote />
-              <span className="rp-period-dates">{getPeriodLabel()}</span>
-              <span className="rp-period-label">Выбранный период</span>
-            </div>
-
-            {exportError && (
-              <div style={{ fontSize: "12px", color: "#ff5252" }}>{exportError}</div>
-            )}
-
-            <button className="rp-export-btn" onClick={handleExport} disabled={exportLoading}>
-              <IconDownload />
-              <span>{exportLoading ? "Загрузка..." : `Экспортировать  ${exportFmt.toUpperCase()}`}</span>
-            </button>
-          </div>
+          <ExportCard
+            locations={locations}
+            loadingLocs={loadingLocs}
+            locationsError={locationsError}
+            sensors={sensors}
+            controlUnits={controlUnits}
+            currentUser={currentUser}
+            exportHistory={exportHistory}
+            setExportHistory={setExportHistory}
+          />
 
           <div className="rp-card rp-history-card">
-            <h2 className="rp-card-title">История экспорта</h2>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <h2 className="rp-card-title">История экспорта</h2>
+              {exportHistory.length > 0 && (
+                <button
+                  onClick={handleClearHistory}
+                  title="Очистить историю"
+                  style={{
+                    display: "flex", alignItems: "center", gap: 4,
+                    background: "none", border: "none", cursor: "pointer",
+                    color: "#929292", fontSize: "12px", padding: "2px 6px",
+                  }}
+                >
+                  <IconTrash /> Очистить
+                </button>
+              )}
+            </div>
             {exportHistory.length === 0 && (
               <div className="rp-empty-state" style={{ marginTop: 16 }}>Нет истории</div>
             )}
@@ -933,8 +1407,8 @@ export const Reports = () => {
               {exportHistory.map((item, i) => (
                 <li key={i} className="rp-history-item">
                   <div className="rp-history-timeline">
-                    <span className="rp-history-dot" style={{ background: item.color }}/>
-                    {i < exportHistory.length - 1 && <span className="rp-history-line"/>}
+                    <span className="rp-history-dot" style={{ background: item.color }} />
+                    {i < exportHistory.length - 1 && <span className="rp-history-line" />}
                   </div>
                   <div className="rp-history-text">
                     <div className="rp-history-label-row">

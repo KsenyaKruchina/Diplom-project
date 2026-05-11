@@ -17,7 +17,20 @@ const apiFetch = async (path, opts = {}) => {
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
-    throw new Error(err.detail || `Ошибка ${res.status}`);
+    // FastAPI validation errors: detail is an array of {loc, msg, type}
+    let message;
+    if (Array.isArray(err.detail)) {
+      message = err.detail
+        .map(e => {
+          const field = Array.isArray(e.loc) ? e.loc.filter(l => l !== "body").join(".") : "";
+          return field ? `${field}: ${e.msg}` : e.msg;
+        })
+        .join("; ");
+    } else {
+      message = err.detail || `Ошибка ${res.status}`;
+    }
+    console.error(`API error ${res.status} on ${path}:`, err);
+    throw new Error(message);
   }
   return res.json();
 };
@@ -47,9 +60,11 @@ const IconGSM       = () => <svg width="14" height="14" viewBox="0 0 16 16" fill
 const IconSim       = () => <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><rect x="3" y="1.5" width="10" height="13" rx="2" stroke="#ffc207" strokeWidth="1.3"/><rect x="5.5" y="6" width="2" height="2" rx="0.5" fill="#ffc207"/><rect x="8.5" y="6" width="2" height="2" rx="0.5" fill="#ffc207"/><rect x="5.5" y="9" width="2" height="2" rx="0.5" fill="#ffc207"/><rect x="8.5" y="9" width="2" height="2" rx="0.5" fill="#ffc207"/><path d="M6 1.5V4h4V1.5" stroke="#ffc207" strokeWidth="1.3"/></svg>;
 const IconPower     = ({ on }) => <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M8 2v5M5 4a5 5 0 1 0 6 0" stroke={on ? "#01e676" : "#555"} strokeWidth="1.4" strokeLinecap="round"/></svg>;
 const IconEdit      = () => <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#929292" strokeWidth="2.2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>;
+const IconTrash     = () => <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#ff5b5b" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>;
 const IconDrag      = () => <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><circle cx="5.5" cy="4" r="1" fill="#555"/><circle cx="10.5" cy="4" r="1" fill="#555"/><circle cx="5.5" cy="8" r="1" fill="#555"/><circle cx="10.5" cy="8" r="1" fill="#555"/><circle cx="5.5" cy="12" r="1" fill="#555"/><circle cx="10.5" cy="12" r="1" fill="#555"/></svg>;
 const IconMapPin    = () => <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M8 1a5 5 0 0 1 5 5c0 4-5 9-5 9S3 10 3 6a5 5 0 0 1 5-5z" stroke="#929292" strokeWidth="1.3"/><circle cx="8" cy="6" r="1.5" fill="#929292"/></svg>;
 const IconPlus      = () => <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><line x1="8" y1="3" x2="8" y2="13" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/><line x1="3" y1="8" x2="13" y2="8" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>;
+const IconBlock     = () => <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><rect x="1" y="1" width="6" height="6" rx="1.5" stroke="currentColor" strokeWidth="1.5"/><rect x="9" y="1" width="6" height="6" rx="1.5" stroke="currentColor" strokeWidth="1.5"/><rect x="1" y="9" width="6" height="6" rx="1.5" stroke="currentColor" strokeWidth="1.5"/><rect x="9" y="9" width="6" height="6" rx="1.5" stroke="currentColor" strokeWidth="1.5"/></svg>;
 
 // ─── Sparkline ────────────────────────────────────────────────────────────────
 const Sparkline = ({ color, data, sensor, type }) => {
@@ -207,8 +222,182 @@ const ChartLegend = ({ sensor, type }) => {
   );
 };
 
+// ─── ThresholdTable ───────────────────────────────────────────────────────────
+const ThresholdTable = ({ form, setVal, type }) => {
+  const unit = type === "temp" ? "°C" : "%";
+  const prefix = type === "temp" ? "temp" : "hum";
+
+  const levels = [
+    { key: "normal",  color: "#01e676", bg: "#0d2318", label: "🟢 Норма" },
+    { key: "warning", color: "#ffd550", bg: "#29220a", label: "🟡 Внимание" },
+    { key: "alarm",   color: "#ff5b5b", bg: "#2a100f", label: "🔴 Тревога" },
+  ];
+
+  const NumInput = ({ fkey, placeholder, color }) => (
+    <input
+      className="sn-th-input"
+      type="text"
+      inputMode="decimal"
+      value={form[fkey] === null ? "" : form[fkey]}
+      onChange={e => setVal(fkey, e.target.value)}
+      placeholder={placeholder}
+      style={{ "--inp-focus": color }}
+    />
+  );
+
+  return (
+    <div className="sn-th-table">
+      <div className="sn-th-header-row">
+        <div className="sn-th-col-level">Уровень</div>
+        <div className="sn-th-col-minmax">
+          <span>Мин {unit}</span>
+          <span className="sn-th-range-sep">—</span>
+          <span>Макс {unit}</span>
+        </div>
+      </div>
+      {levels.map(({ key, color, bg, label }) => (
+        <div key={key} className="sn-th-row" style={{ background: bg, borderLeft: `3px solid ${color}22` }}>
+          <div className="sn-th-col-level">
+            <span className="sn-th-level-dot" style={{ background: color }}/>
+            <span className="sn-th-level-label" style={{ color }}>{label}</span>
+          </div>
+          <div className="sn-th-col-minmax">
+            <NumInput fkey={`${key}_min_${prefix}`} placeholder="—" color={color}/>
+            <span className="sn-th-range-sep" style={{ color: "#444" }}>—</span>
+            <NumInput fkey={`${key}_max_${prefix}`} placeholder="—" color={color}/>
+          </div>
+        </div>
+      ))}
+      <div className="sn-th-hint">
+        Пустое поле = порог не задан. Значения можно оставить частичными (только макс., только мин.).
+      </div>
+    </div>
+  );
+};
+
+// ─── Modal: Подтверждение удаления ───────────────────────────────────────────
+const ConfirmModal = ({ title, message, confirmLabel = "Удалить", onClose, onConfirm }) => {
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState("");
+
+  const handleConfirm = async () => {
+    setLoading(true);
+    setErr("");
+    try {
+      await onConfirm();
+      onClose();
+    } catch (e) { setErr(e.message); }
+    finally { setLoading(false); }
+  };
+
+  return (
+    <div className="sn-overlay" onClick={onClose}>
+      <div className="sn-modal sn-modal--narrow" onClick={e => e.stopPropagation()}>
+        <div className="sn-modal-header">
+          <div>
+            <h3 className="sn-modal-title">{title}</h3>
+          </div>
+          <button className="sn-modal-close" onClick={onClose}><IconClose/></button>
+        </div>
+        <div className="sn-modal-body">
+          <p style={{ color: "#929292", fontSize: 13, lineHeight: 1.6, margin: 0 }}>{message}</p>
+          {err && <div className="sn-modal-error" style={{ marginTop: 12 }}>{err}</div>}
+        </div>
+        <div className="sn-modal-footer">
+          <button className="sn-btn-cancel" onClick={onClose}>Отмена</button>
+          <button
+            className="sn-btn-delete"
+            onClick={handleConfirm}
+            disabled={loading}
+          >
+            {loading ? "Удаление..." : confirmLabel}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ─── Modal: Редактировать ЦБУ ─────────────────────────────────────────────────
+// PATCH /api/v1/control-units/{control_unit_id}
+const EditBlockModal = ({ block, locations, onClose, onSave }) => {
+  const [form, setForm] = useState({
+    name:        block?.name        ?? "",
+    location_id: block?.location_id ?? block?.group_id ?? "",
+  });
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState("");
+
+  const setVal = (k, v) => setForm(f => ({ ...f, [k]: v }));
+
+  const handleSave = async () => {
+    if (!form.name.trim())   { setErr("Введите название ЦБУ"); return; }
+    if (!form.location_id)   { setErr("Выберите локацию"); return; }
+    setLoading(true);
+    setErr("");
+    try {
+      await onSave({
+        name:        form.name.trim(),
+        location_id: Number(form.location_id),
+        group_id:    Number(form.location_id),
+      });
+      onClose();
+    } catch (e) { setErr(e.message); }
+    finally { setLoading(false); }
+  };
+
+  return (
+    <div className="sn-overlay" onClick={onClose}>
+      <div className="sn-modal" onClick={e => e.stopPropagation()}>
+        <div className="sn-modal-header">
+          <div>
+            <h3 className="sn-modal-title">Редактировать ЦБУ</h3>
+            <div className="sn-modal-subtitle">ID: {block?.id}</div>
+          </div>
+          <button className="sn-modal-close" onClick={onClose}><IconClose/></button>
+        </div>
+        <div className="sn-modal-body">
+          <div className="sn-field" style={{ marginBottom: 16 }}>
+            <label className="sn-field-label">Название ЦБУ <span style={{ color: "#ff5b5b" }}>*</span></label>
+            <input
+              className="sn-field-input"
+              type="text"
+              value={form.name}
+              onChange={e => setVal("name", e.target.value)}
+              autoFocus
+              style={{ width: "100%" }}
+            />
+          </div>
+          <div className="sn-field">
+            <label className="sn-field-label">Локация <span style={{ color: "#ff5b5b" }}>*</span></label>
+            <select
+              className="sn-field-input sn-field-select"
+              value={form.location_id}
+              onChange={e => setVal("location_id", e.target.value)}
+              style={{ width: "100%" }}
+            >
+              {locations.map(loc => (
+                <option key={loc.id} value={loc.id}>{loc.name}</option>
+              ))}
+            </select>
+          </div>
+          {err && <div className="sn-modal-error" style={{ marginTop: 12 }}>{err}</div>}
+        </div>
+        <div className="sn-modal-footer">
+          <button className="sn-btn-cancel" onClick={onClose}>Отмена</button>
+          <button className="sn-btn-save" onClick={handleSave} disabled={loading}>
+            {loading ? "Сохранение..." : "Сохранить"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // ─── Modal: Thresholds ────────────────────────────────────────────────────────
+// ИСПРАВЛЕНО: используем PATCH /api/v1/sensors/{id}/thresholds
 const ThresholdsModal = ({ sensor, onClose, onSave }) => {
+  const [activeTab, setActiveTab] = useState("temp");
   const [form, setForm] = useState({
     alarm_min_temp:   sensor?.alarm_min_temp   ?? "",
     alarm_max_temp:   sensor?.alarm_max_temp   ?? "",
@@ -230,6 +419,7 @@ const ThresholdsModal = ({ sensor, onClose, onSave }) => {
 
   const handleSave = async () => {
     setLoading(true);
+    setErr("");
     try {
       await onSave({
         alarm_min_temp:   parseOpt(form.alarm_min_temp),
@@ -250,76 +440,26 @@ const ThresholdsModal = ({ sensor, onClose, onSave }) => {
     finally { setLoading(false); }
   };
 
-  const NF = ({ label, fkey, color }) => (
-    <div className="sn-field">
-      <label className="sn-field-label" style={{ color: color || undefined }}>{label}</label>
-      <input 
-        className="sn-field-input" 
-        type="text" 
-        inputMode="decimal"
-        value={form[fkey] === null ? "" : form[fkey]}
-        onChange={e => setVal(fkey, e.target.value)}
-        placeholder="—"
-        style={{ 
-          borderColor: form[fkey] !== "" && form[fkey] !== null && form[fkey] !== undefined ? (color + "66") : undefined,
-          width: "100%"
-        }}
-      />
-    </div>
-  );
-
   return (
     <div className="sn-overlay" onClick={onClose}>
       <div className="sn-modal" onClick={e => e.stopPropagation()}>
         <div className="sn-modal-header">
-          <h3 className="sn-modal-title">Пороговые значения — {sensor?.name}</h3>
+          <div>
+            <h3 className="sn-modal-title">Пороговые значения</h3>
+            <div className="sn-modal-subtitle">{sensor?.name} · ID {sensor?.id}</div>
+          </div>
           <button className="sn-modal-close" onClick={onClose}><IconClose/></button>
         </div>
-        <div className="sn-modal-body">
-          <div className="sn-modal-section-title">🌡 Температура (°C)</div>
-          <div className="sn-threshold-section">
-            <div className="sn-threshold-title" style={{ color: "#01e676" }}>🟢 Норма</div>
-            <div className="sn-field-grid">
-              <NF label="Мин." fkey="normal_min_temp" color="#01e676"/>
-              <NF label="Макс." fkey="normal_max_temp" color="#01e676"/>
-            </div>
-          </div>
-          <div className="sn-threshold-section">
-            <div className="sn-threshold-title" style={{ color: "#ffd550" }}>🟡 Внимание</div>
-            <div className="sn-field-grid">
-              <NF label="Мин." fkey="warning_min_temp" color="#ffd550"/>
-              <NF label="Макс." fkey="warning_max_temp" color="#ffd550"/>
-            </div>
-          </div>
-          <div className="sn-threshold-section">
-            <div className="sn-threshold-title" style={{ color: "#ff5b5b" }}>🔴 Тревога</div>
-            <div className="sn-field-grid">
-              <NF label="Мин." fkey="alarm_min_temp" color="#ff5b5b"/>
-              <NF label="Макс." fkey="alarm_max_temp" color="#ff5b5b"/>
-            </div>
-          </div>
-          <div className="sn-modal-section-title" style={{ marginTop: 8 }}>💧 Влажность (%)</div>
-          <div className="sn-threshold-section">
-            <div className="sn-threshold-title" style={{ color: "#01e676" }}>🟢 Норма</div>
-            <div className="sn-field-grid">
-              <NF label="Мин." fkey="normal_min_hum" color="#01e676"/>
-              <NF label="Макс." fkey="normal_max_hum" color="#01e676"/>
-            </div>
-          </div>
-          <div className="sn-threshold-section">
-            <div className="sn-threshold-title" style={{ color: "#ffd550" }}>🟡 Внимание</div>
-            <div className="sn-field-grid">
-              <NF label="Мин." fkey="warning_min_hum" color="#ffd550"/>
-              <NF label="Макс." fkey="warning_max_hum" color="#ffd550"/>
-            </div>
-          </div>
-          <div className="sn-threshold-section">
-            <div className="sn-threshold-title" style={{ color: "#ff5b5b" }}>🔴 Тревога</div>
-            <div className="sn-field-grid">
-              <NF label="Мин." fkey="alarm_min_hum" color="#ff5b5b"/>
-              <NF label="Макс." fkey="alarm_max_hum" color="#ff5b5b"/>
-            </div>
-          </div>
+        <div className="sn-modal-tabs">
+          <button className={`sn-modal-tab ${activeTab === "temp" ? "sn-modal-tab--active" : ""}`} onClick={() => setActiveTab("temp")}>
+            🌡 Температура
+          </button>
+          <button className={`sn-modal-tab ${activeTab === "hum" ? "sn-modal-tab--active" : ""}`} onClick={() => setActiveTab("hum")}>
+            💧 Влажность
+          </button>
+        </div>
+        <div className="sn-modal-body" style={{ paddingTop: 16 }}>
+          <ThresholdTable form={form} setVal={setVal} type={activeTab} />
           {err && <div className="sn-modal-error">{err}</div>}
         </div>
         <div className="sn-modal-footer">
@@ -333,11 +473,163 @@ const ThresholdsModal = ({ sensor, onClose, onSave }) => {
   );
 };
 
-// ─── Modal: Добавить датчик ─────────────────────────────────
-const AddSensorModal = ({ locations, defaultLocationId, onClose, onSave }) => {
+// ─── Modal: Создать ЦБУ ────────────────────────────────────────────────────────
+// ИСПРАВЛЕНО: POST /api/v1/control-units/register
+// Поля: control_unit_id (строка), name, location_id
+const CreateBlockModal = ({ locations, onClose, onSave }) => {
   const [form, setForm] = useState({
+    control_unit_id: "",
+    serial_number: "",
     name: "",
-    group_id: defaultLocationId ?? locations[0]?.id ?? "",
+    location_id: locations[0]?.id ?? "",
+  });
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState("");
+
+  const setVal = (k, v) => setForm(f => ({ ...f, [k]: v }));
+
+  const handleSave = async () => {
+    if (!form.control_unit_id.trim()) { setErr("Введите ID блока"); return; }
+    if (!form.serial_number.trim())   { setErr("Введите серийный номер"); return; }
+    if (!form.name.trim())            { setErr("Введите название ЦБУ"); return; }
+    if (!form.location_id)            { setErr("Выберите локацию"); return; }
+    setLoading(true);
+    setErr("");
+    try {
+      await onSave({
+        control_unit_id: form.control_unit_id.trim(),
+        serial_number:   form.serial_number.trim(),
+        name:            form.name.trim(),
+        location_id:     Number(form.location_id),
+        group_id:        Number(form.location_id),
+      });
+      onClose();
+    } catch (e) { setErr(e.message); }
+    finally { setLoading(false); }
+  };
+
+  return (
+    <div className="sn-overlay" onClick={onClose}>
+      <div className="sn-modal" onClick={e => e.stopPropagation()}>
+        <div className="sn-modal-header">
+          <div>
+            <h3 className="sn-modal-title">Создать ЦБУ</h3>
+            <div className="sn-modal-subtitle">Центральный Блок Управления</div>
+          </div>
+          <button className="sn-modal-close" onClick={onClose}><IconClose/></button>
+        </div>
+
+        <div className="sn-modal-body">
+          <div className="sn-cbu-preview">
+            <div className="sn-cbu-preview-row">
+              <span className="sn-cbu-preview-field">
+                <span className="sn-cbu-preview-label">ID блока</span>
+                <span className="sn-cbu-preview-val sn-cbu-preview-val--id">
+                  {form.control_unit_id || "—"}
+                </span>
+              </span>
+              <span className="sn-cbu-preview-field">
+                <span className="sn-cbu-preview-label">Серийный №</span>
+                <span className="sn-cbu-preview-val sn-cbu-preview-val--id">
+                  {form.serial_number || "—"}
+                </span>
+              </span>
+              <span className="sn-cbu-preview-field">
+                <span className="sn-cbu-preview-label">Локация</span>
+                <span className="sn-cbu-preview-val">
+                  {form.location_id
+                    ? locations.find(l => l.id === Number(form.location_id))?.name ?? "—"
+                    : "—"}
+                </span>
+              </span>
+              <span className="sn-cbu-preview-field">
+                <span className="sn-cbu-preview-label">Название</span>
+                <span className="sn-cbu-preview-val">{form.name || "—"}</span>
+              </span>
+            </div>
+          </div>
+
+          <div className="sn-field-grid" style={{ marginTop: 20 }}>
+            <div className="sn-field">
+              <label className="sn-field-label">ID блока <span style={{ color: "#ff5b5b" }}>*</span></label>
+              <input
+                className="sn-field-input sn-field-input--mono"
+                type="text"
+                placeholder="Напр.: CBU-001, B42"
+                value={form.control_unit_id}
+                onChange={e => setVal("control_unit_id", e.target.value)}
+                autoFocus
+                style={{ width: "100%" }}
+              />
+            </div>
+            <div className="sn-field">
+              <label className="sn-field-label">Серийный номер <span style={{ color: "#ff5b5b" }}>*</span></label>
+              <input
+                className="sn-field-input sn-field-input--mono"
+                type="text"
+                placeholder="Напр.: SN-123456"
+                value={form.serial_number}
+                onChange={e => setVal("serial_number", e.target.value)}
+                style={{ width: "100%" }}
+              />
+            </div>
+          </div>
+
+          <div className="sn-field-grid">
+            <div className="sn-field">
+              <label className="sn-field-label">Название ЦБУ <span style={{ color: "#ff5b5b" }}>*</span></label>
+              <input
+                className="sn-field-input"
+                type="text"
+                placeholder="Напр.: Склад А, Холодная зона"
+                value={form.name}
+                onChange={e => setVal("name", e.target.value)}
+                style={{ width: "100%" }}
+              />
+            </div>
+            <div className="sn-field">
+              <label className="sn-field-label">Локация <span style={{ color: "#ff5b5b" }}>*</span></label>
+              <select
+                className="sn-field-input sn-field-select"
+                value={form.location_id}
+                onChange={e => setVal("location_id", e.target.value)}
+                style={{ width: "100%" }}
+              >
+                {locations.map(loc => (
+                  <option key={loc.id} value={loc.id}>{loc.name}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="sn-add-info-box" style={{ marginTop: 8 }}>
+            <span style={{ fontSize: 11, color: "#929292", lineHeight: 1.6 }}>
+              ID и серийный номер берутся с физического устройства. После создания ЦБУ можно добавлять датчики.
+            </span>
+          </div>
+
+          {err && <div className="sn-modal-error">{err}</div>}
+        </div>
+
+        <div className="sn-modal-footer">
+          <button className="sn-btn-cancel" onClick={onClose}>Отмена</button>
+          <button className="sn-btn-save" onClick={handleSave} disabled={loading}>
+            {loading ? "Создание..." : "Создать ЦБУ"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ─── Modal: Добавить датчик ─────────────────────────────────
+// ИСПРАВЛЕНО: POST /api/v1/sensors/create_sensor
+// Поля: sensor_id (строка), name, control_unit_id + опциональные пороги
+const AddSensorModal = ({ locations, blocks, defaultBlockId, onClose, onSave }) => {
+  const [form, setForm] = useState({
+    sensor_id: "",
+    name: "",
+    control_unit_id: defaultBlockId ?? blocks[0]?.id ?? "",
     normal_min_temp: "", normal_max_temp: "",
     warning_min_temp: "", warning_max_temp: "",
     alarm_min_temp: "", alarm_max_temp: "",
@@ -345,21 +637,30 @@ const AddSensorModal = ({ locations, defaultLocationId, onClose, onSave }) => {
     warning_min_hum: "", warning_max_hum: "",
     alarm_min_hum: "", alarm_max_hum: "",
   });
+  const [activeTab, setActiveTab] = useState("info");
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
 
   const setVal = (k, v) => setForm(f => ({ ...f, [k]: v }));
   const parseOpt = v => (v === "" || v == null) ? null : parseFloat(v);
 
+  // Найти выбранный блок и его локацию для отображения в превью
+  const selectedBlock = blocks.find(b => String(b.id) === String(form.control_unit_id));
+  const selectedLoc   = selectedBlock
+    ? locations.find(l => l.id === (selectedBlock.location_id ?? selectedBlock.group_id))
+    : null;
+
   const handleSave = async () => {
-    if (!form.name.trim()) { setErr("Введите название датчика"); return; }
-    if (!form.group_id) { setErr("Выберите локацию"); return; }
+    if (!form.sensor_id.trim())     { setErr("Введите ID датчика"); return; }
+    if (!form.name.trim())          { setErr("Введите название датчика"); return; }
+    if (!form.control_unit_id)      { setErr("Выберите блок (ЦБУ)"); return; }
     setLoading(true);
     setErr("");
     try {
       await onSave({
-        name: form.name.trim(),
-        group_id: Number(form.group_id),
+        sensor_id:        form.sensor_id.trim(),
+        name:             form.name.trim(),
+        control_unit_id:  form.control_unit_id,   // строка — ID ЦБУ
         normal_min_temp:  parseOpt(form.normal_min_temp),
         normal_max_temp:  parseOpt(form.normal_max_temp),
         warning_min_temp: parseOpt(form.warning_min_temp),
@@ -378,111 +679,114 @@ const AddSensorModal = ({ locations, defaultLocationId, onClose, onSave }) => {
     finally { setLoading(false); }
   };
 
-  const NF = ({ label, fkey, color, placeholder }) => (
-    <div className="sn-field">
-      <label className="sn-field-label" style={{ color: color || undefined }}>{label}</label>
-      <input
-        className="sn-field-input"
-        type="text"
-        inputMode="decimal"
-        value={form[fkey]}
-        onChange={e => setVal(fkey, e.target.value)}
-        placeholder={placeholder ?? "—"}
-        style={{ 
-          borderColor: form[fkey] !== "" && color ? (color + "55") : undefined,
-          width: "100%"
-        }}
-      />
-    </div>
-  );
-
   return (
     <div className="sn-overlay" onClick={onClose}>
       <div className="sn-modal sn-modal--wide" onClick={e => e.stopPropagation()}>
         <div className="sn-modal-header">
-          <h3 className="sn-modal-title">Добавить датчик</h3>
+          <div>
+            <h3 className="sn-modal-title">Добавить датчик</h3>
+            <div className="sn-modal-subtitle">
+              {selectedBlock ? `ЦБУ: ${selectedBlock.name} · ID ${selectedBlock.id}` : "Выберите ЦБУ"}
+            </div>
+          </div>
           <button className="sn-modal-close" onClick={onClose}><IconClose/></button>
         </div>
 
+        <div className="sn-modal-tabs">
+          <button className={`sn-modal-tab ${activeTab === "info" ? "sn-modal-tab--active" : ""}`} onClick={() => setActiveTab("info")}>
+            Основное
+          </button>
+          <button className={`sn-modal-tab ${activeTab === "temp" ? "sn-modal-tab--active" : ""}`} onClick={() => setActiveTab("temp")}>
+            🌡 Пороги темп.
+          </button>
+          <button className={`sn-modal-tab ${activeTab === "hum" ? "sn-modal-tab--active" : ""}`} onClick={() => setActiveTab("hum")}>
+            💧 Пороги влаж.
+          </button>
+        </div>
+
         <div className="sn-modal-body">
-          <div className="sn-field">
-            <label className="sn-field-label">Название датчика *</label>
-            <input
-              className="sn-field-input"
-              type="text"
-              placeholder="Напр.: Стеллаж А1, Зона хранения"
-              value={form.name}
-              onChange={e => setVal("name", e.target.value)}
-              autoFocus
-              style={{ width: "100%" }}
-            />
-          </div>
+          {activeTab === "info" && (
+            <>
+              <div className="sn-cbu-preview sn-cbu-preview--sensor">
+                <div className="sn-cbu-preview-row">
+                  <span className="sn-cbu-preview-field">
+                    <span className="sn-cbu-preview-label">ID датчика</span>
+                    <span className="sn-cbu-preview-val sn-cbu-preview-val--id">
+                      {form.sensor_id || "—"}
+                    </span>
+                  </span>
+                  <span className="sn-cbu-preview-field">
+                    <span className="sn-cbu-preview-label">Название</span>
+                    <span className="sn-cbu-preview-val">{form.name || "—"}</span>
+                  </span>
+                  <span className="sn-cbu-preview-field">
+                    <span className="sn-cbu-preview-label">ЦБУ</span>
+                    <span className="sn-cbu-preview-val">{selectedBlock?.name ?? "—"}</span>
+                  </span>
+                </div>
+              </div>
 
-          <div className="sn-field">
-            <label className="sn-field-label">Локация *</label>
-            <select
-              className="sn-field-input sn-field-select"
-              value={form.group_id}
-              onChange={e => setVal("group_id", e.target.value)}
-              style={{ width: "100%" }}
-            >
-              {locations.map(loc => (
-                <option key={loc.id} value={loc.id}>{loc.name}</option>
-              ))}
-            </select>
-          </div>
+              <div className="sn-field-grid" style={{ marginTop: 20 }}>
+                <div className="sn-field">
+                  <label className="sn-field-label">ID датчика <span style={{ color: "#ff5b5b" }}>*</span></label>
+                  <input
+                    className="sn-field-input sn-field-input--mono"
+                    type="text"
+                    placeholder="Напр.: S-001, T42"
+                    value={form.sensor_id}
+                    onChange={e => setVal("sensor_id", e.target.value)}
+                    autoFocus
+                    style={{ width: "100%" }}
+                  />
+                </div>
+                <div className="sn-field">
+                  <label className="sn-field-label">Название датчика <span style={{ color: "#ff5b5b" }}>*</span></label>
+                  <input
+                    className="sn-field-input"
+                    type="text"
+                    placeholder="Напр.: Стеллаж А1, Зона хранения"
+                    value={form.name}
+                    onChange={e => setVal("name", e.target.value)}
+                    style={{ width: "100%" }}
+                  />
+                </div>
+              </div>
 
-          <div className="sn-add-info-box">
-            <span style={{ fontSize: 11, color: "#929292", lineHeight: 1.6 }}>
-              Датчик передаёт: 🌡 Температуру · 💧 Влажность · 🔋 Уровень заряда батареи
-            </span>
-          </div>
+              <div className="sn-field">
+                <label className="sn-field-label">ЦБУ (Центральный блок) <span style={{ color: "#ff5b5b" }}>*</span></label>
+                <select
+                  className="sn-field-input sn-field-select"
+                  value={form.control_unit_id}
+                  onChange={e => setVal("control_unit_id", e.target.value)}
+                  style={{ width: "100%" }}
+                >
+                  {blocks.map(b => {
+                    const loc = locations.find(l => l.id === (b.location_id ?? b.group_id));
+                    return (
+                      <option key={b.id} value={b.id}>
+                        {b.name} (ID: {b.id}){loc ? ` · ${loc.name}` : ""}
+                      </option>
+                    );
+                  })}
+                </select>
+              </div>
 
-          <div className="sn-modal-section-title">🌡 Температура (°C) — необязательно</div>
-          <div className="sn-threshold-section">
-            <div className="sn-threshold-title" style={{ color: "#01e676" }}>🟢 Норма</div>
-            <div className="sn-field-grid">
-              <NF label="Мин." fkey="normal_min_temp" color="#01e676" placeholder="напр. 18"/>
-              <NF label="Макс." fkey="normal_max_temp" color="#01e676" placeholder="напр. 24"/>
-            </div>
-          </div>
-          <div className="sn-threshold-section">
-            <div className="sn-threshold-title" style={{ color: "#ffd550" }}>🟡 Внимание</div>
-            <div className="sn-field-grid">
-              <NF label="Мин." fkey="warning_min_temp" color="#ffd550" placeholder="напр. 15"/>
-              <NF label="Макс." fkey="warning_max_temp" color="#ffd550" placeholder="напр. 26"/>
-            </div>
-          </div>
-          <div className="sn-threshold-section">
-            <div className="sn-threshold-title" style={{ color: "#ff5b5b" }}>🔴 Тревога</div>
-            <div className="sn-field-grid">
-              <NF label="Мин." fkey="alarm_min_temp" color="#ff5b5b" placeholder="напр. 10"/>
-              <NF label="Макс." fkey="alarm_max_temp" color="#ff5b5b" placeholder="напр. 30"/>
-            </div>
-          </div>
+              <div className="sn-add-info-box">
+                <span style={{ fontSize: 11, color: "#929292", lineHeight: 1.6 }}>
+                  ID берётся с физического устройства. Датчик передаёт: 🌡 Температуру · 💧 Влажность · 🔋 Батарею.
+                  Пороги задаются на вкладках выше — необязательно.
+                </span>
+              </div>
+            </>
+          )}
 
-          <div className="sn-modal-section-title" style={{ marginTop: 4 }}>💧 Влажность (%) — необязательно</div>
-          <div className="sn-threshold-section">
-            <div className="sn-threshold-title" style={{ color: "#01e676" }}>🟢 Норма</div>
-            <div className="sn-field-grid">
-              <NF label="Мин." fkey="normal_min_hum" color="#01e676" placeholder="напр. 40"/>
-              <NF label="Макс." fkey="normal_max_hum" color="#01e676" placeholder="напр. 60"/>
-            </div>
-          </div>
-          <div className="sn-threshold-section">
-            <div className="sn-threshold-title" style={{ color: "#ffd550" }}>🟡 Внимание</div>
-            <div className="sn-field-grid">
-              <NF label="Мин." fkey="warning_min_hum" color="#ffd550" placeholder="напр. 35"/>
-              <NF label="Макс." fkey="warning_max_hum" color="#ffd550" placeholder="напр. 65"/>
-            </div>
-          </div>
-          <div className="sn-threshold-section">
-            <div className="sn-threshold-title" style={{ color: "#ff5b5b" }}>🔴 Тревога</div>
-            <div className="sn-field-grid">
-              <NF label="Мин." fkey="alarm_min_hum" color="#ff5b5b" placeholder="напр. 20"/>
-              <NF label="Макс." fkey="alarm_max_hum" color="#ff5b5b" placeholder="напр. 80"/>
-            </div>
-          </div>
+          {activeTab === "temp" && (
+            <ThresholdTable form={form} setVal={setVal} type="temp" />
+          )}
+
+          {activeTab === "hum" && (
+            <ThresholdTable form={form} setVal={setVal} type="hum" />
+          )}
 
           {err && <div className="sn-modal-error">{err}</div>}
         </div>
@@ -499,7 +803,7 @@ const AddSensorModal = ({ locations, defaultLocationId, onClose, onSave }) => {
 };
 
 // ─── SensorMiniCard ───────────────────────────────────────────────────────────
-const SensorMiniCard = ({ sensor, isReorderMode, onDragStart, onDragOver, onDrop, onEditThresholds }) => {
+const SensorMiniCard = ({ sensor, isReorderMode, onDragStart, onDragOver, onDrop, onEditThresholds, onDeleteSensor }) => {
   const st = STATUS[getSensorStatus(sensor)];
   const history = useSensorHistory(sensor.id);
   const tempData = history?.map(p => p.temperature) ?? null;
@@ -507,6 +811,7 @@ const SensorMiniCard = ({ sensor, isReorderMode, onDragStart, onDragOver, onDrop
   const battery  = sensor.battery_level ?? null;
   const bc = battery > 50 ? "#01e676" : battery > 20 ? "#ffd550" : "#ff5b5b";
   const [showEdit, setShowEdit] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   return (
     <>
@@ -529,9 +834,14 @@ const SensorMiniCard = ({ sensor, isReorderMode, onDragStart, onDragOver, onDrop
               {st.label}
             </span>
             {!isReorderMode && (
-              <button className="sn-icon-btn" onClick={() => setShowEdit(true)} title="Настроить пороги">
-                <IconEdit/>
-              </button>
+              <>
+                <button className="sn-icon-btn" onClick={() => setShowEdit(true)} title="Настроить пороги">
+                  <IconEdit/>
+                </button>
+                <button className="sn-icon-btn sn-icon-btn--danger" onClick={() => setShowDeleteConfirm(true)} title="Удалить датчик">
+                  <IconTrash/>
+                </button>
+              </>
             )}
           </div>
         </div>
@@ -591,26 +901,45 @@ const SensorMiniCard = ({ sensor, isReorderMode, onDragStart, onDragOver, onDrop
           }}
         />
       )}
+      {showDeleteConfirm && (
+        <ConfirmModal
+          title="Удалить датчик"
+          message={`Удалить датчик «${sensor.name}» (ID: ${sensor.id})? Это действие необратимо.`}
+          confirmLabel="Удалить датчик"
+          onClose={() => setShowDeleteConfirm(false)}
+          onConfirm={() => onDeleteSensor(sensor.id)}
+        />
+      )}
     </>
   );
 };
 
 // ─── BlockCard ────────────────────────────────────────────────────────────────
-const BlockCard = ({ block, allSensors, onEditThresholds, onReorderSensors, onAddSensor, isSearching }) => {
-  // 🔧 ИСПРАВЛЕНИЕ: начальное состояние false (закрыто)
+const BlockCard = ({ block, allSensors, allBlocks, locations, onEditThresholds, onReorderSensors, onAddSensor, onEditBlock, onDeleteBlock, onDeleteSensor, isSearching }) => {
   const [expanded, setExpanded] = useState(false);
   const [isReorderMode, setIsReorderMode] = useState(false);
   const [sensorOrder, setSensorOrder] = useState([]);
+  const [showEditBlock, setShowEditBlock] = useState(false);
+  const [showDeleteBlock, setShowDeleteBlock] = useState(false);
   const dragSrc = useRef(null);
 
-  // 🔧 ДОБАВЛЕНО: автоматическое раскрытие при поиске
   useEffect(() => {
-    if (isSearching) {
-      setExpanded(true);
-    }
+    if (isSearching) setExpanded(true);
   }, [isSearching]);
 
-  const childSensors = allSensors.filter(s => s.group_id === block.id);
+  // Для синтетического блока (__synthetic__) совпадаем по group_id === location_id
+  // Для реального ЦБУ — по control_unit_id или group_id === block.id
+  const isSyntheticBlock = String(block.id).startsWith("__synthetic__");
+  const syntheticLocId = isSyntheticBlock ? block.location_id ?? block.group_id : null;
+
+  const childSensors = allSensors.filter(s => {
+    if (isSyntheticBlock) {
+      // Бесхозные датчики: group_id указывает прямо на локацию
+      return s.group_id === syntheticLocId;
+    }
+    return String(s.control_unit_id) === String(block.id) ||
+           String(s.group_id)        === String(block.id);
+  });
 
   useEffect(() => {
     setSensorOrder(childSensors.map(s => s.id));
@@ -620,9 +949,9 @@ const BlockCard = ({ block, allSensors, onEditThresholds, onReorderSensors, onAd
     ? sensorOrder.map(id => childSensors.find(s => s.id === id)).filter(Boolean)
     : childSensors;
 
-  const battery = block.battery_level ?? null;
+  const battery  = block.battery_level ?? null;
   const bc = battery > 50 ? "#01e676" : battery > 20 ? "#ffd550" : "#ff5b5b";
-  const isOnline = block.status === "active";
+  const isOnline = block.status === "active" || block.status === "online";
 
   const handleDragStart = (sensorId) => { dragSrc.current = sensorId; };
   const handleDragOver  = (targetId) => {
@@ -643,9 +972,7 @@ const BlockCard = ({ block, allSensors, onEditThresholds, onReorderSensors, onAd
     try {
       await onReorderSensors(sensorOrder);
     } catch (e) { console.error(e); }
-    finally {
-      setIsReorderMode(false);
-    }
+    finally { setIsReorderMode(false); }
   };
 
   return (
@@ -654,7 +981,7 @@ const BlockCard = ({ block, allSensors, onEditThresholds, onReorderSensors, onAd
         <div className="sn-block-header-left">
           <span className="sn-block-chevron">{expanded ? <IconChevDown/> : <IconChevRight/>}</span>
           <div className="sn-block-name-group">
-            <span className="sn-block-id-tag">Блок #{block.id}</span>
+            <span className="sn-block-id-tag">ЦБУ #{block.id}</span>
             <span className="sn-block-name">{block.name}</span>
           </div>
         </div>
@@ -686,7 +1013,7 @@ const BlockCard = ({ block, allSensors, onEditThresholds, onReorderSensors, onAd
               <>
                 <button
                   className="sn-add-sensor-btn"
-                  title="Добавить датчик в блок"
+                  title="Добавить датчик в этот ЦБУ"
                   onClick={e => { e.stopPropagation(); onAddSensor(block); }}
                 >
                   <IconPlus/> Датчик
@@ -699,6 +1026,24 @@ const BlockCard = ({ block, allSensors, onEditThresholds, onReorderSensors, onAd
                 >
                   <IconDrag/> <span>Порядок</span>
                 </button>
+                {!isSyntheticBlock && (
+                  <>
+                    <button
+                      className="sn-icon-btn"
+                      title="Редактировать ЦБУ"
+                      onClick={e => { e.stopPropagation(); setShowEditBlock(true); }}
+                    >
+                      <IconEdit/>
+                    </button>
+                    <button
+                      className="sn-icon-btn sn-icon-btn--danger"
+                      title="Удалить ЦБУ"
+                      onClick={e => { e.stopPropagation(); setShowDeleteBlock(true); }}
+                    >
+                      <IconTrash/>
+                    </button>
+                  </>
+                )}
               </>
             )
           ) : (
@@ -714,7 +1059,7 @@ const BlockCard = ({ block, allSensors, onEditThresholds, onReorderSensors, onAd
         <div className="sn-sensors-grid" onDragEnd={handleDragEnd}>
           {orderedSensors.length === 0 && (
             <div className="sn-empty-sensors">
-              <div style={{ marginBottom: 12, color: "#555" }}>Нет датчиков в этом блоке</div>
+              <div style={{ marginBottom: 12, color: "#555" }}>Нет датчиков в этом ЦБУ</div>
               <button className="sn-add-sensor-btn-empty" onClick={() => onAddSensor(block)}>
                 <IconPlus/> Добавить датчик
               </button>
@@ -738,20 +1083,18 @@ const BlockCard = ({ block, allSensors, onEditThresholds, onReorderSensors, onAd
 };
 
 // ─── LocationSection ──────────────────────────────────────────────────────────
-const LocationSection = ({ location, blocks, allSensors, onEditThresholds, onReorderSensors, onAddSensor,
+const LocationSection = ({ location, blocks, allSensors, allBlocks, onEditThresholds, onReorderSensors, onAddSensor,
   isReorderLocMode, onLocDragStart, onLocDragOver, onLocDrop, isSearching }) => {
-  // 🔧 ИСПРАВЛЕНИЕ: начальное состояние false (закрыто)
   const [expanded, setExpanded] = useState(false);
-  
-  // 🔧 ДОБАВЛЕНО: автоматическое раскрытие при поиске
+
   useEffect(() => {
-    if (isSearching) {
-      setExpanded(true);
-    }
+    if (isSearching) setExpanded(true);
   }, [isSearching]);
-  
+
   const locBlocks = blocks.filter(b => b.group_id === location.id || b.location_id === location.id);
-  const totalSensors = allSensors.filter(s => locBlocks.some(b => b.id === s.group_id)).length;
+  const totalSensors = allSensors.filter(s =>
+    locBlocks.some(b => b.id === s.group_id || b.id === s.control_unit_id)
+  ).length;
 
   return (
     <div
@@ -781,6 +1124,7 @@ const LocationSection = ({ location, blocks, allSensors, onEditThresholds, onReo
               key={block.id}
               block={block}
               allSensors={allSensors}
+              allBlocks={allBlocks}
               onEditThresholds={onEditThresholds}
               onReorderSensors={(order) => onReorderSensors(block.id, order)}
               onAddSensor={onAddSensor}
@@ -796,6 +1140,7 @@ const LocationSection = ({ location, blocks, allSensors, onEditThresholds, onReo
 // ─── Main Sensors Component ───────────────────────────────────────────────────
 const Sensors = () => {
   const [locations,  setLocations]  = useState([]);
+  const [blocks,     setBlocks]     = useState([]);   // ЦБУ с /api/v1/control-units/
   const [sensors,    setSensors]    = useState([]);
   const [loading,    setLoading]    = useState(true);
   const [error,      setError]      = useState(null);
@@ -808,19 +1153,32 @@ const Sensors = () => {
   const [locOrder,         setLocOrder]         = useState([]);
   const locDragSrc = useRef(null);
 
-  const [showAddSensor, setShowAddSensor]   = useState(false);
-  const [addSensorBlock, setAddSensorBlock] = useState(null);
+  const [showCreateBlock, setShowCreateBlock]   = useState(false);
+  const [showAddSensor,   setShowAddSensor]     = useState(false);
+  const [addSensorBlock,  setAddSensorBlock]    = useState(null);
 
   const dropdownRef = useRef(null);
 
   const fetchAll = useCallback(async () => {
     try {
       setLoading(true);
-      const [locs, snrs] = await Promise.all([
+      const [locs, snrs, blks] = await Promise.all([
         apiGet("/api/v1/locations/"),
         apiGet("/api/v1/sensors/"),
+        // ИСПРАВЛЕНО: правильный endpoint для ЦБУ
+        apiGet("/api/v1/control-units/").catch(() => []),
       ]);
       setLocations(locs);
+      setSensors(snrs);
+      setBlocks(blks);
+
+      // ── DEBUG ──────────────────────────────────────────────────────────────
+      console.group("📡 Sensors page — raw API data");
+      console.log("📍 Locations:", JSON.stringify(locs, null, 2));
+      console.log("🔲 Control units:", JSON.stringify(blks, null, 2));
+      console.log("🌡 Sensors:", JSON.stringify(snrs, null, 2));
+      console.groupEnd();
+      // ───────────────────────────────────────────────────────────────────────
 
       const saved = loadLocOrder();
       if (saved && saved.length > 0) {
@@ -832,7 +1190,6 @@ const Sensors = () => {
         setLocOrder(locs.map(l => l.id));
       }
 
-      setSensors(snrs);
       setError(null);
     } catch (e) {
       setError(e.message);
@@ -858,19 +1215,30 @@ const Sensors = () => {
     return () => document.removeEventListener("mousedown", h);
   }, []);
 
+  // ИСПРАВЛЕНО: пороги — отдельный endpoint /thresholds
   const handleEditThresholds = async (sensorId, payload) => {
-    await apiPatch(`/api/v1/sensors/${sensorId}`, payload);
+    await apiPatch(`/api/v1/sensors/${sensorId}/thresholds`, payload);
     await fetchAll();
   };
 
+  // ИСПРАВЛЕНО: создание датчика через /api/v1/sensors/create_sensor
   const handleAddSensor = async (payload) => {
     await apiPost("/api/v1/sensors/create_sensor", payload);
     await fetchAll();
   };
 
+  // ИСПРАВЛЕНО: создание ЦБУ через /api/v1/control-units/register
+  const handleCreateBlock = async (payload) => {
+    await apiPost("/api/v1/control-units/register", payload);
+    await fetchAll();
+  };
+
+  // ИСПРАВЛЕНО: порядок датчиков через /api/v1/sensors/{id}/position
   const handleReorderSensors = async (blockId, orderedIds) => {
     await Promise.all(
-      orderedIds.map((id, idx) => apiPatch(`/api/v1/sensors/${id}`, { display_order: idx }))
+      orderedIds.map((id, idx) =>
+        apiPatch(`/api/v1/sensors/${id}/position`, { position: idx })
+      )
     );
     await fetchAll();
   };
@@ -898,26 +1266,86 @@ const Sensors = () => {
           apiPatch(`/api/v1/locations/${id}`, { display_order: idx }).catch(() => {})
         )
       );
-    } catch (e) {
-      console.error("Не удалось сохранить порядок на сервере:", e);
-    }
+    } catch (e) { console.error("Не удалось сохранить порядок на сервере:", e); }
     setIsReorderLocMode(false);
   };
 
   const q = searchQuery.toLowerCase().trim();
   const isSearching = q.length > 0;
-  
+
   const filteredSensors = sensors.filter(s => {
-    const loc = locations.find(l => l.id === s.group_id);
+    // control_unit_id может быть строкой или числом — ищем блок по обоим вариантам
+    const sBlock = blocks.find(b => String(b.id) === String(s.control_unit_id ?? s.group_id));
+    const loc = sBlock
+      ? locations.find(l => l.id === (sBlock.location_id ?? sBlock.group_id))
+      : locations.find(l => l.id === s.group_id);
+
     const matchSearch = !isSearching
       || String(s.id).includes(q)
       || s.name?.toLowerCase().includes(q)
-      || loc?.name?.toLowerCase().includes(q);
-    const matchLoc = !selectedLocation || s.group_id === selectedLocation;
+      || loc?.name?.toLowerCase().includes(q)
+      || sBlock?.name?.toLowerCase().includes(q);
+    const matchLoc = !selectedLocation || (sBlock
+      ? (sBlock.location_id === selectedLocation || sBlock.group_id === selectedLocation)
+      : s.group_id === selectedLocation);
     return matchSearch && matchLoc;
   });
 
   const orderedLocations = locOrder.map(id => locations.find(l => l.id === id)).filter(Boolean);
+
+  // Блоки для конкретной локации (реальные ЦБУ + синтетический для "бесхозных" датчиков)
+  const getBlocksForLocation = (locId) => {
+    // 1. Реальные ЦБУ этой локации
+    const real = blocks.filter(b => b.location_id === locId || b.group_id === locId);
+
+    // 2. "Бесхозные" датчики — те у которых нет ЦБУ или group_id === locId напрямую
+    const realBlockIds = new Set(real.map(b => String(b.id)));
+    const orphanSensors = sensors.filter(s => {
+      const cuId = String(s.control_unit_id ?? s.group_id ?? "");
+      // датчик "бесхозный" если его ЦБУ не из real-блоков И group_id === locId
+      return s.group_id === locId && !realBlockIds.has(cuId);
+    });
+
+    // 3. Если есть бесхозные датчики — добавляем синтетический блок
+    const syntheticBlocks = orphanSensors.length > 0 ? [{
+      id: `__synthetic__${locId}`,
+      name: locations.find(l => l.id === locId)?.name ?? `Блок #${locId}`,
+      location_id: locId,
+      group_id: locId,
+      __synthetic: true,
+      status: orphanSensors.some(s => s.status === "active") ? "active" : "offline",
+      battery_level: null,
+      gsm_signal: null,
+      sim_balance: null,
+    }] : [];
+
+    // 4. Если совсем нет ни реальных ЦБУ ни бесхозных — пустой синтетик чтобы показать блок
+    if (real.length === 0 && syntheticBlocks.length === 0) {
+      return [{
+        id: `__synthetic__${locId}`,
+        name: locations.find(l => l.id === locId)?.name ?? `Блок #${locId}`,
+        location_id: locId,
+        group_id: locId,
+        __synthetic: true,
+        status: "offline",
+        battery_level: null,
+        gsm_signal: null,
+        sim_balance: null,
+      }];
+    }
+
+    return [...real, ...syntheticBlocks];
+  };
+
+  // Все блоки для AddSensorModal (реальные ЦБУ или синтетические)
+  const allBlocksForModal = blocks.length > 0
+    ? blocks
+    : locations.map(loc => ({
+        id: loc.id,
+        name: loc.name,
+        location_id: loc.id,
+        group_id: loc.id,
+      }));
 
   if (loading) return (
     <div className="sn-container" style={{ display:"flex", alignItems:"center", justifyContent:"center", minHeight:"100vh", color:"#555", fontSize: 14 }}>
@@ -951,8 +1379,18 @@ const Sensors = () => {
                 >
                   <IconDrag/> Порядок локаций
                 </button>
-                <button className="sn-add-btn" onClick={() => { setAddSensorBlock(null); setShowAddSensor(true); }}>
-                  <IconPlus/> Добавить датчик
+                <button
+                  className="sn-add-btn sn-add-btn--secondary"
+                  onClick={() => { setAddSensorBlock(null); setShowAddSensor(true); }}
+                  title="Добавить датчик к существующему ЦБУ"
+                >
+                  <IconPlus/> Датчик
+                </button>
+                <button
+                  className="sn-add-btn"
+                  onClick={() => setShowCreateBlock(true)}
+                >
+                  <IconBlock/> Создать ЦБУ
                 </button>
               </>
             ) : (
@@ -982,7 +1420,7 @@ const Sensors = () => {
               <IconSearch/>
               <input
                 className="sn-search-input"
-                placeholder="Поиск по ID, названию датчика, локации..."
+                placeholder="Поиск по ID, названию датчика, ЦБУ, локации..."
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
               />
@@ -1001,17 +1439,26 @@ const Sensors = () => {
               </button>
               {showLocDropdown && (
                 <div className="sn-loc-dropdown">
-                  <div className={`sn-loc-option ${!selectedLocation ? "sn-loc-option--active" : ""}`}
-                    onClick={() => { setSelectedLocation(null); setShowLocDropdown(false); }}>
+                  <div
+                    className={`sn-loc-option ${!selectedLocation ? "sn-loc-option--active" : ""}`}
+                    onClick={() => { setSelectedLocation(null); setShowLocDropdown(false); }}
+                  >
                     Все локации
                   </div>
                   {locations.map(loc => (
-                    <div key={loc.id}
+                    <div
+                      key={loc.id}
                       className={`sn-loc-option ${selectedLocation === loc.id ? "sn-loc-option--active" : ""}`}
-                      onClick={() => { setSelectedLocation(loc.id); setShowLocDropdown(false); }}>
+                      onClick={() => { setSelectedLocation(loc.id); setShowLocDropdown(false); }}
+                    >
                       <IconMapPin/>
                       {loc.name}
-                      <span className="sn-loc-option-count">{sensors.filter(s => s.group_id === loc.id).length}</span>
+                      <span className="sn-loc-option-count">
+                        {sensors.filter(s => {
+                          const b = blocks.find(bl => String(bl.id) === String(s.control_unit_id ?? s.group_id));
+                          return b ? (b.location_id === loc.id || b.group_id === loc.id) : s.group_id === loc.id;
+                        }).length}
+                      </span>
                     </div>
                   ))}
                 </div>
@@ -1025,8 +1472,13 @@ const Sensors = () => {
             <div className="sn-search-results-title">{filteredSensors.length} результат(ов)</div>
             <div className="sn-sensors-grid">
               {filteredSensors.map(sensor => (
-                <SensorMiniCard key={sensor.id} sensor={sensor} isReorderMode={false}
-                  onDragStart={() => {}} onDragOver={() => {}} onDrop={() => {}}
+                <SensorMiniCard
+                  key={sensor.id}
+                  sensor={sensor}
+                  isReorderMode={false}
+                  onDragStart={() => {}}
+                  onDragOver={() => {}}
+                  onDrop={() => {}}
                   onEditThresholds={handleEditThresholds}
                 />
               ))}
@@ -1037,23 +1489,27 @@ const Sensors = () => {
             {orderedLocations.length === 0 && <div className="sn-empty-state">Нет локаций</div>}
             {orderedLocations.map(loc => {
               if (selectedLocation && loc.id !== selectedLocation) return null;
-              const locSensors = sensors.filter(s => s.group_id === loc.id);
-              const block = {
-                id: loc.id,
-                name: loc.name,
-                group_id: loc.id,
-                status: locSensors.some(s => s.status === "active") ? "active" : "offline",
-                battery_level: null,
-                gsm_signal: null,
-                sim_balance: null,
-              };
+              const locBlocks = getBlocksForLocation(loc.id);
+              // Все датчики локации: через реальные ЦБУ ИЛИ напрямую через group_id
+              const locSensors = sensors.filter(s => {
+                // 1. Датчик привязан к одному из ЦБУ этой локации
+                const viaBlock = locBlocks.some(b => {
+                  if (String(b.id).startsWith("__synthetic__")) return false;
+                  return String(s.control_unit_id) === String(b.id) ||
+                         String(s.group_id)        === String(b.id);
+                });
+                if (viaBlock) return true;
+                // 2. Датчик напрямую через group_id === locId (старая схема)
+                return s.group_id === loc.id;
+              });
 
               return (
                 <LocationSection
                   key={loc.id}
                   location={loc}
-                  blocks={[block]}
+                  blocks={locBlocks}
                   allSensors={locSensors}
+                  allBlocks={allBlocksForModal}
                   onEditThresholds={handleEditThresholds}
                   onReorderSensors={handleReorderSensors}
                   onAddSensor={(blk) => { setAddSensorBlock(blk); setShowAddSensor(true); }}
@@ -1069,10 +1525,19 @@ const Sensors = () => {
         )}
       </main>
 
+      {showCreateBlock && (
+        <CreateBlockModal
+          locations={locations}
+          onClose={() => setShowCreateBlock(false)}
+          onSave={handleCreateBlock}
+        />
+      )}
+
       {showAddSensor && (
         <AddSensorModal
           locations={locations}
-          defaultLocationId={addSensorBlock?.group_id ?? addSensorBlock?.id}
+          blocks={allBlocksForModal}
+          defaultBlockId={addSensorBlock?.id}
           onClose={() => setShowAddSensor(false)}
           onSave={handleAddSensor}
         />
