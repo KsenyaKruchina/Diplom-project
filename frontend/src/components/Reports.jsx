@@ -8,7 +8,6 @@ import { wsService } from "../services/websocketService";
 const BASE_URL = "http://157.90.127.202/api/v1";
 
 // ── Storage helpers ───────────────────────────────────────────────────────────
-// Ключ хранилища зависит от id и роли пользователя, чтобы история была per-user
 const getStorageKey = (user) => {
   if (!user) return null;
   return `rp_export_history_${user.id}_${user.role || "user"}`;
@@ -29,11 +28,8 @@ const saveHistory = (user, history) => {
   const key = getStorageKey(user);
   if (!key) return;
   try {
-    // Ограничиваем 100 записями, чтобы не засорять localStorage
     localStorage.setItem(key, JSON.stringify(history.slice(0, 100)));
-  } catch {
-    // localStorage может быть недоступен (приватный режим и т.д.)
-  }
+  } catch {}
 };
 
 // иконки
@@ -144,6 +140,16 @@ const IconExcel = () => (
     <text x="26" y="47" textAnchor="middle" fill="#01e676" fontSize="9" fontFamily="Inter, sans-serif" fontWeight="700">XLSX</text>
   </svg>
 );
+const IconCSV = () => (
+  <svg width="52" height="52" viewBox="0 0 52 52" fill="none">
+    <rect x="8" y="4" width="28" height="36" rx="3" fill="#1a1a1a" stroke="#29b6f6" strokeWidth="1.5"/>
+    <path d="M36 4l8 8h-8V4z" fill="#29b6f6" fillOpacity="0.5"/>
+    <line x1="14" y1="16" x2="30" y2="16" stroke="#29b6f6" strokeWidth="1.4" strokeLinecap="round"/>
+    <line x1="14" y1="21" x2="30" y2="21" stroke="#29b6f6" strokeWidth="1.4" strokeLinecap="round"/>
+    <line x1="14" y1="26" x2="24" y2="26" stroke="#29b6f6" strokeWidth="1.4" strokeLinecap="round"/>
+    <text x="26" y="47" textAnchor="middle" fill="#29b6f6" fontSize="9" fontFamily="Inter, sans-serif" fontWeight="700">CSV</text>
+  </svg>
+);
 const IconRefresh = () => (
   <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
     <path d="M13.5 8a5.5 5.5 0 1 1-1.1-3.3" stroke="#929292" strokeWidth="1.4" strokeLinecap="round"/>
@@ -179,7 +185,7 @@ const IconTrash = () => (
   </svg>
 );
 
-// словари маппинги
+// ── Словари / маппинги ────────────────────────────────────────────────────────
 const STATUS_MAP = {
   new:          { label: "Новая",      color: "#ff5252", bg: "#321c1b" },
   acknowledged: { label: "В работе",   color: "#ffd550", bg: "#312c1c" },
@@ -196,13 +202,13 @@ const ALARM_TYPE_MAP = {
   low_battery:     "Низкий заряд",
 };
 const PERIOD_API_MAP = {
-  "1d":  "last_24_hours",
-  "1w":  "last_week",
-  "1m":  "last_month",
-  "2m":  "last_2_months",
-  "3m":  "last_3_months",
-  "6m":  "last_6_months",
-  "1y":  "last_year",
+  "1d": "last_24_hours",
+  "1w": "last_week",
+  "1m": "last_month",
+  "2m": "last_2_months",
+  "3m": "last_3_months",
+  "6m": "last_6_months",
+  "1y": "last_year",
 };
 const PERIOD_OPTIONS = [
   { key: "1d", label: "1 день" },
@@ -214,11 +220,48 @@ const PERIOD_OPTIONS = [
   { key: "1y", label: "1 год" },
   { key: "custom", label: "Свой диапазон" },
 ];
+
+// ── FIX: правильные endpoints из документации ─────────────────────────────────
+// Полные отчёты (с KPI, графиками температуры/влажности, журналом тревог)
+// используют download-period-*, а НЕ download-events-*
 const REPORT_TYPE_OPTIONS = [
-  { key: "location",     label: "По локации",  icon: <IconLocation />,  endpoint: "download-events-location" },
-  { key: "control_unit", label: "По ЦБУ",      icon: <IconBuilding />,  endpoint: "download-events-control-unit" },
-  { key: "sensor",       label: "По датчику",  icon: <IconSensor />,    endpoint: "download-events-sensor" },
+  {
+    key:               "location",
+    label:             "По локации",
+    icon:              <IconLocation />,
+    // GET /api/v1/reports/download-period-location/{location_id}
+    periodEndpoint:    "download-period-location",
+    // GET /api/v1/reports/download-events-location/{location_id}
+    eventsEndpoint:    "download-events-location",
+  },
+  {
+    key:               "control_unit",
+    label:             "По ЦБУ",
+    icon:              <IconBuilding />,
+    // GET /api/v1/reports/download-period-control-unit/{control_unit_id}
+    periodEndpoint:    "download-period-control-unit",
+    // GET /api/v1/reports/download-events-control-unit/{control_unit_id}
+    eventsEndpoint:    "download-events-control-unit",
+  },
+  {
+    key:               "sensor",
+    label:             "По датчику",
+    icon:              <IconSensor />,
+    // GET /api/v1/reports/download-period/{sensor_id}
+    periodEndpoint:    "download-period",
+    // GET /api/v1/reports/download-events-sensor/{sensor_id}
+    eventsEndpoint:    "download-events-sensor",
+  },
 ];
+
+// FIX: CSV доступен только для полных отчётов (download-period-*).
+// Для download-events-* доступны только pdf и xlsx — проверяем это при выборе.
+const FORMAT_OPTIONS = [
+  { key: "pdf",  label: "PDF формат",   color: "#ff5252",  ext: "pdf",  contentType: "application/pdf" },
+  { key: "xlsx", label: "Excel формат", color: "#01e676",  ext: "xlsx", contentType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" },
+  { key: "csv",  label: "CSV выгрузка", color: "#29b6f6",  ext: "csv",  contentType: "text/csv" },
+];
+
 const COLS = [
   { key: "id",          label: "ID" },
   { key: "severity",    label: "Серьезность" },
@@ -240,6 +283,7 @@ const formatDateTime = (iso) => {
   } catch { return iso; }
 };
 
+// ── Вспомогательные компоненты ────────────────────────────────────────────────
 function Dropdown({ trigger, children, open, setOpen }) {
   return (
     <div className="rp-dropdown-wrap">
@@ -472,45 +516,107 @@ function CalendarPicker({ onChange }) {
   );
 }
 
-// ── Скачивание отчёта (blob) ──────────────────────────────────────────────────
-const downloadReport = async (path, fallbackFilename, isXlsx = false) => {
+// ── FIX: исправленная функция скачивания отчёта ───────────────────────────────
+// Документация требует:
+// 1. Сначала проверить HTTP status
+// 2. Если не 2xx — читать тело как текст/JSON и показать пользователю сообщение
+// 3. Для xlsx и pdf дополнительно проверить Content-Type
+// 4. Только после успешного status сохранять body как файл
+// 5. Освобождать object URL после скачивания
+const CONTENT_TYPE_MAP = {
+  pdf:  "application/pdf",
+  xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  csv:  "text/csv",
+};
+
+const ACCEPT_MAP = {
+  pdf:  "application/pdf",
+  xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  csv:  "text/csv",
+};
+
+const downloadReport = async (path, fallbackFilename, format) => {
   const token = getToken();
 
-  const headers = {
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    ...(isXlsx
-      ? { Accept: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }
-      : { Accept: "application/pdf" }),
-  };
+  const response = await fetch(`${BASE_URL}${path}`, {
+    headers: {
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      Accept: ACCEPT_MAP[format] || "*/*",
+    },
+  });
 
-  const response = await fetch(`${BASE_URL}${path}`, { headers });
-
-  if (response.status === 403) {
-    throw new Error("403: Нет доступа к этой сущности");
-  }
-  if (response.status === 422) {
-    let detail = "Неверные параметры запроса (422)";
-    try {
-      const body = await response.json();
-      if (body?.detail) {
-        detail = Array.isArray(body.detail)
-          ? body.detail.map(e => `${e.loc?.join(".")} — ${e.msg}`).join("; ")
-          : String(body.detail);
-      }
-    } catch { /* ignore */ }
-    throw new Error(detail);
-  }
+  // FIX: сначала проверяем статус — при ошибке читаем тело как текст/JSON,
+  // НЕ сохраняем как файл (иначе Excel покажет "формат файла недопустим")
   if (!response.ok) {
-    let msg = `Ошибка ${response.status}`;
-    try { const e = await response.json(); if (e.detail) msg = e.detail; } catch {}
-    throw new Error(msg);
+    let errorMessage = `Ошибка ${response.status}`;
+
+    if (response.status === 400) {
+      try {
+        const body = await response.json();
+        errorMessage = body?.detail
+          ? (Array.isArray(body.detail)
+              ? body.detail.map(e => `${e.loc?.join(".")} — ${e.msg}`).join("; ")
+              : String(body.detail))
+          : "Неверные параметры запроса (400)";
+      } catch {
+        errorMessage = "Неверные параметры запроса (400)";
+      }
+    } else if (response.status === 403) {
+      errorMessage = "Нет доступа к этой сущности (403)";
+    } else if (response.status === 404) {
+      errorMessage = "Объект не найден (404)";
+    } else if (response.status === 422) {
+      try {
+        const body = await response.json();
+        errorMessage = body?.detail
+          ? (Array.isArray(body.detail)
+              ? body.detail.map(e => `${e.loc?.join(".")} — ${e.msg}`).join("; ")
+              : String(body.detail))
+          : "Неверные параметры запроса (422)";
+      } catch {
+        errorMessage = "Неверные параметры запроса (422)";
+      }
+    } else if (response.status === 500) {
+      errorMessage = "Ошибка генерации отчёта на сервере (500)";
+    } else {
+      try {
+        const body = await response.json();
+        if (body?.detail) errorMessage = String(body.detail);
+      } catch {}
+    }
+
+    throw new Error(errorMessage);
   }
 
+  // FIX: проверяем Content-Type только для xlsx и pdf.
+  // Если сервер вернул не тот тип — не сохраняем файл.
+  if (format === "xlsx" || format === "pdf") {
+    const contentType = response.headers.get("Content-Type") || "";
+    const expectedType = CONTENT_TYPE_MAP[format];
+    if (!contentType.includes(expectedType)) {
+      // Сервер мог вернуть JSON-ошибку с кодом 2xx (нестандартно, но бывает)
+      let serverMsg = `Сервер вернул неожиданный Content-Type: ${contentType}`;
+      try {
+        const body = await response.text();
+        const parsed = JSON.parse(body);
+        if (parsed?.detail) serverMsg = String(parsed.detail);
+      } catch {}
+      throw new Error(serverMsg);
+    }
+  }
+
+  // FIX: имя файла берём из Content-Disposition, иначе используем fallback
   let fname = fallbackFilename;
   const cd = response.headers.get("Content-Disposition");
   if (cd) {
-    const m = cd.match(/filename[^;=\n]*=([^;\n]*)/);
-    if (m) fname = m[1].replace(/['"]/g, "").trim();
+    // Поддерживаем filename и filename*
+    const fnStar = cd.match(/filename\*=(?:UTF-8'')?([^;\n]+)/i);
+    const fn     = cd.match(/filename[^*;=\n]*=([^;\n]*)/i);
+    if (fnStar) {
+      fname = decodeURIComponent(fnStar[1].replace(/['"]/g, "").trim());
+    } else if (fn) {
+      fname = fn[1].replace(/['"]/g, "").trim();
+    }
   }
 
   const blob = await response.blob();
@@ -521,6 +627,7 @@ const downloadReport = async (path, fallbackFilename, isXlsx = false) => {
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
+  // FIX: освобождаем object URL после скачивания
   URL.revokeObjectURL(url);
 };
 
@@ -795,6 +902,8 @@ function ExportCard({
 }) {
   const [exportFmt, setExportFmt]           = useState("pdf");
   const [reportType, setReportType]         = useState("location");
+  // FIX: переключатель между полным отчётом и только журналом событий
+  const [reportMode, setReportMode]         = useState("period"); // "period" | "events"
   const [selectedLocation, setSelectedLocation]       = useState(null);
   const [selectedControlUnit, setSelectedControlUnit] = useState(null);
   const [selectedSensor, setSelectedSensor]           = useState(null);
@@ -812,19 +921,15 @@ function ExportCard({
     return locations.filter(l => l.id === currentUser.location_id);
   }, [locations, isAdmin, currentUser]);
 
-  // FIX: расширенная фильтрация ЦБУ — проверяем все возможные поля привязки к локации
   const availableControlUnits = useMemo(() => {
     if (isAdmin) return controlUnits;
     if (!currentUser?.location_id) return [];
     const locId = Number(currentUser.location_id);
-    return controlUnits.filter(cu => {
-      // Проверяем все возможные поля, по которым ЦБУ может быть привязан к локации
-      return (
-        Number(cu.location_id) === locId ||
-        Number(cu.group_id)    === locId ||
-        Number(cu.site_id)     === locId
-      );
-    });
+    return controlUnits.filter(cu =>
+      Number(cu.location_id) === locId ||
+      Number(cu.group_id)    === locId ||
+      Number(cu.site_id)     === locId
+    );
   }, [controlUnits, isAdmin, currentUser]);
 
   const availableSensors = useMemo(() => {
@@ -836,6 +941,15 @@ function ExportCard({
       Number(s.group_id)    === locId
     );
   }, [sensors, isAdmin, currentUser]);
+
+  // FIX: CSV недоступен для режима "только события" — автосброс при переключении
+  const handleReportModeChange = (mode) => {
+    setReportMode(mode);
+    setExportError("");
+    if (mode === "events" && exportFmt === "csv") {
+      setExportFmt("pdf");
+    }
+  };
 
   const handleReportTypeChange = (key) => {
     setReportType(key);
@@ -899,8 +1013,14 @@ function ExportCard({
         entityName = selectedSensor.name || selectedSensor.serial_number || `Датчик #${entityId}`;
       }
 
-      const isXlsx = exportFmt === "xlsx";
+      // FIX: выбираем endpoint в зависимости от режима отчёта
+      // - "period" → download-period-* (полный отчёт: KPI + графики + журнал тревог)
+      // - "events" → download-events-* (только журнал событий)
+      const endpointSlug = reportMode === "period"
+        ? rtConfig.periodEndpoint
+        : rtConfig.eventsEndpoint;
 
+      // FIX: формируем query parameters согласно документации
       let params;
       if (periodKey === "custom") {
         if (!customRange?.start || !customRange?.end) throw new Error("Выберите диапазон дат");
@@ -908,35 +1028,38 @@ function ExportCard({
           period:     "custom",
           start_date: customRange.start.toISOString().slice(0, 10),
           end_date:   customRange.end.toISOString().slice(0, 10),
-          format:     isXlsx ? "xlsx" : "pdf",
+          format:     exportFmt,  // "pdf" | "xlsx" | "csv"
         });
       } else {
         params = new URLSearchParams({
           period: PERIOD_API_MAP[periodKey] || "last_month",
-          format: isXlsx ? "xlsx" : "pdf",
+          format: exportFmt,
         });
       }
 
-      const ext = isXlsx ? "xlsx" : "pdf";
       const now = new Date();
       const dateStr = now.toLocaleDateString("ru-RU", { day: "2-digit", month: "2-digit", year: "numeric" });
       const timeStr = now.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
-      const fallbackFilename = `report_${rtConfig.key}_${entityId}_${now.toISOString().slice(0,10)}.${ext}`;
+      const fallbackFilename = `report_${rtConfig.key}_${entityId}_${now.toISOString().slice(0, 10)}.${exportFmt}`;
 
-      const path = `/reports/${rtConfig.endpoint}/${entityId}?${params}`;
+      // FIX: путь формируется по шаблону /api/v1/reports/{endpoint}/{entityId}?{params}
+      const path = `/reports/${endpointSlug}/${entityId}?${params}`;
 
-      await downloadReport(path, fallbackFilename, isXlsx);
+      await downloadReport(path, fallbackFilename, exportFmt);
+
+      const fmtLabel = exportFmt.toUpperCase();
+      const modeLabel = reportMode === "period" ? "Полный отчёт" : "Журнал событий";
+      const fmtColor = FORMAT_OPTIONS.find(f => f.key === exportFmt)?.color || "#929292";
 
       const newEntry = {
-        label: `${rtConfig.label} ${getPeriodDescription()} · ${entityName}`,
-        fmt:   isXlsx ? "XLSX" : "PDF",
+        label: `${modeLabel} · ${rtConfig.label} ${getPeriodDescription()} · ${entityName}`,
+        fmt:   fmtLabel,
         date:  dateStr,
         time:  timeStr,
-        color: isXlsx ? "#01e676" : "#ff5252",
+        color: fmtColor,
         icon:  rtConfig.key,
       };
 
-      // FIX: обновляем историю и сразу сохраняем в localStorage
       setExportHistory(prev => {
         const updated = [newEntry, ...prev];
         saveHistory(currentUser, updated);
@@ -944,11 +1067,7 @@ function ExportCard({
       });
 
     } catch (err) {
-      if (err.message?.startsWith("403")) {
-        setExportError("Нет доступа к этой сущности");
-      } else {
-        setExportError(err.message || "Ошибка экспорта");
-      }
+      setExportError(err.message || "Ошибка экспорта");
     } finally {
       setExportLoading(false);
     }
@@ -960,29 +1079,53 @@ function ExportCard({
     (reportType === "sensor"       && selectedSensor)
   );
 
+  // FIX: CSV недоступен для режима "только события"
+  const availableFormats = reportMode === "events"
+    ? FORMAT_OPTIONS.filter(f => f.key !== "csv")
+    : FORMAT_OPTIONS;
+
   const exportBtnLabel = exportLoading
     ? "Загрузка..."
-    : exportFmt === "xlsx" ? "Экспортировать Excel" : "Экспортировать PDF";
+    : `Экспортировать ${exportFmt.toUpperCase()}`;
 
   return (
     <div className="rp-card rp-export-card">
       <h2 className="rp-card-title">Экспортировать данные</h2>
 
+      {/* FIX: переключатель режима отчёта */}
+      <div className="rp-filter-label">Режим отчёта</div>
+      <div className="rp-report-type-row" style={{ marginBottom: 12 }}>
+        <button
+          className={`rp-report-type-btn ${reportMode === "period" ? "rp-report-type-btn--active" : ""}`}
+          onClick={() => handleReportModeChange("period")}
+          title="Полный отчёт: KPI, графики температуры/влажности, журнал тревог"
+        >
+          <span>Полный отчёт</span>
+        </button>
+        <button
+          className={`rp-report-type-btn ${reportMode === "events" ? "rp-report-type-btn--active" : ""}`}
+          onClick={() => handleReportModeChange("events")}
+          title="Только журнал событий без данных мониторинга"
+        >
+          <span>Только события</span>
+        </button>
+      </div>
+
+      {/* Выбор формата — CSV недоступен для events */}
       <div className="rp-format-row">
-        <button
-          className={`rp-format-btn rp-format-btn--pdf ${exportFmt === "pdf" ? "rp-format-btn--active" : ""}`}
-          onClick={() => setExportFmt("pdf")}
-        >
-          <IconPDF />
-          <span>PDF формат</span>
-        </button>
-        <button
-          className={`rp-format-btn rp-format-btn--excel ${exportFmt === "xlsx" ? "rp-format-btn--active" : ""}`}
-          onClick={() => setExportFmt("xlsx")}
-        >
-          <IconExcel />
-          <span>Excel формат</span>
-        </button>
+        {availableFormats.map(fmt => (
+          <button
+            key={fmt.key}
+            className={`rp-format-btn ${exportFmt === fmt.key ? "rp-format-btn--active" : ""}`}
+            style={exportFmt === fmt.key ? { borderColor: fmt.color } : {}}
+            onClick={() => setExportFmt(fmt.key)}
+          >
+            {fmt.key === "pdf"  && <IconPDF />}
+            {fmt.key === "xlsx" && <IconExcel />}
+            {fmt.key === "csv"  && <IconCSV />}
+            <span>{fmt.label}</span>
+          </button>
+        ))}
       </div>
 
       <div className="rp-filter-label" style={{ marginTop: 14 }}>Тип отчёта</div>
@@ -1065,8 +1208,17 @@ function ExportCard({
         <span className="rp-period-label">Выбранный период</span>
       </div>
 
+      {/* FIX: подсказка какой endpoint будет использован */}
+      {hasSelection && (
+        <div style={{ fontSize: "11px", color: "#929292", marginTop: 4, lineHeight: 1.4 }}>
+          {reportMode === "period"
+            ? "Полный отчёт с KPI, графиками и журналом тревог"
+            : "Только журнал событий без данных мониторинга"}
+        </div>
+      )}
+
       {exportError && (
-        <div style={{ fontSize: "12px", color: "#ff5252", marginTop: 4 }}>{exportError}</div>
+        <div style={{ fontSize: "12px", color: "#ff5252", marginTop: 6 }}>{exportError}</div>
       )}
 
       <button
@@ -1105,7 +1257,6 @@ export const Reports = () => {
   const [filterOpen, setFilterOpen]         = useState(false);
   const filterRef = useRef(null);
 
-  // FIX: история инициализируется из localStorage после загрузки пользователя
   const [exportHistory, setExportHistory] = useState([]);
 
   const [page, setPage]       = useState(1);
@@ -1130,13 +1281,10 @@ export const Reports = () => {
         const user = userData || null;
         setCurrentUser(user);
 
-        // FIX: загружаем историю из localStorage сразу после получения данных пользователя
         if (user) {
           setExportHistory(loadHistory(user));
         }
 
-        // FIX: пробуем загрузить ЦБУ сначала из /control-units/, потом из /groups/
-        // и логируем структуру для диагностики
         try {
           const cuData = await apiRequest("/control-units/");
           const arr = Array.isArray(cuData) ? cuData : [];
@@ -1250,7 +1398,6 @@ export const Reports = () => {
     (filterIdRange.from || filterIdRange.to) && { key: "id", label: `ID: ${filterIdRange.from || "—"} – ${filterIdRange.to || "—"}`, clear: () => setFilterIdRange({ from: "", to: "" }) },
   ].filter(Boolean);
 
-  // FIX: очистка истории с удалением из localStorage
   const handleClearHistory = () => {
     setExportHistory([]);
     saveHistory(currentUser, []);

@@ -28,10 +28,12 @@ const apiFetch = async (path, opts = {}) => {
     } else {
       message = err.detail || `Ошибка ${res.status}`;
     }
+    const error = new Error(message);
+    error.status = res.status;
+    error.raw = err;
     console.error(`API error ${res.status} on ${path}:`, err);
-    throw new Error(message);
+    throw error;
   }
-  // DELETE может вернуть пустой ответ
   const text = await res.text();
   return text ? JSON.parse(text) : {};
 };
@@ -67,6 +69,7 @@ const IconDrag      = () => <svg width="14" height="14" viewBox="0 0 16 16" fill
 const IconMapPin    = () => <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M8 1a5 5 0 0 1 5 5c0 4-5 9-5 9S3 10 3 6a5 5 0 0 1 5-5z" stroke="#929292" strokeWidth="1.3"/><circle cx="8" cy="6" r="1.5" fill="#929292"/></svg>;
 const IconPlus      = () => <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><line x1="8" y1="3" x2="8" y2="13" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/><line x1="3" y1="8" x2="13" y2="8" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>;
 const IconBlock     = () => <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><rect x="1" y="1" width="6" height="6" rx="1.5" stroke="currentColor" strokeWidth="1.5"/><rect x="9" y="1" width="6" height="6" rx="1.5" stroke="currentColor" strokeWidth="1.5"/><rect x="1" y="9" width="6" height="6" rx="1.5" stroke="currentColor" strokeWidth="1.5"/><rect x="9" y="9" width="6" height="6" rx="1.5" stroke="currentColor" strokeWidth="1.5"/></svg>;
+const IconWarn      = () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 2L2 20h20L12 2z" stroke="#ffd550" strokeWidth="1.8" strokeLinejoin="round"/><line x1="12" y1="9" x2="12" y2="14" stroke="#ffd550" strokeWidth="1.8" strokeLinecap="round"/><circle cx="12" cy="17.5" r="0.8" fill="#ffd550"/></svg>;
 
 // ─── Sparkline ────────────────────────────────────────────────────────────────
 const Sparkline = ({ color, data, sensor, type }) => {
@@ -313,6 +316,125 @@ const ConfirmModal = ({ title, message, confirmLabel = "Удалить", onClose
             disabled={loading}
           >
             {loading ? "Удаление..." : confirmLabel}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ─── Modal: Удаление ЦБУ с привязанными сенсорами ────────────────────────────
+// Показывается когда у блока есть датчики.
+// Предлагает два варианта:
+//   1. Удалить блок с отвязкой сенсоров (DELETE ?detach_sensors=true)
+//   2. Отмена
+const DeleteBlockWithSensorsModal = ({ block, attachedSensors, onClose, onDetachAndDelete }) => {
+  const [loading, setLoading] = useState(false);
+  const [err, setErr]         = useState("");
+
+  const handleDetachAndDelete = async () => {
+    setLoading(true);
+    setErr("");
+    try {
+      await onDetachAndDelete();
+      onClose();
+    } catch (e) {
+      setErr(e.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="sn-overlay" onClick={onClose}>
+      <div className="sn-modal" onClick={e => e.stopPropagation()}>
+        <div className="sn-modal-header">
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <IconWarn/>
+            <div>
+              <h3 className="sn-modal-title">Удалить ЦБУ невозможно</h3>
+              <div className="sn-modal-subtitle">ЦБУ «{block.name}» · ID {block.id}</div>
+            </div>
+          </div>
+          <button className="sn-modal-close" onClick={onClose}><IconClose/></button>
+        </div>
+
+        <div className="sn-modal-body">
+          {/* Предупреждение */}
+          <div style={{
+            background: "#29220a",
+            border: "1px solid #ffd55033",
+            borderRadius: 8,
+            padding: "12px 14px",
+            marginBottom: 16,
+            fontSize: 13,
+            color: "#ffd550",
+            lineHeight: 1.6,
+          }}>
+            К этому ЦБУ привязано <strong>{attachedSensors.length}</strong> датч.
+            Нельзя удалить блок, пока к нему привязаны сенсоры.
+          </div>
+
+          {/* Список датчиков */}
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ fontSize: 11, color: "#555", marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.06em" }}>
+              Привязанные датчики
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 6, maxHeight: 180, overflowY: "auto" }}>
+              {attachedSensors.map(s => (
+                <div key={s.id} style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 10,
+                  padding: "8px 12px",
+                  background: "#1a1a1a",
+                  borderRadius: 6,
+                  border: "1px solid #252525",
+                }}>
+                  <span className="sn-sensor-id-tag" style={{ flexShrink: 0 }}>ID {s.id}</span>
+                  <span style={{ fontSize: 13, color: "#ccc" }}>{s.name}</span>
+                  {s.current_temp != null && (
+                    <span style={{ marginLeft: "auto", fontSize: 11, color: "#ffc207", flexShrink: 0 }}>
+                      {parseFloat(s.current_temp).toFixed(1)}°C
+                    </span>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Информация о detach */}
+          <div style={{
+            background: "#0d1f1a",
+            border: "1px solid #01e67622",
+            borderRadius: 8,
+            padding: "12px 14px",
+            fontSize: 12,
+            color: "#929292",
+            lineHeight: 1.7,
+            marginBottom: 4,
+          }}>
+            <div style={{ color: "#01e676", fontWeight: 600, marginBottom: 6, fontSize: 12 }}>
+              Удалить блок с отвязкой сенсоров
+            </div>
+            Центральный блок будет удалён. Сенсоры <strong style={{ color: "#ccc" }}>останутся в системе</strong> и
+            будут отвязаны от этого ЦБУ. История измерений и тревог сохранится.
+          </div>
+
+          {err && <div className="sn-modal-error" style={{ marginTop: 12 }}>{err}</div>}
+        </div>
+
+        <div className="sn-modal-footer">
+          <button className="sn-btn-cancel" onClick={onClose} disabled={loading}>
+            Отмена
+          </button>
+          <button
+            className="sn-btn-delete"
+            onClick={handleDetachAndDelete}
+            disabled={loading}
+            style={{ minWidth: 190 }}
+          >
+            {loading ? "Удаление..." : "Удалить блок, отвязать датчики"}
           </button>
         </div>
       </div>
@@ -641,9 +763,6 @@ const AddSensorModal = ({ locations, blocks, defaultBlockId, onClose, onSave }) 
   const parseOpt = v => (v === "" || v == null) ? null : parseFloat(v);
 
   const selectedBlock = blocks.find(b => String(b.id) === String(form.control_unit_id));
-  const selectedLoc   = selectedBlock
-    ? locations.find(l => l.id === (selectedBlock.location_id ?? selectedBlock.group_id))
-    : null;
 
   const handleSave = async () => {
     if (!form.sensor_id.trim())     { setErr("Введите ID датчика"); return; }
@@ -922,14 +1041,24 @@ const BlockCard = ({
   onAddSensor,
   onEditBlock,
   onDeleteBlock,
-  onDeleteSensor,   // ← ИСПРАВЛЕНО: принимаем проп
+  onDeleteSensor,
   isSearching,
 }) => {
   const [expanded, setExpanded] = useState(false);
   const [isReorderMode, setIsReorderMode] = useState(false);
   const [sensorOrder, setSensorOrder] = useState([]);
   const [showEditBlock, setShowEditBlock] = useState(false);
-  const [showDeleteBlock, setShowDeleteBlock] = useState(false);
+
+  // ─── Новый стейт для флоу удаления ЦБУ ───────────────────────────────────
+  // Возможные значения:
+  //   null           — ничего не показываем
+  //   "loading"      — загружаем список датчиков с сервера
+  //   "confirmEmpty" — датчиков нет, показываем простое подтверждение
+  //   "hasSensors"   — датчики есть, показываем DeleteBlockWithSensorsModal
+  const [deleteState, setDeleteState]         = useState(null);
+  const [blockSensors, setBlockSensors]       = useState([]);
+  const [deleteCheckErr, setDeleteCheckErr]   = useState("");
+
   const dragSrc = useRef(null);
 
   useEffect(() => {
@@ -959,6 +1088,9 @@ const BlockCard = ({
   const bc = battery > 50 ? "#01e676" : battery > 20 ? "#ffd550" : "#ff5b5b";
   const isOnline = block.status === "active" || block.status === "online";
 
+  // Количество сенсоров: предпочитаем sensors_count из API, иначе считаем локально
+  const sensorsCount = block.sensors_count ?? childSensors.length;
+
   const handleDragStart = (sensorId) => { dragSrc.current = sensorId; };
   const handleDragOver  = (targetId) => {
     if (!dragSrc.current || dragSrc.current === targetId) return;
@@ -981,6 +1113,44 @@ const BlockCard = ({
     finally { setIsReorderMode(false); }
   };
 
+  // ─── Клик на кнопку "Удалить ЦБУ" ────────────────────────────────────────
+  // Шаг 1: запрашиваем список датчиков с сервера, не доверяем UI
+  const handleDeleteClick = async (e) => {
+    e.stopPropagation();
+    setDeleteCheckErr("");
+    setDeleteState("loading");
+    try {
+      const sensors = await apiGet(`/api/v1/control-units/${block.id}/sensors`);
+      setBlockSensors(Array.isArray(sensors) ? sensors : []);
+      if (!sensors || sensors.length === 0) {
+        // Датчиков нет — переходим к простому подтверждению
+        setDeleteState("confirmEmpty");
+      } else {
+        // Датчики есть — показываем предупреждение с выбором
+        setDeleteState("hasSensors");
+      }
+    } catch (e) {
+      setDeleteCheckErr(e.message);
+      setDeleteState("error");
+    }
+  };
+
+  const handleCloseDelete = () => {
+    setDeleteState(null);
+    setBlockSensors([]);
+    setDeleteCheckErr("");
+  };
+
+  // Шаг 2a: обычное удаление (датчиков нет)
+  const handleConfirmDelete = async () => {
+    await onDeleteBlock(block.id);
+  };
+
+  // Шаг 2b: удаление с отвязкой датчиков
+  const handleDetachAndDelete = async () => {
+    await onDeleteBlock(block.id, true);
+  };
+
   return (
     <>
       <div className="sn-block-card">
@@ -990,6 +1160,20 @@ const BlockCard = ({
             <div className="sn-block-name-group">
               <span className="sn-block-id-tag">ЦБУ #{block.id}</span>
               <span className="sn-block-name">{block.name}</span>
+              {/* Отображаем sensors_count из API если доступно */}
+              {block.sensors_count != null && (
+                <span style={{
+                  fontSize: 10,
+                  color: block.sensors_count > 0 ? "#ffc207" : "#555",
+                  background: block.sensors_count > 0 ? "#29220a" : "#1a1a1a",
+                  border: `1px solid ${block.sensors_count > 0 ? "#ffc20733" : "#252525"}`,
+                  borderRadius: 4,
+                  padding: "1px 6px",
+                  marginLeft: 4,
+                }}>
+                  {block.sensors_count} датч.
+                </span>
+              )}
             </div>
           </div>
           <div className="sn-block-header-right" onClick={e => e.stopPropagation()}>
@@ -1013,7 +1197,7 @@ const BlockCard = ({
                 </div>
               )}
             </div>
-            <span className="sn-block-sensor-count">{childSensors.length} датч.</span>
+            <span className="sn-block-sensor-count">{sensorsCount} датч.</span>
 
             {!isReorderMode ? (
               expanded && (
@@ -1045,9 +1229,13 @@ const BlockCard = ({
                       <button
                         className="sn-icon-btn sn-icon-btn--danger"
                         title="Удалить ЦБУ"
-                        onClick={e => { e.stopPropagation(); setShowDeleteBlock(true); }}
+                        onClick={handleDeleteClick}
+                        disabled={deleteState === "loading"}
                       >
-                        <IconTrash/>
+                        {deleteState === "loading"
+                          ? <span style={{ fontSize: 10, color: "#555" }}>...</span>
+                          : <IconTrash/>
+                        }
                       </button>
                     </>
                   )}
@@ -1061,6 +1249,21 @@ const BlockCard = ({
             )}
           </div>
         </div>
+
+        {/* Ошибка загрузки при проверке датчиков */}
+        {deleteState === "error" && (
+          <div style={{ padding: "8px 16px", background: "#2a100f", borderTop: "1px solid #ff5b5b33" }}>
+            <span style={{ fontSize: 12, color: "#ff5b5b" }}>
+              Не удалось проверить датчики: {deleteCheckErr}
+            </span>
+            <button
+              onClick={handleCloseDelete}
+              style={{ marginLeft: 12, fontSize: 11, color: "#929292", background: "none", border: "none", cursor: "pointer" }}
+            >
+              Закрыть
+            </button>
+          </div>
+        )}
 
         {expanded && (
           <div className="sn-sensors-grid" onDragEnd={handleDragEnd}>
@@ -1081,14 +1284,14 @@ const BlockCard = ({
                 onDragOver={() => handleDragOver(sensor.id)}
                 onDrop={() => {}}
                 onEditThresholds={onEditThresholds}
-                onDeleteSensor={onDeleteSensor}   // ← ИСПРАВЛЕНО: прокидываем проп
+                onDeleteSensor={onDeleteSensor}
               />
             ))}
           </div>
         )}
       </div>
 
-      {/* Модал редактирования ЦБУ */}
+      {/* Редактирование ЦБУ */}
       {showEditBlock && (
         <EditBlockModal
           block={block}
@@ -1101,16 +1304,24 @@ const BlockCard = ({
         />
       )}
 
-      {/* Модал подтверждения удаления ЦБУ */}
-      {showDeleteBlock && (
+      {/* Удаление: датчиков нет — простое подтверждение */}
+      {deleteState === "confirmEmpty" && (
         <ConfirmModal
           title="Удалить ЦБУ"
-          message={`Удалить блок «${block.name}» (ID: ${block.id})? Все датчики этого блока также будут удалены. Это действие необратимо.`}
+          message={`Удалить блок «${block.name}» (ID: ${block.id})? Датчиков не привязано. Это действие необратимо.`}
           confirmLabel="Удалить ЦБУ"
-          onClose={() => setShowDeleteBlock(false)}
-          onConfirm={async () => {
-            await onDeleteBlock(block.id);
-          }}
+          onClose={handleCloseDelete}
+          onConfirm={handleConfirmDelete}
+        />
+      )}
+
+      {/* Удаление: датчики есть — предупреждение с выбором */}
+      {deleteState === "hasSensors" && (
+        <DeleteBlockWithSensorsModal
+          block={block}
+          attachedSensors={blockSensors}
+          onClose={handleCloseDelete}
+          onDetachAndDelete={handleDetachAndDelete}
         />
       )}
     </>
@@ -1129,7 +1340,7 @@ const LocationSection = ({
   onAddSensor,
   onEditBlock,
   onDeleteBlock,
-  onDeleteSensor,   // ← ИСПРАВЛЕНО: принимаем проп
+  onDeleteSensor,
   isReorderLocMode,
   onLocDragStart,
   onLocDragOver,
@@ -1182,7 +1393,7 @@ const LocationSection = ({
               onAddSensor={onAddSensor}
               onEditBlock={onEditBlock}
               onDeleteBlock={onDeleteBlock}
-              onDeleteSensor={onDeleteSensor}   // ← ИСПРАВЛЕНО: прокидываем проп
+              onDeleteSensor={onDeleteSensor}
               isSearching={isSearching}
             />
           ))}
@@ -1282,21 +1493,24 @@ const Sensors = () => {
     await fetchAll();
   };
 
-  // ─── НОВОЕ: удаление датчика ──────────────────────────────────────────────
   const handleDeleteSensor = async (sensorId) => {
     await apiDelete(`/api/v1/sensors/${sensorId}`);
     await fetchAll();
   };
 
-  // ─── НОВОЕ: редактирование ЦБУ ───────────────────────────────────────────
   const handleEditBlock = async (blockId, payload) => {
     await apiPatch(`/api/v1/control-units/${blockId}`, payload);
     await fetchAll();
   };
 
-  // ─── НОВОЕ: удаление ЦБУ ─────────────────────────────────────────────────
-  const handleDeleteBlock = async (blockId) => {
-    await apiDelete(`/api/v1/control-units/${blockId}`);
+  // ─── Удаление ЦБУ ────────────────────────────────────────────────────────
+  // detach=true  → DELETE /api/v1/control-units/{id}?detach_sensors=true
+  // detach=false → DELETE /api/v1/control-units/{id}  (обычное, только если нет датчиков)
+  const handleDeleteBlock = async (blockId, detach = false) => {
+    const url = detach
+      ? `/api/v1/control-units/${blockId}?detach_sensors=true`
+      : `/api/v1/control-units/${blockId}`;
+    await apiDelete(url);
     await fetchAll();
   };
 
@@ -1538,7 +1752,7 @@ const Sensors = () => {
                   onDragOver={() => {}}
                   onDrop={() => {}}
                   onEditThresholds={handleEditThresholds}
-                  onDeleteSensor={handleDeleteSensor}   // ← ИСПРАВЛЕНО: передаём в поиске
+                  onDeleteSensor={handleDeleteSensor}
                 />
               ))}
             </div>
@@ -1572,7 +1786,7 @@ const Sensors = () => {
                   onAddSensor={(blk) => { setAddSensorBlock(blk); setShowAddSensor(true); }}
                   onEditBlock={handleEditBlock}
                   onDeleteBlock={handleDeleteBlock}
-                  onDeleteSensor={handleDeleteSensor}   // ← ИСПРАВЛЕНО: передаём везде
+                  onDeleteSensor={handleDeleteSensor}
                   isReorderLocMode={isReorderLocMode}
                   onLocDragStart={() => handleLocDragStart(loc.id)}
                   onLocDragOver={() => handleLocDragOver(loc.id)}

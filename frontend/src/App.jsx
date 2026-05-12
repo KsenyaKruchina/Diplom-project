@@ -80,25 +80,18 @@ const IconLogout = () => (
   </svg>
 );
 
-// ─── Отображение роли ─────────────────────────────────────────────────────────
+// Роли
 // admin  → "Администратор" (Temperature KZ, полный контроль)
-// editor → "Редактор"      (Клиент-менеджер, управление порогами и датчиками)
-// viewer → "Наблюдатель"   (Охранник, только просмотр + квитирование алармов)
+// editor → "Редактор"      (Компания, управление порогами и датчиками)
+// viewer → "Наблюдатель"   (Сотрудник, только просмотр + устранение алармов)
 const ROLE_DISPLAY = {
   admin:  "Администратор",
   editor: "Редактор",
   viewer: "Наблюдатель",
 };
 
-// ─── Пункты меню ─────────────────────────────────────────────────────────────
-// Все пункты доступны всем ролям.
-// Что именно видит пользователь ВНУТРИ каждой страницы —
-// определяется логикой самого компонента на основе role из useAuth().
-//
-// Страница «Настройки»:
-//   admin  → локации + пользователи всех компаний + аудит-лог + профиль
-//   editor → пользователи своей локации + история действий + профиль
-//   viewer → только блок профиля (имя, роль, email, кнопка «редактировать имя»)
+// Пункты меню 
+
 const NAV_ITEMS = [
   { id: "dashboard", label: "Дашборд",     Icon: IconDashboard },
   { id: "sensors",   label: "Датчики",     Icon: IconSensors   },
@@ -107,10 +100,11 @@ const NAV_ITEMS = [
   { id: "settings",  label: "Настройки",   Icon: IconSettings  },
 ];
 
-// ─── Боковое меню ─────────────────────────────────────────────────────────────
+// Боковое меню 
 const Sidebar = ({ activePage, onNavigate }) => {
   const { user, logout } = useAuth();
 
+// для аватарки инициалы
   const initials = user?.full_name
     ? user.full_name.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase()
     : (user?.username || "?").slice(0, 2).toUpperCase();
@@ -121,7 +115,8 @@ const Sidebar = ({ activePage, onNavigate }) => {
         TEMPERATURA.KZ
       </div>
 
-      <nav className="app-sidebar-nav">
+
+      <nav className="app-sidebar-nav"> 
         {NAV_ITEMS.map(({ id, label, Icon }) => {
           const active = activePage === id;
           return (
@@ -157,7 +152,7 @@ const Sidebar = ({ activePage, onNavigate }) => {
   );
 };
 
-// ─── Основной макет ───────────────────────────────────────────────────────────
+// Основной макет, первая страница выходит Дэшборд 
 const AppLayout = () => {
   const [activePage, setActivePage] = useState("dashboard");
 
@@ -172,6 +167,7 @@ const AppLayout = () => {
     }
   };
 
+// две колонки — Sidebar слева и main справа, которые работаю сообща
   return (
     <div className="app-screen">
       <Sidebar activePage={activePage} onNavigate={setActivePage} />
@@ -182,7 +178,9 @@ const AppLayout = () => {
   );
 };
 
-// ─── Роутер ───────────────────────────────────────────────────────────────────
+//Если данные ещё загружаются → показываем спиннер
+//Если пользователь не авторизован (user = null) → показываем страницу входа
+//Если авторизован → показываем основное приложение
 const AppRouter = () => {
   const { user, loading } = useAuth();
 
@@ -199,7 +197,7 @@ const AppRouter = () => {
   return <AppLayout />;
 };
 
-// ─── Root ─────────────────────────────────────────────────────────────────────
+// ЛЮБОЙ компонент внутри (AppRouter, Sidebar, Dashboard...) может вызвать useAuth() и получить данные пользователя.
 const App = () => (
   <AuthProvider>
     <AppRouter />

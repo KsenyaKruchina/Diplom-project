@@ -1,5 +1,5 @@
 // frontend/src/hooks/useSensorsData.js
-// ─── Хук для страницы Датчики ─────────────────────────────────────────────────
+//  Хук для страницы Датчики 
 //
 // Загружает датчики, телеметрию, поддерживает live-обновления через WebSocket.
 
@@ -18,7 +18,7 @@ export const useSensorsData = () => {
   const [error,     setError]     = useState(null);
   const mountedRef = useRef(true);
 
-  // ─── Загрузить всё ─────────────────────────────────────────────────────────
+  //  Загрузить всё 
 
   const fetchAll = useCallback(async () => {
     setLoading(true);
@@ -46,7 +46,7 @@ export const useSensorsData = () => {
     }
   }, []);
 
-  // ─── Загрузить историю для конкретного датчика ─────────────────────────────
+  //  Загрузить историю для конкретного датчика 
 
   const fetchSensorHistory = useCallback(async (sensorId) => {
     if (histories.has(sensorId)) return; // уже загружено
@@ -80,7 +80,7 @@ export const useSensorsData = () => {
     }
   }, [histories]);
 
-  // ─── Обновить пороги через API ─────────────────────────────────────────────
+  //  Обновить пороги через API 
 
   const saveThresholds = useCallback(async (sensorId, thresholds) => {
     await updateSensorThresholds(sensorId, {
@@ -104,7 +104,7 @@ export const useSensorsData = () => {
     ));
   }, []);
 
-  // ─── Монтирование / размонтирование ────────────────────────────────────────
+  // Монтирование / размонтирование 
 
   useEffect(() => {
     mountedRef.current = true;
@@ -130,7 +130,7 @@ export const useSensorsData = () => {
     };
   }, [fetchAll]);
 
-  // ─── Преобразовать данные для компонента SensorDetailCard ──────────────────
+  //  Преобразовать данные для компонента SensorDetailCard 
 
   /**
    * Преобразует датчик из API в формат, который ожидает Sensors.jsx.

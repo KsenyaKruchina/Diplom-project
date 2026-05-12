@@ -1,5 +1,5 @@
 // frontend/src/services/locationsService.js
-// ─── Сервис локаций ───────────────────────────────────────────────────────────
+//  Сервис локаций 
 
 import { apiRequest, apiUpload } from "./api";
 

@@ -1,5 +1,5 @@
 // frontend/src/pages/LoginPage.jsx
-// ─── Страница входа ───────────────────────────────────────────────────────────
+// Страница входа 
 
 import React, { useState } from "react";
 import { useAuth } from "../context/AuthContext";
@@ -11,6 +11,8 @@ const LoginPage = ({ onSuccess }) => {
   const [loading,  setLoading]  = useState(false);
   const [error,    setError]    = useState("");
 
+
+  //e.preventDefault() — отменяем перезагрузку страницы при отправке формы
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");

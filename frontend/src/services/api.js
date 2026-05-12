@@ -1,21 +1,20 @@
 // frontend/src/services/api.js
-// ─── Базовый API-клиент ───────────────────────────────────────────────────────
+// Базовый API-клиент 
 // Все запросы к бэкенду идут через этот файл.
 // Он автоматически подставляет токен и обрабатывает ошибки.
 
-// 🔥 БЕРЁМ URL ИЗ ПЕРЕМЕННЫХ ОКРУЖЕНИЯ
+// URL ИЗ ПЕРЕМЕННЫХ ОКРУЖЕНИЯ
 const BASE_URL = import.meta.env.VITE_API_BASE_URL || "/api/v1";
 
-console.log("API Base URL:", BASE_URL); // Для отладки — убедись, что URL правильный
+console.log("API Base URL:", BASE_URL); 
 
-// ─── Вспомогательные функции для токена ──────────────────────────────────────
+// Вспомогательные функции хранения токена в localStorage
 
 export const getToken = () => localStorage.getItem("token");
 export const setToken = (token) => localStorage.setItem("token", token);
 export const removeToken = () => localStorage.removeItem("token");
 
-// ─── Основная функция запроса ─────────────────────────────────────────────────
-
+// Основная функция всех запросов 
 /**
  * Универсальная функция для всех HTTP-запросов.
  * Автоматически добавляет Authorization-заголовок.
@@ -23,11 +22,11 @@ export const removeToken = () => localStorage.removeItem("token");
  *
  * @param {string} path - путь после /api/v1, например "/sensors/"
  * @param {object} options - стандартные fetch-опции (method, body, headers...)
- * @returns {Promise<any>} - распарсенный JSON или null
+ * @returns {Promise<any>} 
  */
 export const apiRequest = async (path, options = {}) => {
   const token = getToken();
-
+// заголовки запросов
   const headers = {
     "Content-Type": "application/json",
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -36,7 +35,7 @@ export const apiRequest = async (path, options = {}) => {
 
   const url = `${BASE_URL}${path}`;
   console.log(`📡 ${options.method || 'GET'} ${url}`); // Для отладки
-
+//Делаем запрос. fetch — встроенная функция браузера для HTTP-запросов. await — ждём ответа. response — это ответ сервера.
   const response = await fetch(url, {
     ...options,
     headers,
@@ -71,7 +70,6 @@ export const apiRequest = async (path, options = {}) => {
             : JSON.stringify(errorData.detail);
       }
     } catch {
-      // Если JSON не парсится — оставляем дефолтное сообщение
     }
     throw new Error(errorMessage);
   }
@@ -82,11 +80,10 @@ export const apiRequest = async (path, options = {}) => {
   return response.json();
 };
 
-// ─── Специальная функция для multipart/form-data (загрузка файлов) ────────────
+// Специальная функция для multipart/form-data (загрузка файлов)
 
-/**
- * Для загрузки файлов — НЕ ставим Content-Type, браузер сам добавит boundary.
- */
+//Для загрузки файлов — НЕ ставим Content-Type, браузер сам добавит boundary.
+ 
 export const apiUpload = async (path, formData, method = "POST") => {
   const token = getToken();
 
@@ -116,11 +113,10 @@ export const apiUpload = async (path, formData, method = "POST") => {
   return response.json();
 };
 
-// ─── Специальная функция для логина (form-urlencoded) ─────────────────────────
+//  Специальная функция для логина (form-urlencoded)
 
-/**
- * Логин использует application/x-www-form-urlencoded — это требование OAuth2/FastAPI.
- */
+// Логин использует application/x-www-form-urlencoded — это требование OAuth2/FastAPI.
+ 
 export const apiLogin = async (username, password) => {
   const url = `${BASE_URL}/auth/login`;
   console.log("🔐 Login URL:", url); // Для отладки
@@ -144,7 +140,6 @@ export const apiLogin = async (username, password) => {
   return data; // { access_token, token_type }
 };
 
-// ─── НОВЫЕ ФУНКЦИИ ДЛЯ ФИЛЬТРАЦИИ ПО РОЛЯМ ─────────────────────────────────────
 
 /**
  * Получение локаций пользователя с учётом роли

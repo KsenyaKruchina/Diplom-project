@@ -13,24 +13,24 @@ const WS_URL = `${window.location.protocol === "https:" ? "wss" : "ws"}://${
   
   class WebSocketService {
     constructor() {
-      this.ws = null;
-      this.listeners = {}; // { eventType: [callback, ...] }
-      this.reconnectTimeout = null;
-      this.shouldReconnect = true;
-      this.reconnectDelay = 3000; // мс
+      this.ws = null;              // само WebSocket-соединение
+      this.listeners = {};         // подписчики: { тип_события: [функции...] }
+      this.reconnectTimeout = null; // таймер переподключения
+      this.shouldReconnect = true; // флаг: нужно ли переподключаться
+      this.reconnectDelay = 3000;  // задержка переподключения (мс)
     }
   
-    /**
-     * Подключиться к WebSocket.
-     * Безопасно вызывать несколько раз — повторного подключения не будет,
-     * если уже подключён.
-     */
+//Подключиться к WebSocket. повторного подключения не будет, если уже подключён.
+    
     connect() {
       if (this.ws && this.ws.readyState === WebSocket.OPEN) return;
   
       try {
         this.ws = new WebSocket(WS_URL);
-  
+  //onopen — функция вызовется когда соединение установлено. 
+  // onmessage — когда придёт сообщение. onclose — когда соединение закроется. 
+  // onerror — при ошибке.
+
         this.ws.onopen = () => {
           console.log("[WS] Подключён к серверу");
           this.reconnectDelay = 3000; // сброс задержки при успешном подключении
@@ -112,7 +112,7 @@ const WS_URL = `${window.location.protocol === "https:" ? "wss" : "ws"}://${
         }
       });
     }
-  
+  // При отключении пытаемся переподключиться с экспоненциальным бэкоффом. Первый раз ждём 3 секунды, потом 4.5, потом 6.75... до 30 секунд.
     _scheduleReconnect() {
       if (this.reconnectTimeout) clearTimeout(this.reconnectTimeout);
       console.log(`[WS] Переподключение через ${this.reconnectDelay / 1000}с...`);
@@ -120,11 +120,10 @@ const WS_URL = `${window.location.protocol === "https:" ? "wss" : "ws"}://${
         this.shouldReconnect = true;
         this.connect();
       }, this.reconnectDelay);
-      // Экспоненциальный бэкофф (макс. 30 секунд)
       this.reconnectDelay = Math.min(this.reconnectDelay * 1.5, 30000);
     }
   }
   
-  // ─── Синглтон ─────────────────────────────────────────────────────────────────
-  // Один экземпляр на всё приложение
+  // Создаём один экземпляр (синглтон) на всё приложение. 
+  // Все компоненты используют один и тот же объект — одно WebSocket-соединение.
   export const wsService = new WebSocketService();

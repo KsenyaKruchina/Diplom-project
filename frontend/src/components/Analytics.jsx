@@ -18,8 +18,6 @@ const authHeaders = () => ({
 
 // ── Telemetry helpers ─────────────────────────────────────────────────────────
 
-// FIX: API возвращает { sensor_id, sensor_name, measurements: [...], latest: {...} }
-// Добавлен limit=1000 для получения достаточного количества данных
 const fetchSensorHistory = async (sensorId, startTime, endTime) => {
   const params = new URLSearchParams({
     start_time: startTime,
@@ -31,7 +29,7 @@ const fetchSensorHistory = async (sensorId, startTime, endTime) => {
     { headers: authHeaders() }
   );
   if (!res.ok) throw new Error(`Ошибка получения истории: ${res.status}`);
-  return res.json(); // { sensor_id, sensor_name, measurements: [...], latest: {...} }
+  return res.json();
 };
 
 const fetchSensorHistoryByPeriod = async (sensorId, limit = 500) => {
@@ -40,7 +38,7 @@ const fetchSensorHistoryByPeriod = async (sensorId, limit = 500) => {
     { headers: authHeaders() }
   );
   if (!res.ok) throw new Error(`Ошибка получения истории: ${res.status}`);
-  return res.json(); // { sensor_id, sensor_name, measurements: [...], latest: {...} }
+  return res.json();
 };
 
 const fetchSensorLast24h = async (sensorId) => {
@@ -49,22 +47,17 @@ const fetchSensorLast24h = async (sensorId) => {
     { headers: authHeaders() }
   );
   if (!res.ok) throw new Error(`Ошибка получения данных за 24ч: ${res.status}`);
-  return res.json(); // { sensor_id, sensor_name, measurements: [...], latest: {...} }
+  return res.json();
 };
 
-// ── FIX: Правильное извлечение measurements из ответа API ────────────────────
 const extractMeasurements = (apiResponse) => {
   if (!apiResponse) return [];
-  // API возвращает объект с полем measurements
   if (Array.isArray(apiResponse.measurements)) return apiResponse.measurements;
-  // Fallback: если вдруг пришёл массив напрямую
   if (Array.isArray(apiResponse)) return apiResponse;
-  // Fallback для других форматов
   if (Array.isArray(apiResponse.data)) return apiResponse.data;
   return [];
 };
 
-// ── FIX: Прореживание массива до нужного кол-ва точек ────────────────────────
 const downsample = (arr, target) => {
   if (!arr || arr.length === 0) return [];
   if (arr.length <= target) return arr;
@@ -77,82 +70,135 @@ const downsample = (arr, target) => {
 
 // ── Download ──────────────────────────────────────────────────────────────────
 
-const REPORT_ENDPOINTS = {
-  location:     "download-events-location",
-  control_unit: "download-events-control-unit",
-  sensor:       "download-events-sensor",
+// FIX: используем download-period-* эндпоинты для полных отчётов (с KPI, графиками и журналом тревог)
+// download-events-* — только для отчётов исключительно по журналу событий
+const FULL_REPORT_ENDPOINTS = {
+  sensor:       "download-period",
+  control_unit: "download-period-control-unit",
+  location:     "download-period-location",
 };
 
+// FIX: добавлены все значения периодов из API-контракта
 const PERIOD_API_MAP = {
-  day:   "last_24_hours",
-  week:  "last_week",
-  month: "last_month",
-  year:  "last_year",
+  day:      "last_24_hours",
+  week:     "last_week",
+  month:    "last_month",
+  month2:   "last_2_months",
+  month3:   "last_3_months",
+  month6:   "last_6_months",
+  year:     "last_year",
+};
+
+// FIX: ожидаемые Content-Type для проверки ответа сервера
+const EXPECTED_CONTENT_TYPES = {
+  xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  pdf:  "application/pdf",
+  csv:  "text/csv",
 };
 
 const downloadReport = async ({ entityType, entityId, period, format, customRange }) => {
-  const endpoint = REPORT_ENDPOINTS[entityType];
+  const endpoint = FULL_REPORT_ENDPOINTS[entityType];
   if (!endpoint) throw new Error("Неизвестный тип сущности");
 
-  const isXlsx = format === "xlsx";
+  // FIX: валидация дат для custom-периода до отправки запроса
+  if (customRange) {
+    const from = new Date(customRange.from);
+    const to   = new Date(customRange.to);
+    if (from > to) {
+      throw new Error("Дата начала не может быть позже даты окончания");
+    }
+  }
 
   const params = new URLSearchParams();
   if (customRange) {
-    params.set("period", "custom");
-    params.set("start_date", customRange.from);
-    params.set("end_date", customRange.to);
+    params.set("period",     "custom");
+    params.set("start_date", customRange.from); // YYYY-MM-DD
+    params.set("end_date",   customRange.to);   // YYYY-MM-DD
   } else {
-    params.set("period", period);
+    params.set("period", PERIOD_API_MAP[period] || "last_month");
   }
-  params.set("format", isXlsx ? "xlsx" : "pdf");
+  params.set("format", format); // xlsx | pdf | csv
 
   const url = `${BASE_URL}/reports/${endpoint}/${entityId}?${params}`;
   const token = getToken();
 
+  const acceptHeader = {
+    xlsx: EXPECTED_CONTENT_TYPES.xlsx,
+    pdf:  EXPECTED_CONTENT_TYPES.pdf,
+    csv:  EXPECTED_CONTENT_TYPES.csv,
+  }[format] || "*/*";
+
   const response = await fetch(url, {
     headers: {
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...(isXlsx
-        ? { Accept: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }
-        : { Accept: "application/pdf" }
-      ),
+      Accept: acceptHeader,
     },
   });
 
-  if (response.status === 403) throw new Error("Нет доступа к этой сущности");
-  if (response.status === 422) {
-    let detail = "Неверные параметры запроса (422)";
-    try {
-      const body = await response.json();
-      if (body?.detail) {
-        detail = Array.isArray(body.detail)
-          ? body.detail.map(e => `${e.loc?.join(".")} — ${e.msg}`).join("; ")
-          : String(body.detail);
-      }
-    } catch {}
-    throw new Error(detail);
-  }
+  // FIX: сначала проверяем HTTP status — тело ответа НЕ трогаем до успешного статуса
   if (!response.ok) {
+    // Читаем ошибку как текст/JSON и показываем пользователю
     let msg = `Ошибка ${response.status}`;
-    try { const e = await response.json(); if (e.detail) msg = e.detail; } catch {}
+    try {
+      const contentType = response.headers.get("Content-Type") || "";
+      if (contentType.includes("application/json")) {
+        const body = await response.json();
+        if (body?.detail) {
+          msg = Array.isArray(body.detail)
+            ? body.detail.map(e => `${e.loc?.join(".")} — ${e.msg}`).join("; ")
+            : String(body.detail);
+        } else if (body?.message) {
+          msg = body.message;
+        }
+      } else {
+        const text = await response.text();
+        if (text) msg = text.slice(0, 200);
+      }
+    } catch {
+      // игнорируем ошибку парсинга, оставляем дефолтный msg
+    }
+
+    if (response.status === 400) throw new Error(`Неверные параметры запроса: ${msg}`);
+    if (response.status === 403) throw new Error("Нет доступа к этому объекту");
+    if (response.status === 404) throw new Error("Объект не найден. Проверьте правильность выбранного элемента");
+    if (response.status === 500) throw new Error("Ошибка генерации отчёта на сервере. Попробуйте позже");
     throw new Error(msg);
   }
 
-  const cd = response.headers.get("Content-Disposition") || "";
-  const m  = cd.match(/filename[^;=\n]*=([^;\n]*)/);
-  const ext = isXlsx ? "xlsx" : "pdf";
+  // FIX: проверяем Content-Type ответа — убеждаемся, что сервер вернул нужный формат,
+  // а не JSON-ошибку. Если Content-Type не совпадает — не сохраняем файл.
+  const responseContentType = response.headers.get("Content-Type") || "";
+  const expectedCT = EXPECTED_CONTENT_TYPES[format];
+  if (expectedCT && !responseContentType.includes(expectedCT.split(";")[0].trim())) {
+    // Сервер вернул не тот тип — читаем как текст и показываем ошибку
+    let serverMsg = "Сервер вернул неожиданный формат файла";
+    try {
+      if (responseContentType.includes("application/json")) {
+        const body = await response.json();
+        if (body?.detail) serverMsg = String(body.detail);
+      }
+    } catch {}
+    throw new Error(serverMsg);
+  }
+
+  // FIX: имя файла берём из Content-Disposition или генерируем сами
+  const cd  = response.headers.get("Content-Disposition") || "";
+  const m   = cd.match(/filename[^;=\n]*=([^;\n]*)/);
+  const ext = format; // расширение всегда совпадает с параметром format
   const filename = m
     ? m[1].replace(/['"]/g, "").trim()
     : `report_${entityType}_${entityId}_${new Date().toISOString().slice(0, 10)}.${ext}`;
 
-  const blob = await response.blob();
+  // Только после всех проверок — сохраняем файл
+  const blob   = await response.blob();
   const blobUrl = URL.createObjectURL(blob);
   const a = document.createElement("a");
-  a.href = blobUrl;
+  a.href     = blobUrl;
   a.download = filename;
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
+  // FIX: освобождаем object URL после скачивания
   URL.revokeObjectURL(blobUrl);
 };
 
@@ -161,20 +207,36 @@ const downloadReport = async ({ entityType, entityId, period, format, customRang
 const getPeriodRange = (period) => {
   const now = new Date();
   const starts = {
-    day:   new Date(now - 24 * 60 * 60 * 1000).toISOString(),
-    week:  new Date(now - 7  * 24 * 60 * 60 * 1000).toISOString(),
-    month: new Date(now - 30 * 24 * 60 * 60 * 1000).toISOString(),
-    year:  new Date(now - 365* 24 * 60 * 60 * 1000).toISOString(),
+    day:    new Date(now - 24 * 60 * 60 * 1000).toISOString(),
+    week:   new Date(now - 7  * 24 * 60 * 60 * 1000).toISOString(),
+    month:  new Date(now - 30 * 24 * 60 * 60 * 1000).toISOString(),
+    month2: new Date(now - 60 * 24 * 60 * 60 * 1000).toISOString(),
+    month3: new Date(now - 90 * 24 * 60 * 60 * 1000).toISOString(),
+    month6: new Date(now - 180* 24 * 60 * 60 * 1000).toISOString(),
+    year:   new Date(now - 365* 24 * 60 * 60 * 1000).toISOString(),
   };
   return { start: starts[period] || starts.month, end: now.toISOString() };
 };
 
 const MONTH_LABELS = ["Янв","Фев","Мар","Апр","Май","Июн","Июл","Авг","Сен","Окт","Ноя","Дек"];
-const PERIODS = [
+
+// Периоды для графика (визуализация)
+const CHART_PERIODS = [
   { key: "day",   label: "День" },
   { key: "week",  label: "Нед"  },
   { key: "month", label: "Мес"  },
   { key: "year",  label: "Год"  },
+];
+
+// Периоды для экспорта (все периоды из API-контракта)
+const EXPORT_PERIODS = [
+  { key: "day",    label: "24ч"   },
+  { key: "week",   label: "Нед"   },
+  { key: "month",  label: "Мес"   },
+  { key: "month2", label: "2 мес" },
+  { key: "month3", label: "3 мес" },
+  { key: "month6", label: "6 мес" },
+  { key: "year",   label: "Год"   },
 ];
 
 const getLabels = (period) => {
@@ -251,6 +313,13 @@ const IconXLSX = () => (
     <text x="22" y="41" textAnchor="middle" fill="#01e676" fontSize="8" fontFamily="Inter, sans-serif" fontWeight="700">XLSX</text>
   </svg>
 );
+const IconCSV = () => (
+  <svg width="44" height="44" viewBox="0 0 44 44" fill="none">
+    <rect x="6" y="3" width="24" height="30" rx="2.5" fill="#1a1a1a" stroke="#64b5f6" strokeWidth="1.4"/>
+    <path d="M30 3l8 8h-8V3z" fill="#64b5f6" fillOpacity="0.5"/>
+    <text x="22" y="41" textAnchor="middle" fill="#64b5f6" fontSize="8" fontFamily="Inter, sans-serif" fontWeight="700">CSV</text>
+  </svg>
+);
 
 // ── Dropdown ──────────────────────────────────────────────────────────────────
 const Dropdown = ({ icon, options, value, onChange, placeholder }) => {
@@ -298,6 +367,20 @@ const Dropdown = ({ icon, options, value, onChange, placeholder }) => {
 const DatePickerModal = ({ onClose, onApply }) => {
   const [from, setFrom] = useState("");
   const [to, setTo]     = useState("");
+  const [dateError, setDateError] = useState("");
+
+  const handleApply = () => {
+    if (!from || !to) return;
+    // FIX: валидация — start_date не может быть позже end_date
+    if (new Date(from) > new Date(to)) {
+      setDateError("Дата начала не может быть позже даты окончания");
+      return;
+    }
+    setDateError("");
+    onApply(from, to);
+    onClose();
+  };
+
   return (
     <div className="an-overlay" onClick={onClose}>
       <div className="an-modal" onClick={e => e.stopPropagation()}>
@@ -309,20 +392,23 @@ const DatePickerModal = ({ onClose, onApply }) => {
           <div className="an-modal-fields">
             <div className="an-modal-field">
               <label className="an-modal-label">От</label>
-              <input className="an-modal-input" type="date" value={from} onChange={e=>setFrom(e.target.value)}/>
+              <input className="an-modal-input" type="date" value={from} onChange={e => { setFrom(e.target.value); setDateError(""); }}/>
             </div>
             <div className="an-modal-field">
               <label className="an-modal-label">До</label>
-              <input className="an-modal-input" type="date" value={to} onChange={e=>setTo(e.target.value)}/>
+              <input className="an-modal-input" type="date" value={to} onChange={e => { setTo(e.target.value); setDateError(""); }}/>
             </div>
           </div>
+          {dateError && (
+            <div style={{ fontSize: "12px", color: "#ff5252", marginTop: "8px" }}>{dateError}</div>
+          )}
         </div>
         <div className="an-modal-footer">
           <button className="an-btn-cancel" onClick={onClose}>Отмена</button>
           <button
             className="an-btn-save"
             disabled={!from || !to}
-            onClick={() => { if (from && to) { onApply(from, to); onClose(); } }}>
+            onClick={handleApply}>
             Применить
           </button>
         </div>
@@ -366,9 +452,11 @@ const REPORT_TYPES = [
   { key: "sensor",       label: "По датчику",  placeholder: "Выбрать датчик",   icon: <IconSensor />,      color: "#ffc207" },
 ];
 
+// FIX: добавлен CSV формат
 const EXPORT_FORMATS = [
   { key: "pdf",  label: "PDF",   icon: <IconPDF />,  color: "#ff5252", bg: "rgba(255,82,82,0.08)" },
   { key: "xlsx", label: "Excel", icon: <IconXLSX />, color: "#01e676", bg: "rgba(1,230,118,0.08)" },
+  { key: "csv",  label: "CSV",   icon: <IconCSV />,  color: "#64b5f6", bg: "rgba(100,181,246,0.08)" },
 ];
 
 // ── Main ──────────────────────────────────────────────────────────────────────
@@ -451,7 +539,7 @@ export const Analytics = () => {
     setExportError("");
   }, [reportType]);
 
-  // ── FIX: Загрузка телеметрии с правильным парсингом ответа API ──────────────
+  // ── Загрузка телеметрии ──────────────────────────────────────────────────────
   useEffect(() => {
     if (!filterSensor) {
       setChartTemp([]);
@@ -465,51 +553,39 @@ export const Analytics = () => {
       setHistLoading(true);
       setHistError("");
 
-      const uiPeriod = chartPeriod; // "day" | "week" | "month" | "year"
+      const uiPeriod = chartPeriod;
       const targetPoints = CHART_POINTS[uiPeriod] || 60;
 
       try {
         let apiResponse;
 
         if (customRange) {
-          // Произвольный диапазон — передаём start_time / end_time
           apiResponse = await fetchSensorHistory(
             filterSensor,
             `${customRange.from}T00:00:00`,
             `${customRange.to}T23:59:59`
           );
         } else if (uiPeriod === "day") {
-          // Последние 24 часа — специальный endpoint
           apiResponse = await fetchSensorLast24h(filterSensor);
         } else {
-          // Остальные периоды — history с нужным лимитом
           const limit = API_LIMITS[uiPeriod] || 500;
           apiResponse = await fetchSensorHistoryByPeriod(filterSensor, limit);
         }
 
-        // FIX: Извлекаем measurements из объекта ответа
         const measurements = extractMeasurements(apiResponse);
 
-        // Сортируем по времени (от старых к новым)
         const sorted = [...measurements].sort(
           (a, b) => new Date(a.timestamp) - new Date(b.timestamp)
         );
 
-        // Прореживаем до нужного кол-ва точек для графика
         const sampled = downsample(sorted, targetPoints);
 
-        // Извлекаем значения температуры и влажности
-        const temps = sampled
-          .map(m => m.temperature)
-          .filter(v => v != null && !isNaN(v));
-        const hums = sampled
-          .map(m => m.humidity)
-          .filter(v => v != null && !isNaN(v));
+        const temps = sampled.map(m => m.temperature).filter(v => v != null && !isNaN(v));
+        const hums  = sampled.map(m => m.humidity).filter(v => v != null && !isNaN(v));
 
         setChartTemp(temps);
         setChartHum(hums);
 
-        // Последнее значение — из поля latest или из последнего measurement
         const latest = apiResponse?.latest ?? (sorted.length > 0 ? sorted[sorted.length - 1] : null);
         if (latest) {
           setLatestData({
@@ -554,7 +630,7 @@ export const Analytics = () => {
 
   const exportPeriodLabel = exportCustom
     ? `${exportCustom.from} – ${exportCustom.to}`
-    : { day: "День", week: "Неделя", month: "Месяц", year: "Год" }[exportPeriod];
+    : EXPORT_PERIODS.find(p => p.key === exportPeriod)?.label || exportPeriod;
 
   const entityLabel = exportEntityId
     ? exportOptions().find(o => o.value === exportEntityId)?.label
@@ -573,7 +649,7 @@ export const Analytics = () => {
       await downloadReport({
         entityType:  reportType,
         entityId:    exportEntityId,
-        period:      PERIOD_API_MAP[exportPeriod] || "last_month",
+        period:      exportPeriod,
         format:      exportFormat,
         customRange: exportCustom,
       });
@@ -609,7 +685,6 @@ export const Analytics = () => {
   const labels = getLabels(chartPeriod);
   const n = CHART_POINTS[chartPeriod] || 30;
 
-  // Показываем реальные данные если датчик выбран, иначе демо
   const displayTemp = chartTemp.length > 0 ? chartTemp : (!filterSensor ? genFallback(n) : []);
   const displayHum  = chartHum.length  > 0 ? chartHum  : (!filterSensor ? genFallback(n) : []);
 
@@ -705,7 +780,7 @@ export const Analytics = () => {
                   <p className="an-chart-sub">{chartSubLabel}</p>
                 </div>
                 <div className="an-period-bar">
-                  {PERIODS.map(p => (
+                  {CHART_PERIODS.map(p => (
                     <button key={p.key}
                       className={`an-period-btn ${chartPeriod === p.key && !customRange ? "an-period-btn--active" : ""}`}
                       onClick={() => { setChartPeriod(p.key); setCustomRange(null); }}>
@@ -778,7 +853,7 @@ export const Analytics = () => {
                 <IconCalendar />
                 <span className="an-export-context-key">Период:</span>
                 <div className="an-period-bar an-period-bar--inline">
-                  {PERIODS.map(p => (
+                  {EXPORT_PERIODS.map(p => (
                     <button key={p.key}
                       className={`an-period-btn ${exportPeriod === p.key && !exportCustom ? "an-period-btn--active" : ""}`}
                       onClick={() => { setExportPeriod(p.key); setExportCustom(null); }}>
@@ -816,6 +891,13 @@ export const Analytics = () => {
               ))}
             </div>
 
+            {/* FIX: подсказка для CSV — нет графиков */}
+            {exportFormat === "csv" && (
+              <div style={{ fontSize:"12px", color:"#929292", padding:"4px 0" }}>
+                CSV содержит только табличные данные без графиков
+              </div>
+            )}
+
             {exportError && (
               <div style={{ fontSize:"12px", color:"#ff5252", padding:"4px 0" }}>{exportError}</div>
             )}
@@ -825,7 +907,7 @@ export const Analytics = () => {
               style={{
                 borderColor:     currentFormatCfg.color,
                 color:           currentFormatCfg.color,
-                backgroundColor: exportFormat === "pdf" ? "#1a1010" : "#0f1a12",
+                backgroundColor: exportFormat === "pdf" ? "#1a1010" : exportFormat === "xlsx" ? "#0f1a12" : "#0f1318",
                 opacity:         exportLoading ? 0.7 : 1,
               }}
               onClick={doExport}

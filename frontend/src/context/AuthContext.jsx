@@ -1,18 +1,31 @@
 // frontend/src/context/AuthContext.jsx
+// глобальная память авторизации и прав доступа
+// createContext — создать контейнер данных.
+// useContext — получить данные из контейнера. 
+// useState — локальное состояние. useEffect — код при монтировании/изменениях. 
+// useCallback — оптимизация функций.
+
+
 import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
 import { login as loginService, logout as logoutService, getCurrentUser } from "../services/authService";
 import { isAuthenticated } from "../services/authService";
 import { wsService } from "../services/websocketService";
 import { getUserLocations } from "../services/api";
 
+// коробка для хранения данных о текущем пользователе и его правах доступа
 const AuthContext = createContext(null);
 
+// user — объект текущего пользователя (или null если не авторизован)
+// loading — true пока идёт проверка авторизации (при запуске)
+// error — текст ошибки при входе
+// userLocations — список локаций, к которым имеет доступ этот пользователь
 export const AuthProvider = ({ children }) => {
   const [user, setUser]       = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState(null);
   const [userLocations, setUserLocations] = useState([]);
 
+  //Функция загрузки локаций
   const fetchUserLocations = useCallback(async () => {
     if (!isAuthenticated()) return;
     try {
@@ -42,6 +55,7 @@ export const AuthProvider = ({ children }) => {
     return () => { wsService.disconnect(); };
   }, [fetchUserLocations]);
 
+//Функция входа
   const login = useCallback(async (username, password) => {
     setError(null);
     try {
@@ -65,9 +79,10 @@ export const AuthProvider = ({ children }) => {
 
   const role = user?.role ?? null;
 
+  // Объект value, который будет доступен всем компонентам, использующим useAuth().
   const value = {
     user,
-    userLocations, // ← список ID локаций, к которым имеет доступ пользователь
+    userLocations, 
     loading,
     error,
     login,
@@ -78,7 +93,7 @@ export const AuthProvider = ({ children }) => {
     isEditor: role === "editor",
     isViewer: role === "viewer",
 
-    // ─── Флаги доступа ───────────────────────────────────────────────────────
+    // Редактирование локаций — admin + editor
 
     // Редактирование порогов датчиков — admin + editor
     canEdit: role === "admin" || role === "editor",
