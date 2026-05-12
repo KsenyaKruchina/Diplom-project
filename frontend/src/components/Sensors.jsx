@@ -17,7 +17,6 @@ const apiFetch = async (path, opts = {}) => {
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
-    // FastAPI validation errors: detail is an array of {loc, msg, type}
     let message;
     if (Array.isArray(err.detail)) {
       message = err.detail
@@ -32,12 +31,15 @@ const apiFetch = async (path, opts = {}) => {
     console.error(`API error ${res.status} on ${path}:`, err);
     throw new Error(message);
   }
-  return res.json();
+  // DELETE может вернуть пустой ответ
+  const text = await res.text();
+  return text ? JSON.parse(text) : {};
 };
 
 const apiGet    = (path)        => apiFetch(path);
-const apiPatch  = (path, body)  => apiFetch(path, { method: "PATCH", body: JSON.stringify(body) });
-const apiPost   = (path, body)  => apiFetch(path, { method: "POST",  body: JSON.stringify(body) });
+const apiPatch  = (path, body)  => apiFetch(path, { method: "PATCH",  body: JSON.stringify(body) });
+const apiPost   = (path, body)  => apiFetch(path, { method: "POST",   body: JSON.stringify(body) });
+const apiDelete = (path)        => apiFetch(path, { method: "DELETE" });
 
 // ─── LocalStorage helpers for location order ──────────────────────────────────
 const LOC_ORDER_KEY = "sensors_location_order";
@@ -319,7 +321,6 @@ const ConfirmModal = ({ title, message, confirmLabel = "Удалить", onClose
 };
 
 // ─── Modal: Редактировать ЦБУ ─────────────────────────────────────────────────
-// PATCH /api/v1/control-units/{control_unit_id}
 const EditBlockModal = ({ block, locations, onClose, onSave }) => {
   const [form, setForm] = useState({
     name:        block?.name        ?? "",
@@ -395,7 +396,6 @@ const EditBlockModal = ({ block, locations, onClose, onSave }) => {
 };
 
 // ─── Modal: Thresholds ────────────────────────────────────────────────────────
-// ИСПРАВЛЕНО: используем PATCH /api/v1/sensors/{id}/thresholds
 const ThresholdsModal = ({ sensor, onClose, onSave }) => {
   const [activeTab, setActiveTab] = useState("temp");
   const [form, setForm] = useState({
@@ -474,8 +474,6 @@ const ThresholdsModal = ({ sensor, onClose, onSave }) => {
 };
 
 // ─── Modal: Создать ЦБУ ────────────────────────────────────────────────────────
-// ИСПРАВЛЕНО: POST /api/v1/control-units/register
-// Поля: control_unit_id (строка), name, location_id
 const CreateBlockModal = ({ locations, onClose, onSave }) => {
   const [form, setForm] = useState({
     control_unit_id: "",
@@ -623,8 +621,6 @@ const CreateBlockModal = ({ locations, onClose, onSave }) => {
 };
 
 // ─── Modal: Добавить датчик ─────────────────────────────────
-// ИСПРАВЛЕНО: POST /api/v1/sensors/create_sensor
-// Поля: sensor_id (строка), name, control_unit_id + опциональные пороги
 const AddSensorModal = ({ locations, blocks, defaultBlockId, onClose, onSave }) => {
   const [form, setForm] = useState({
     sensor_id: "",
@@ -644,7 +640,6 @@ const AddSensorModal = ({ locations, blocks, defaultBlockId, onClose, onSave }) 
   const setVal = (k, v) => setForm(f => ({ ...f, [k]: v }));
   const parseOpt = v => (v === "" || v == null) ? null : parseFloat(v);
 
-  // Найти выбранный блок и его локацию для отображения в превью
   const selectedBlock = blocks.find(b => String(b.id) === String(form.control_unit_id));
   const selectedLoc   = selectedBlock
     ? locations.find(l => l.id === (selectedBlock.location_id ?? selectedBlock.group_id))
@@ -660,7 +655,7 @@ const AddSensorModal = ({ locations, blocks, defaultBlockId, onClose, onSave }) 
       await onSave({
         sensor_id:        form.sensor_id.trim(),
         name:             form.name.trim(),
-        control_unit_id:  form.control_unit_id,   // строка — ID ЦБУ
+        control_unit_id:  form.control_unit_id,
         normal_min_temp:  parseOpt(form.normal_min_temp),
         normal_max_temp:  parseOpt(form.normal_max_temp),
         warning_min_temp: parseOpt(form.warning_min_temp),
@@ -907,7 +902,9 @@ const SensorMiniCard = ({ sensor, isReorderMode, onDragStart, onDragOver, onDrop
           message={`Удалить датчик «${sensor.name}» (ID: ${sensor.id})? Это действие необратимо.`}
           confirmLabel="Удалить датчик"
           onClose={() => setShowDeleteConfirm(false)}
-          onConfirm={() => onDeleteSensor(sensor.id)}
+          onConfirm={async () => {
+            await onDeleteSensor(sensor.id);
+          }}
         />
       )}
     </>
@@ -915,7 +912,19 @@ const SensorMiniCard = ({ sensor, isReorderMode, onDragStart, onDragOver, onDrop
 };
 
 // ─── BlockCard ────────────────────────────────────────────────────────────────
-const BlockCard = ({ block, allSensors, allBlocks, locations, onEditThresholds, onReorderSensors, onAddSensor, onEditBlock, onDeleteBlock, onDeleteSensor, isSearching }) => {
+const BlockCard = ({
+  block,
+  allSensors,
+  allBlocks,
+  locations,
+  onEditThresholds,
+  onReorderSensors,
+  onAddSensor,
+  onEditBlock,
+  onDeleteBlock,
+  onDeleteSensor,   // ← ИСПРАВЛЕНО: принимаем проп
+  isSearching,
+}) => {
   const [expanded, setExpanded] = useState(false);
   const [isReorderMode, setIsReorderMode] = useState(false);
   const [sensorOrder, setSensorOrder] = useState([]);
@@ -927,14 +936,11 @@ const BlockCard = ({ block, allSensors, allBlocks, locations, onEditThresholds, 
     if (isSearching) setExpanded(true);
   }, [isSearching]);
 
-  // Для синтетического блока (__synthetic__) совпадаем по group_id === location_id
-  // Для реального ЦБУ — по control_unit_id или group_id === block.id
   const isSyntheticBlock = String(block.id).startsWith("__synthetic__");
   const syntheticLocId = isSyntheticBlock ? block.location_id ?? block.group_id : null;
 
   const childSensors = allSensors.filter(s => {
     if (isSyntheticBlock) {
-      // Бесхозные датчики: group_id указывает прямо на локацию
       return s.group_id === syntheticLocId;
     }
     return String(s.control_unit_id) === String(block.id) ||
@@ -976,115 +982,160 @@ const BlockCard = ({ block, allSensors, allBlocks, locations, onEditThresholds, 
   };
 
   return (
-    <div className="sn-block-card">
-      <div className="sn-block-header" onClick={() => !isReorderMode && setExpanded(v => !v)}>
-        <div className="sn-block-header-left">
-          <span className="sn-block-chevron">{expanded ? <IconChevDown/> : <IconChevRight/>}</span>
-          <div className="sn-block-name-group">
-            <span className="sn-block-id-tag">ЦБУ #{block.id}</span>
-            <span className="sn-block-name">{block.name}</span>
+    <>
+      <div className="sn-block-card">
+        <div className="sn-block-header" onClick={() => !isReorderMode && setExpanded(v => !v)}>
+          <div className="sn-block-header-left">
+            <span className="sn-block-chevron">{expanded ? <IconChevDown/> : <IconChevRight/>}</span>
+            <div className="sn-block-name-group">
+              <span className="sn-block-id-tag">ЦБУ #{block.id}</span>
+              <span className="sn-block-name">{block.name}</span>
+            </div>
           </div>
-        </div>
-        <div className="sn-block-header-right" onClick={e => e.stopPropagation()}>
-          <div className="sn-block-indicators">
-            <div className="sn-block-indicator" title={isOnline ? "Питание: Сеть" : "Питание: Офлайн"}>
-              <IconPower on={isOnline}/>
-              <span style={{ color: isOnline ? "#01e676" : "#555", fontSize: 10 }}>{isOnline ? "Сеть" : "Офф"}</span>
+          <div className="sn-block-header-right" onClick={e => e.stopPropagation()}>
+            <div className="sn-block-indicators">
+              <div className="sn-block-indicator" title={isOnline ? "Питание: Сеть" : "Питание: Офлайн"}>
+                <IconPower on={isOnline}/>
+                <span style={{ color: isOnline ? "#01e676" : "#555", fontSize: 10 }}>{isOnline ? "Сеть" : "Офф"}</span>
+              </div>
+              <div className="sn-block-indicator" title="GSM">
+                <IconGSM/>
+                <span style={{ fontSize: 10, color: "#929292" }}>{block.gsm_signal ?? "—"}</span>
+              </div>
+              <div className="sn-block-indicator" title="SIM баланс">
+                <IconSim/>
+                <span style={{ fontSize: 10, color: "#ffc207" }}>{block.sim_balance ?? "—"}</span>
+              </div>
+              {battery != null && (
+                <div className="sn-block-indicator" title={`Батарея: ${battery}%`}>
+                  <IconBattery pct={battery}/>
+                  <span style={{ fontSize: 10, color: bc }}>{battery}%</span>
+                </div>
+              )}
             </div>
-            <div className="sn-block-indicator" title="GSM">
-              <IconGSM/>
-              <span style={{ fontSize: 10, color: "#929292" }}>{block.gsm_signal ?? "—"}</span>
-            </div>
-            <div className="sn-block-indicator" title="SIM баланс">
-              <IconSim/>
-              <span style={{ fontSize: 10, color: "#ffc207" }}>{block.sim_balance ?? "—"}</span>
-            </div>
-            {battery != null && (
-              <div className="sn-block-indicator" title={`Батарея: ${battery}%`}>
-                <IconBattery pct={battery}/>
-                <span style={{ fontSize: 10, color: bc }}>{battery}%</span>
+            <span className="sn-block-sensor-count">{childSensors.length} датч.</span>
+
+            {!isReorderMode ? (
+              expanded && (
+                <>
+                  <button
+                    className="sn-add-sensor-btn"
+                    title="Добавить датчик в этот ЦБУ"
+                    onClick={e => { e.stopPropagation(); onAddSensor(block); }}
+                  >
+                    <IconPlus/> Датчик
+                  </button>
+                  <button
+                    className="sn-reorder-btn"
+                    title="Порядок датчиков (двойной клик)"
+                    onDoubleClick={() => { setSensorOrder(childSensors.map(s => s.id)); setIsReorderMode(true); }}
+                    onClick={e => e.stopPropagation()}
+                  >
+                    <IconDrag/> <span>Порядок</span>
+                  </button>
+                  {!isSyntheticBlock && (
+                    <>
+                      <button
+                        className="sn-icon-btn"
+                        title="Редактировать ЦБУ"
+                        onClick={e => { e.stopPropagation(); setShowEditBlock(true); }}
+                      >
+                        <IconEdit/>
+                      </button>
+                      <button
+                        className="sn-icon-btn sn-icon-btn--danger"
+                        title="Удалить ЦБУ"
+                        onClick={e => { e.stopPropagation(); setShowDeleteBlock(true); }}
+                      >
+                        <IconTrash/>
+                      </button>
+                    </>
+                  )}
+                </>
+              )
+            ) : (
+              <div style={{ display: "flex", gap: 6 }} onClick={e => e.stopPropagation()}>
+                <button className="sn-btn-cancel-sm" onClick={() => setIsReorderMode(false)}>Отмена</button>
+                <button className="sn-btn-save-sm" onClick={handleSaveOrder}>Сохранить</button>
               </div>
             )}
           </div>
-          <span className="sn-block-sensor-count">{childSensors.length} датч.</span>
-
-          {!isReorderMode ? (
-            expanded && (
-              <>
-                <button
-                  className="sn-add-sensor-btn"
-                  title="Добавить датчик в этот ЦБУ"
-                  onClick={e => { e.stopPropagation(); onAddSensor(block); }}
-                >
-                  <IconPlus/> Датчик
-                </button>
-                <button
-                  className="sn-reorder-btn"
-                  title="Порядок датчиков (двойной клик)"
-                  onDoubleClick={() => { setSensorOrder(childSensors.map(s => s.id)); setIsReorderMode(true); }}
-                  onClick={e => e.stopPropagation()}
-                >
-                  <IconDrag/> <span>Порядок</span>
-                </button>
-                {!isSyntheticBlock && (
-                  <>
-                    <button
-                      className="sn-icon-btn"
-                      title="Редактировать ЦБУ"
-                      onClick={e => { e.stopPropagation(); setShowEditBlock(true); }}
-                    >
-                      <IconEdit/>
-                    </button>
-                    <button
-                      className="sn-icon-btn sn-icon-btn--danger"
-                      title="Удалить ЦБУ"
-                      onClick={e => { e.stopPropagation(); setShowDeleteBlock(true); }}
-                    >
-                      <IconTrash/>
-                    </button>
-                  </>
-                )}
-              </>
-            )
-          ) : (
-            <div style={{ display: "flex", gap: 6 }} onClick={e => e.stopPropagation()}>
-              <button className="sn-btn-cancel-sm" onClick={() => setIsReorderMode(false)}>Отмена</button>
-              <button className="sn-btn-save-sm" onClick={handleSaveOrder}>Сохранить</button>
-            </div>
-          )}
         </div>
+
+        {expanded && (
+          <div className="sn-sensors-grid" onDragEnd={handleDragEnd}>
+            {orderedSensors.length === 0 && (
+              <div className="sn-empty-sensors">
+                <div style={{ marginBottom: 12, color: "#555" }}>Нет датчиков в этом ЦБУ</div>
+                <button className="sn-add-sensor-btn-empty" onClick={() => onAddSensor(block)}>
+                  <IconPlus/> Добавить датчик
+                </button>
+              </div>
+            )}
+            {orderedSensors.map(sensor => (
+              <SensorMiniCard
+                key={sensor.id}
+                sensor={sensor}
+                isReorderMode={isReorderMode}
+                onDragStart={() => handleDragStart(sensor.id)}
+                onDragOver={() => handleDragOver(sensor.id)}
+                onDrop={() => {}}
+                onEditThresholds={onEditThresholds}
+                onDeleteSensor={onDeleteSensor}   // ← ИСПРАВЛЕНО: прокидываем проп
+              />
+            ))}
+          </div>
+        )}
       </div>
 
-      {expanded && (
-        <div className="sn-sensors-grid" onDragEnd={handleDragEnd}>
-          {orderedSensors.length === 0 && (
-            <div className="sn-empty-sensors">
-              <div style={{ marginBottom: 12, color: "#555" }}>Нет датчиков в этом ЦБУ</div>
-              <button className="sn-add-sensor-btn-empty" onClick={() => onAddSensor(block)}>
-                <IconPlus/> Добавить датчик
-              </button>
-            </div>
-          )}
-          {orderedSensors.map(sensor => (
-            <SensorMiniCard
-              key={sensor.id}
-              sensor={sensor}
-              isReorderMode={isReorderMode}
-              onDragStart={() => handleDragStart(sensor.id)}
-              onDragOver={() => handleDragOver(sensor.id)}
-              onDrop={() => {}}
-              onEditThresholds={onEditThresholds}
-            />
-          ))}
-        </div>
+      {/* Модал редактирования ЦБУ */}
+      {showEditBlock && (
+        <EditBlockModal
+          block={block}
+          locations={locations}
+          onClose={() => setShowEditBlock(false)}
+          onSave={async (payload) => {
+            await onEditBlock(block.id, payload);
+            setShowEditBlock(false);
+          }}
+        />
       )}
-    </div>
+
+      {/* Модал подтверждения удаления ЦБУ */}
+      {showDeleteBlock && (
+        <ConfirmModal
+          title="Удалить ЦБУ"
+          message={`Удалить блок «${block.name}» (ID: ${block.id})? Все датчики этого блока также будут удалены. Это действие необратимо.`}
+          confirmLabel="Удалить ЦБУ"
+          onClose={() => setShowDeleteBlock(false)}
+          onConfirm={async () => {
+            await onDeleteBlock(block.id);
+          }}
+        />
+      )}
+    </>
   );
 };
 
 // ─── LocationSection ──────────────────────────────────────────────────────────
-const LocationSection = ({ location, blocks, allSensors, allBlocks, onEditThresholds, onReorderSensors, onAddSensor,
-  isReorderLocMode, onLocDragStart, onLocDragOver, onLocDrop, isSearching }) => {
+const LocationSection = ({
+  location,
+  blocks,
+  allSensors,
+  allBlocks,
+  locations,
+  onEditThresholds,
+  onReorderSensors,
+  onAddSensor,
+  onEditBlock,
+  onDeleteBlock,
+  onDeleteSensor,   // ← ИСПРАВЛЕНО: принимаем проп
+  isReorderLocMode,
+  onLocDragStart,
+  onLocDragOver,
+  onLocDrop,
+  isSearching,
+}) => {
   const [expanded, setExpanded] = useState(false);
 
   useEffect(() => {
@@ -1125,9 +1176,13 @@ const LocationSection = ({ location, blocks, allSensors, allBlocks, onEditThresh
               block={block}
               allSensors={allSensors}
               allBlocks={allBlocks}
+              locations={locations}
               onEditThresholds={onEditThresholds}
               onReorderSensors={(order) => onReorderSensors(block.id, order)}
               onAddSensor={onAddSensor}
+              onEditBlock={onEditBlock}
+              onDeleteBlock={onDeleteBlock}
+              onDeleteSensor={onDeleteSensor}   // ← ИСПРАВЛЕНО: прокидываем проп
               isSearching={isSearching}
             />
           ))}
@@ -1140,7 +1195,7 @@ const LocationSection = ({ location, blocks, allSensors, allBlocks, onEditThresh
 // ─── Main Sensors Component ───────────────────────────────────────────────────
 const Sensors = () => {
   const [locations,  setLocations]  = useState([]);
-  const [blocks,     setBlocks]     = useState([]);   // ЦБУ с /api/v1/control-units/
+  const [blocks,     setBlocks]     = useState([]);
   const [sensors,    setSensors]    = useState([]);
   const [loading,    setLoading]    = useState(true);
   const [error,      setError]      = useState(null);
@@ -1165,20 +1220,17 @@ const Sensors = () => {
       const [locs, snrs, blks] = await Promise.all([
         apiGet("/api/v1/locations/"),
         apiGet("/api/v1/sensors/"),
-        // ИСПРАВЛЕНО: правильный endpoint для ЦБУ
         apiGet("/api/v1/control-units/").catch(() => []),
       ]);
       setLocations(locs);
       setSensors(snrs);
       setBlocks(blks);
 
-      // ── DEBUG ──────────────────────────────────────────────────────────────
       console.group("📡 Sensors page — raw API data");
       console.log("📍 Locations:", JSON.stringify(locs, null, 2));
       console.log("🔲 Control units:", JSON.stringify(blks, null, 2));
       console.log("🌡 Sensors:", JSON.stringify(snrs, null, 2));
       console.groupEnd();
-      // ───────────────────────────────────────────────────────────────────────
 
       const saved = loadLocOrder();
       if (saved && saved.length > 0) {
@@ -1215,25 +1267,39 @@ const Sensors = () => {
     return () => document.removeEventListener("mousedown", h);
   }, []);
 
-  // ИСПРАВЛЕНО: пороги — отдельный endpoint /thresholds
   const handleEditThresholds = async (sensorId, payload) => {
     await apiPatch(`/api/v1/sensors/${sensorId}/thresholds`, payload);
     await fetchAll();
   };
 
-  // ИСПРАВЛЕНО: создание датчика через /api/v1/sensors/create_sensor
   const handleAddSensor = async (payload) => {
     await apiPost("/api/v1/sensors/create_sensor", payload);
     await fetchAll();
   };
 
-  // ИСПРАВЛЕНО: создание ЦБУ через /api/v1/control-units/register
   const handleCreateBlock = async (payload) => {
     await apiPost("/api/v1/control-units/register", payload);
     await fetchAll();
   };
 
-  // ИСПРАВЛЕНО: порядок датчиков через /api/v1/sensors/{id}/position
+  // ─── НОВОЕ: удаление датчика ──────────────────────────────────────────────
+  const handleDeleteSensor = async (sensorId) => {
+    await apiDelete(`/api/v1/sensors/${sensorId}`);
+    await fetchAll();
+  };
+
+  // ─── НОВОЕ: редактирование ЦБУ ───────────────────────────────────────────
+  const handleEditBlock = async (blockId, payload) => {
+    await apiPatch(`/api/v1/control-units/${blockId}`, payload);
+    await fetchAll();
+  };
+
+  // ─── НОВОЕ: удаление ЦБУ ─────────────────────────────────────────────────
+  const handleDeleteBlock = async (blockId) => {
+    await apiDelete(`/api/v1/control-units/${blockId}`);
+    await fetchAll();
+  };
+
   const handleReorderSensors = async (blockId, orderedIds) => {
     await Promise.all(
       orderedIds.map((id, idx) =>
@@ -1274,7 +1340,6 @@ const Sensors = () => {
   const isSearching = q.length > 0;
 
   const filteredSensors = sensors.filter(s => {
-    // control_unit_id может быть строкой или числом — ищем блок по обоим вариантам
     const sBlock = blocks.find(b => String(b.id) === String(s.control_unit_id ?? s.group_id));
     const loc = sBlock
       ? locations.find(l => l.id === (sBlock.location_id ?? sBlock.group_id))
@@ -1293,20 +1358,15 @@ const Sensors = () => {
 
   const orderedLocations = locOrder.map(id => locations.find(l => l.id === id)).filter(Boolean);
 
-  // Блоки для конкретной локации (реальные ЦБУ + синтетический для "бесхозных" датчиков)
   const getBlocksForLocation = (locId) => {
-    // 1. Реальные ЦБУ этой локации
     const real = blocks.filter(b => b.location_id === locId || b.group_id === locId);
 
-    // 2. "Бесхозные" датчики — те у которых нет ЦБУ или group_id === locId напрямую
     const realBlockIds = new Set(real.map(b => String(b.id)));
     const orphanSensors = sensors.filter(s => {
       const cuId = String(s.control_unit_id ?? s.group_id ?? "");
-      // датчик "бесхозный" если его ЦБУ не из real-блоков И group_id === locId
       return s.group_id === locId && !realBlockIds.has(cuId);
     });
 
-    // 3. Если есть бесхозные датчики — добавляем синтетический блок
     const syntheticBlocks = orphanSensors.length > 0 ? [{
       id: `__synthetic__${locId}`,
       name: locations.find(l => l.id === locId)?.name ?? `Блок #${locId}`,
@@ -1319,7 +1379,6 @@ const Sensors = () => {
       sim_balance: null,
     }] : [];
 
-    // 4. Если совсем нет ни реальных ЦБУ ни бесхозных — пустой синтетик чтобы показать блок
     if (real.length === 0 && syntheticBlocks.length === 0) {
       return [{
         id: `__synthetic__${locId}`,
@@ -1337,7 +1396,6 @@ const Sensors = () => {
     return [...real, ...syntheticBlocks];
   };
 
-  // Все блоки для AddSensorModal (реальные ЦБУ или синтетические)
   const allBlocksForModal = blocks.length > 0
     ? blocks
     : locations.map(loc => ({
@@ -1480,6 +1538,7 @@ const Sensors = () => {
                   onDragOver={() => {}}
                   onDrop={() => {}}
                   onEditThresholds={handleEditThresholds}
+                  onDeleteSensor={handleDeleteSensor}   // ← ИСПРАВЛЕНО: передаём в поиске
                 />
               ))}
             </div>
@@ -1490,16 +1549,13 @@ const Sensors = () => {
             {orderedLocations.map(loc => {
               if (selectedLocation && loc.id !== selectedLocation) return null;
               const locBlocks = getBlocksForLocation(loc.id);
-              // Все датчики локации: через реальные ЦБУ ИЛИ напрямую через group_id
               const locSensors = sensors.filter(s => {
-                // 1. Датчик привязан к одному из ЦБУ этой локации
                 const viaBlock = locBlocks.some(b => {
                   if (String(b.id).startsWith("__synthetic__")) return false;
                   return String(s.control_unit_id) === String(b.id) ||
                          String(s.group_id)        === String(b.id);
                 });
                 if (viaBlock) return true;
-                // 2. Датчик напрямую через group_id === locId (старая схема)
                 return s.group_id === loc.id;
               });
 
@@ -1510,9 +1566,13 @@ const Sensors = () => {
                   blocks={locBlocks}
                   allSensors={locSensors}
                   allBlocks={allBlocksForModal}
+                  locations={locations}
                   onEditThresholds={handleEditThresholds}
                   onReorderSensors={handleReorderSensors}
                   onAddSensor={(blk) => { setAddSensorBlock(blk); setShowAddSensor(true); }}
+                  onEditBlock={handleEditBlock}
+                  onDeleteBlock={handleDeleteBlock}
+                  onDeleteSensor={handleDeleteSensor}   // ← ИСПРАВЛЕНО: передаём везде
                   isReorderLocMode={isReorderLocMode}
                   onLocDragStart={() => handleLocDragStart(loc.id)}
                   onLocDragOver={() => handleLocDragOver(loc.id)}

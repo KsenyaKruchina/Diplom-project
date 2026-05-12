@@ -1,8 +1,5 @@
 // frontend/src/hooks/useAnalyticsData.js
 // ─── Хук для страницы Аналитики ───────────────────────────────────────────────
-//
-// Использует apiRequest из api.js — тот же клиент что и везде в проекте.
-// Токен подхватывается автоматически через getToken() внутри apiRequest.
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { apiRequest } from "../services/api";
@@ -29,27 +26,24 @@ const extractSeries = (measurements = [], targetPoints = 100) => {
   };
 };
 
-// Сколько точек показывать на графике для каждого периода
 const CHART_POINTS = { day: 24, week: 48, month: 60, year: 52 };
-
-// Сколько записей запрашивать с API для каждого периода
-const API_LIMITS = { day: 96, week: 336, month: 720, year: 1000 };
+const API_LIMITS   = { day: 96, week: 336, month: 720, year: 1000 };
 
 // ─── Главный хук ──────────────────────────────────────────────────────────────
 export const useAnalyticsData = () => {
-  const [sensors,     setSensors]     = useState([]);
-  const [locations,   setLocations]   = useState([]);
-  const [loading,     setLoading]     = useState(true);
-  const [loadError,   setLoadError]   = useState("");
+  const [sensors,      setSensors]      = useState([]);
+  const [locations,    setLocations]    = useState([]);
+  const [controlUnits, setControlUnits] = useState([]);   // ← ЦБУ
+  const [loading,      setLoading]      = useState(true);
+  const [loadError,    setLoadError]    = useState("");
 
   const [history,     setHistory]     = useState({ temp: [], hum: [], timestamps: [] });
   const [histLoading, setHistLoading] = useState(false);
   const [histError,   setHistError]   = useState("");
 
-  // Ref чтобы WebSocket-обработчик знал текущий активный датчик
   const activeSensorId = useRef(null);
 
-  // ── Загрузить датчики и локации при монтировании ──────────────────────────
+  // ── Загрузить датчики, локации и ЦБУ при монтировании ───────────────────
   useEffect(() => {
     let cancelled = false;
 
@@ -57,18 +51,29 @@ export const useAnalyticsData = () => {
       setLoading(true);
       setLoadError("");
       try {
-        // Датчики — доступны всем авторизованным пользователям
-        const sensorsData = await apiRequest("/sensors/");
-        if (!cancelled) setSensors(Array.isArray(sensorsData) ? sensorsData : []);
+        // Параллельно грузим всё — каждый запрос независим
+        const [sensorsResult, locResult, cuResult] = await Promise.allSettled([
+          apiRequest("/sensors/"),
+          apiRequest("/locations/"),
+          apiRequest("/control-units/"),
+        ]);
 
-        // Локации — только для admin (при 403 apiRequest выбрасывает ошибку)
-        try {
-          const locData = await apiRequest("/locations/");
-          if (!cancelled) setLocations(Array.isArray(locData) ? locData : []);
-        } catch {
-          // Не admin — нормальная ситуация, оставляем []
-          if (!cancelled) setLocations([]);
+        if (cancelled) return;
+
+        if (sensorsResult.status === "fulfilled") {
+          setSensors(Array.isArray(sensorsResult.value) ? sensorsResult.value : []);
         }
+
+        if (locResult.status === "fulfilled") {
+          setLocations(Array.isArray(locResult.value) ? locResult.value : []);
+        }
+        // 403 для не-admin — нормально, оставляем []
+
+        if (cuResult.status === "fulfilled") {
+          setControlUnits(Array.isArray(cuResult.value) ? cuResult.value : []);
+        }
+        // 403 для не-admin — нормально, оставляем []
+
       } catch (err) {
         if (!cancelled) setLoadError(err.message || "Ошибка загрузки");
       } finally {
@@ -80,10 +85,8 @@ export const useAnalyticsData = () => {
     return () => { cancelled = true; };
   }, []);
 
-  // ── Подписка на WebSocket для live-обновлений ─────────────────────────────
+  // ── WebSocket: live-обновления ────────────────────────────────────────────
   useEffect(() => {
-    // Используем существующий wsService из проекта
-    // wsService.on() возвращает функцию отписки
     const unsubscribe = wsService.on("new_measurement", (event) => {
       if (activeSensorId.current && event.sensor_id === activeSensorId.current) {
         setHistory((prev) => {
@@ -94,18 +97,10 @@ export const useAnalyticsData = () => {
         });
       }
     });
-
     return () => unsubscribe();
   }, []);
 
-  // ── Загрузить историю для выбранного датчика ──────────────────────────────
-  /**
-   * @param {number} sensorId
-   * @param {{ period?: string, dateFrom?: string, dateTo?: string }} options
-   *   period   — API-значение: last_24_hours | last_week | last_month | last_year
-   *   dateFrom — ISO-строка начала (для произвольного диапазона)
-   *   dateTo   — ISO-строка конца
-   */
+  // ── Загрузить историю для выбранного датчика ─────────────────────────────
   const fetchHistory = useCallback(async (sensorId, options = {}) => {
     if (!sensorId) return;
 
@@ -117,7 +112,6 @@ export const useAnalyticsData = () => {
       let measurements = [];
 
       if (options.dateFrom && options.dateTo) {
-        // Произвольный диапазон — берём максимум и фильтруем на клиенте
         const data = await apiRequest(`/telemetry/${sensorId}/history?limit=1000`);
         const all  = data?.measurements || [];
         const from = new Date(options.dateFrom);
@@ -126,13 +120,10 @@ export const useAnalyticsData = () => {
           const t = new Date(m.timestamp);
           return t >= from && t <= to;
         });
-
-        const series = extractSeries(measurements, 60);
-        setHistory(series);
+        setHistory(extractSeries(measurements, 60));
         return;
       }
 
-      // Определяем UI-период из API-периода для прореживания
       const uiPeriodMap = {
         last_24_hours: "day",
         last_week:     "week",
@@ -142,7 +133,6 @@ export const useAnalyticsData = () => {
       const uiPeriod = uiPeriodMap[options.period] || "month";
 
       if (options.period === "last_24_hours") {
-        // Специальный эндпоинт для 24 часов
         const data = await apiRequest(`/telemetry/${sensorId}/last-24h`);
         measurements = data?.measurements || [];
       } else {
@@ -151,9 +141,7 @@ export const useAnalyticsData = () => {
         measurements = data?.measurements || [];
       }
 
-      const targetPoints = CHART_POINTS[uiPeriod] || 60;
-      const series = extractSeries(measurements, targetPoints);
-      setHistory(series);
+      setHistory(extractSeries(measurements, CHART_POINTS[uiPeriod] || 60));
     } catch (err) {
       setHistError(err.message || "Ошибка загрузки истории");
       setHistory({ temp: [], hum: [], timestamps: [] });
@@ -162,10 +150,12 @@ export const useAnalyticsData = () => {
     }
   }, []);
 
-  // ── Опции для Dropdown-компонентов ────────────────────────────────────────
+  // ── Опции для Dropdown ────────────────────────────────────────────────────
+
   const sensorOptions = sensors.map((s) => ({
-    value: String(s.id),
-    label: `${s.name}${s.is_online === false ? " (офлайн)" : ""}`,
+    value:       String(s.id),
+    label:       `${s.name}${s.is_online === false ? " (офлайн)" : ""}`,
+    location_id: s.location_id ?? s.group_id ?? null,
   }));
 
   const locationOptions = locations.map((l) => ({
@@ -173,13 +163,26 @@ export const useAnalyticsData = () => {
     label: l.name,
   }));
 
+  // Для ЦБУ добавляем location_id чтобы фильтр по роли работал в Analytics
+  const controlUnitOptions = controlUnits.map((cu) => ({
+    value:       String(cu.id),
+    label:       cu.name ?? `ЦБУ #${cu.id}`,
+    location_id: cu.location_id ?? cu.group_id ?? null,
+  }));
+
   return {
-    sensorOptions,
-    locationOptions,
+    // данные
     sensors,
     locations,
+    controlUnits,
+    // опции для дропдаунов
+    sensorOptions,
+    locationOptions,
+    controlUnitOptions,
+    // состояние загрузки
     loading,
     loadError,
+    // история телеметрии
     histLoading,
     histError,
     history,
