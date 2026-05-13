@@ -2,6 +2,8 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import "./Sensors.css";
 import { apiRequest } from "../services/api";
+import { getLatestForSensors } from "../services/telemetryService";
+import { wsService } from "../services/websocketService";
 
 // ─── API helpers ──────────────────────────────────────────────────────────────
 const apiFetch = async (path, opts = {}) => {
@@ -15,6 +17,34 @@ const apiPost   = (path, body)  => apiFetch(path, { method: "POST",   body: JSON
 const apiDelete = (path)        => apiFetch(path, { method: "DELETE" });
 
 const sameId = (a, b) => String(a ?? "") === String(b ?? "");
+
+const getTelemetrySensorId = (data) => data?.sensor_id ?? data?.sensorId ?? data?.id;
+const getTelemetryTemp = (data) => data?.temperature ?? data?.temp ?? data?.current_temp;
+const getTelemetryHum = (data) => data?.humidity ?? data?.hum ?? data?.current_hum;
+const toFiniteNumberOrNull = (value) => {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+};
+
+const enrichSensorsWithLatestTelemetry = async (sensors) => {
+  if (!Array.isArray(sensors) || sensors.length === 0) return sensors || [];
+
+  const ids = sensors.map((sensor) => sensor.id);
+  const latestBySensor = await getLatestForSensors(ids).catch(() => new Map());
+
+  return sensors.map((sensor) => {
+    const latest = latestBySensor.get(sensor.id) ?? latestBySensor.get(String(sensor.id));
+    const latestTemp = toFiniteNumberOrNull(getTelemetryTemp(latest));
+    const latestHum = toFiniteNumberOrNull(getTelemetryHum(latest));
+
+    return {
+      ...sensor,
+      current_temp: latestTemp ?? sensor.current_temp ?? sensor.temperature ?? sensor.temp ?? null,
+      current_hum: latestHum ?? sensor.current_hum ?? sensor.humidity ?? sensor.hum ?? null,
+      last_seen: latest?.timestamp ?? sensor.last_seen,
+    };
+  });
+};
 
 // ─── LocalStorage helpers for location order ──────────────────────────────────
 const LOC_ORDER_KEY = "sensors_location_order";
@@ -47,10 +77,23 @@ const IconWarn      = () => <svg width="18" height="18" viewBox="0 0 24 24" fill
 // ─── Sparkline ────────────────────────────────────────────────────────────────
 const Sparkline = ({ color, data, sensor, type }) => {
   const h = 88, w = 260;
-  if (!data || data.length < 2) return (
+  const [selectedIndex, setSelectedIndex] = useState(null);
+  const vals = (data || [])
+    .map(Number)
+    .filter(v => Number.isFinite(v));
+  if (vals.length === 1) vals.push(vals[0]);
+
+  useEffect(() => {
+    setSelectedIndex((prev) => {
+      if (vals.length < 2) return null;
+      if (prev == null) return prev;
+      return Math.min(prev, vals.length - 1);
+    });
+  }, [vals.length]);
+
+  if (vals.length < 2) return (
     <div style={{ height: h, display: "flex", alignItems: "center", justifyContent: "center", color: "#333", fontSize: 10 }}>нет данных</div>
   );
-  const vals = data.map(Number);
 
   const getLimits = () => {
     if (!sensor) return [];
@@ -88,9 +131,33 @@ const Sparkline = ({ color, data, sensor, type }) => {
   };
 
   const pts = vals.map((v, i) => `${(i / (vals.length - 1)) * w},${toY(v)}`).join(" ");
+  const handlePointSelect = (event) => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    const x = ((event.clientX - rect.left) / rect.width) * w;
+    const index = Math.max(
+      0,
+      Math.min(vals.length - 1, Math.round((x / w) * (vals.length - 1)))
+    );
+    setSelectedIndex(index);
+  };
+  const selectedPoint = selectedIndex != null
+    ? {
+        x: (selectedIndex / (vals.length - 1)) * w,
+        y: toY(vals[selectedIndex]),
+        value: vals[selectedIndex],
+      }
+    : null;
+  const unit = type === "temp" ? "°C" : "%";
 
   return (
-    <svg width="100%" height={h} viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none">
+    <svg
+      width="100%"
+      height={h}
+      viewBox={`0 0 ${w} ${h}`}
+      preserveAspectRatio="none"
+      style={{ cursor: "crosshair" }}
+      onPointerDown={handlePointSelect}
+    >
       <defs>
         <linearGradient id={`sg-${color.replace("#","")}-${type}`} x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%" stopColor={color} stopOpacity="0.25"/>
@@ -125,6 +192,29 @@ const Sparkline = ({ color, data, sensor, type }) => {
       </>}
       <polygon points={`0,${h} ${pts} ${w},${h}`} fill={`url(#sg-${color.replace("#","")}-${type})`}/>
       <polyline points={pts} fill="none" stroke={color} strokeWidth="2" strokeLinejoin="round"/>
+      {selectedPoint && (
+        <g pointerEvents="none">
+          <line
+            x1={selectedPoint.x} y1="0" x2={selectedPoint.x} y2={h}
+            stroke={color} strokeWidth="1.2" strokeDasharray="4,3" opacity="0.8"
+          />
+          <circle cx={selectedPoint.x} cy={selectedPoint.y} r="3.8" fill="#101010" stroke={color} strokeWidth="1.8"/>
+          <rect
+            x={Math.max(3, Math.min(w - 59, selectedPoint.x - 29))}
+            y={Math.max(3, selectedPoint.y - 22)}
+            width="56" height="16" rx="4"
+            fill="#111" stroke={color} strokeWidth="0.9" opacity="0.96"
+          />
+          <text
+            x={Math.max(31, Math.min(w - 31, selectedPoint.x))}
+            y={Math.max(14, selectedPoint.y - 11)}
+            fill={color} fontSize="9" textAnchor="middle"
+            fontFamily="monospace" fontWeight="700"
+          >
+            {selectedPoint.value.toFixed(1)}{unit}
+          </text>
+        </g>
+      )}
     </svg>
   );
 };
@@ -156,15 +246,43 @@ const STATUS = {
 };
 
 // ─── useSensorHistory ─────────────────────────────────────────────────────────
+const SENSOR_HISTORY_REFRESH_MS = 5000;
+
+const normalizeTelemetryHistory = (response) => {
+  if (!response) return [];
+  if (Array.isArray(response)) return response;
+  if (Array.isArray(response.measurements)) return response.measurements;
+  if (Array.isArray(response.data)) return response.data;
+  return [];
+};
+
 const useSensorHistory = (sensorId) => {
-  const [data, setData] = useState(null);
+  const [data, setData] = useState([]);
+
   useEffect(() => {
     if (!sensorId) return;
-    setData(null);
-    apiGet(`/api/v1/telemetry/sensor/${sensorId}/latest`)
-      .then(d => setData(d))
-      .catch(() => setData(null));
+
+    let cancelled = false;
+
+    const load = () => {
+      apiGet(`/api/v1/telemetry/${sensorId}/history?period=24h&limit=96`)
+        .then(response => {
+          if (!cancelled) setData(normalizeTelemetryHistory(response));
+        })
+        .catch(() => {
+          if (!cancelled) setData([]);
+        });
+    };
+
+    load();
+    const intervalId = window.setInterval(load, SENSOR_HISTORY_REFRESH_MS);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+    };
   }, [sensorId]);
+
   return data;
 };
 
@@ -909,8 +1027,12 @@ const AddSensorModal = ({ locations, blocks, defaultBlockId, onClose, onSave }) 
 const SensorMiniCard = ({ sensor, isReorderMode, onDragStart, onDragOver, onDrop, onEditThresholds, onDeleteSensor }) => {
   const st = STATUS[getSensorStatus(sensor)];
   const history = useSensorHistory(sensor.id);
-  const tempData = history?.map(p => p.temperature) ?? null;
-  const humData  = history?.map(p => p.humidity)    ?? null;
+  const tempData = history
+    .map(p => getTelemetryTemp(p))
+    .filter(v => v != null && Number.isFinite(Number(v)));
+  const humData = history
+    .map(p => getTelemetryHum(p))
+    .filter(v => v != null && Number.isFinite(Number(v)));
   const battery  = sensor.battery_level ?? null;
   const bc = battery > 50 ? "#01e676" : battery > 20 ? "#ffd550" : "#ff5b5b";
   const [showEdit, setShowEdit] = useState(false);
@@ -1419,11 +1541,12 @@ const Sensors = () => {
   const fetchAll = useCallback(async () => {
     try {
       setLoading(true);
-      const [locs, snrs, blks] = await Promise.all([
+      const [locs, rawSensors, blks] = await Promise.all([
         apiGet("/api/v1/locations/"),
         apiGet("/api/v1/sensors/"),
         apiGet("/api/v1/control-units/").catch(() => []),
       ]);
+      const snrs = await enrichSensorsWithLatestTelemetry(rawSensors);
       setLocations(locs);
       setSensors(snrs);
       setBlocks(blks);
@@ -1456,9 +1579,37 @@ const Sensors = () => {
 
   useEffect(() => {
     const id = setInterval(() => {
-      apiGet("/api/v1/sensors/").then(s => setSensors(s)).catch(() => {});
+      apiGet("/api/v1/sensors/")
+        .then(enrichSensorsWithLatestTelemetry)
+        .then(s => setSensors(s))
+        .catch(() => {});
     }, 10000);
     return () => clearInterval(id);
+  }, []);
+
+  useEffect(() => {
+    const unsub = wsService.on("new_measurement", (data) => {
+      const sensorId = getTelemetrySensorId(data);
+      if (sensorId == null) return;
+
+      const temp = toFiniteNumberOrNull(getTelemetryTemp(data));
+      const hum = toFiniteNumberOrNull(getTelemetryHum(data));
+
+      setSensors((prev) =>
+        prev.map((sensor) =>
+          sameId(sensor.id, sensorId)
+            ? {
+                ...sensor,
+                current_temp: temp ?? sensor.current_temp ?? null,
+                current_hum: hum ?? sensor.current_hum ?? null,
+                last_seen: data.timestamp ?? sensor.last_seen,
+              }
+            : sensor
+        )
+      );
+    });
+
+    return unsub;
   }, []);
 
   useEffect(() => {

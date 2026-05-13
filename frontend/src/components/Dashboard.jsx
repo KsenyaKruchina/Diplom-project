@@ -90,6 +90,19 @@ const getHumStatus = (v, sensor) => {
 
 const sameId = (a, b) => String(a ?? "") === String(b ?? "");
 
+const getTelemetryTemp = (data) => data?.temperature ?? data?.temp ?? data?.current_temp;
+const getTelemetryHum = (data) => data?.humidity ?? data?.hum ?? data?.current_hum;
+const getTelemetrySensorId = (data) => data?.sensor_id ?? data?.sensorId ?? data?.id;
+const isFiniteValue = (value) => Number.isFinite(Number(value));
+
+const normalizeTelemetryHistory = (response) => {
+  if (!response) return [];
+  if (Array.isArray(response)) return response;
+  if (Array.isArray(response.measurements)) return response.measurements;
+  if (Array.isArray(response.data)) return response.data;
+  return [];
+};
+
 const hasLocationPlan = (location) => Boolean(imgUrl(location?.image_url));
 
 const isSensorOfflineByState = (sensor) => {
@@ -152,6 +165,7 @@ const saveActiveLocation = (locId) => {
 // Не использует вложенные компоненты (вызывают проблемы с рендерингом в SVG).
 const MiniChart = ({ data, color, isOffline = false, thresholds = {} }) => {
   const W = 200, H = 48;
+  const [selectedIndex, setSelectedIndex] = useState(null);
 
   // 1. Собираем пороги
   const tEntries = [
@@ -165,7 +179,16 @@ const MiniChart = ({ data, color, isOffline = false, thresholds = {} }) => {
   const vals = Array.isArray(data)
     ? data.map(Number).filter(n => !isNaN(n))
     : [];
+  if (vals.length === 1) vals.push(vals[0]);
   const hasHistory = vals.length >= 2;
+
+  useEffect(() => {
+    setSelectedIndex((prev) => {
+      if (!hasHistory) return null;
+      if (prev == null) return prev;
+      return Math.min(prev, vals.length - 1);
+    });
+  }, [hasHistory, vals.length]);
 
   // 3. Диапазон оси Y — объединяем историю и пороги, добавляем отступ 10%
   const allNums = [...vals, ...tEntries.map(t => Number(t.val))];
@@ -187,6 +210,25 @@ const MiniChart = ({ data, color, isOffline = false, thresholds = {} }) => {
   // 5. Строим путь истории
   const ptsStr = hasHistory
     ? vals.map((v, i) => `${(i / (vals.length - 1)) * W},${toY(v)}`).join("L")
+    : null;
+
+  const handlePointSelect = (event) => {
+    if (!hasHistory) return;
+    const rect = event.currentTarget.getBoundingClientRect();
+    const x = ((event.clientX - rect.left) / rect.width) * W;
+    const index = Math.max(
+      0,
+      Math.min(vals.length - 1, Math.round((x / W) * (vals.length - 1)))
+    );
+    setSelectedIndex(index);
+  };
+
+  const selectedPoint = hasHistory && selectedIndex != null
+    ? {
+        x: (selectedIndex / (vals.length - 1)) * W,
+        y: toY(vals[selectedIndex]),
+        value: vals[selectedIndex],
+      }
     : null;
 
   // 6. Строим линии порогов (чистые SVG-элементы, без вложенных компонентов)
@@ -251,10 +293,38 @@ const MiniChart = ({ data, color, isOffline = false, thresholds = {} }) => {
   const avg = (vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(1);
   return (
     <div>
-      <svg viewBox={`0 0 ${W} ${H}`} style={{ width:"100%", height:H }} preserveAspectRatio="none">
+      <svg
+        viewBox={`0 0 ${W} ${H}`}
+        style={{ width:"100%", height:H, cursor: "crosshair" }}
+        preserveAspectRatio="none"
+        onPointerDown={handlePointSelect}
+      >
         <path d={`M0,${H} L${ptsStr} L${W},${H}Z`} fill={color} opacity="0.12"/>
         <path d={`M${ptsStr}`} fill="none" stroke={color} strokeWidth="1.5"/>
         {thresholdSvg}
+        {selectedPoint && (
+          <g pointerEvents="none">
+            <line
+              x1={selectedPoint.x} y1="0" x2={selectedPoint.x} y2={H}
+              stroke={color} strokeWidth="1" strokeDasharray="3,2" opacity="0.8"
+            />
+            <circle cx={selectedPoint.x} cy={selectedPoint.y} r="3.2" fill="#0e0e0e" stroke={color} strokeWidth="1.6"/>
+            <rect
+              x={Math.max(2, Math.min(W - 43, selectedPoint.x - 20))}
+              y={Math.max(2, selectedPoint.y - 17)}
+              width="41" height="12" rx="3"
+              fill="#111" stroke={color} strokeWidth="0.8" opacity="0.96"
+            />
+            <text
+              x={Math.max(22.5, Math.min(W - 20.5, selectedPoint.x))}
+              y={Math.max(10.5, selectedPoint.y - 8)}
+              fill={color} fontSize="7.2" textAnchor="middle"
+              fontFamily="monospace" fontWeight="700"
+            >
+              {selectedPoint.value.toFixed(1)}
+            </text>
+          </g>
+        )}
       </svg>
       <div style={{ display:"flex", justifyContent:"space-between", fontSize:9, color:"#555", marginTop:2 }}>
         <span>↓<span style={{ color }}>{Math.min(...vals).toFixed(1)}</span></span>
@@ -266,14 +336,60 @@ const MiniChart = ({ data, color, isOffline = false, thresholds = {} }) => {
 };
 
 // ─── useSensorHistory ─────────────────────────────────────────────────────────
-const useSensorHistory = (sensorId) => {
-  const [history, setHistory] = useState(null);
+const DASHBOARD_HISTORY_REFRESH_MS = 5000;
+
+const useSensorHistory = (sensorId, liveMeasurement) => {
+  const [history, setHistory] = useState([]);
+
   useEffect(() => {
     if (!sensorId) return;
-    apiGet(`/telemetry/${sensorId}/history?limit=24`)
-      .then(d => setHistory(d))
-      .catch(() => setHistory(null));
+
+    let cancelled = false;
+
+    const load = () => {
+      apiGet(`/telemetry/${sensorId}/history?period=24h&limit=96`)
+        .then((response) => {
+          if (!cancelled) setHistory(normalizeTelemetryHistory(response));
+        })
+        .catch(() => {
+          if (!cancelled) setHistory([]);
+        });
+    };
+
+    load();
+    const intervalId = window.setInterval(load, DASHBOARD_HISTORY_REFRESH_MS);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+    };
   }, [sensorId]);
+
+  useEffect(() => {
+    if (!sensorId || !liveMeasurement) return;
+    const liveSensorId = getTelemetrySensorId(liveMeasurement) ?? sensorId;
+    if (!sameId(liveSensorId, sensorId)) return;
+
+    const temp = getTelemetryTemp(liveMeasurement);
+    const hum = getTelemetryHum(liveMeasurement);
+    if (!isFiniteValue(temp) && !isFiniteValue(hum)) return;
+
+    const timestamp = liveMeasurement.timestamp ?? new Date().toISOString();
+    const nextPoint = {
+      ...liveMeasurement,
+      sensor_id: sensorId,
+      temperature: temp,
+      humidity: hum,
+      timestamp,
+    };
+
+    setHistory((prev) => {
+      const arr = Array.isArray(prev) ? prev : normalizeTelemetryHistory(prev);
+      const withoutDuplicate = arr.filter((point) => point.timestamp !== timestamp);
+      return [...withoutDuplicate, nextPoint].slice(-96);
+    });
+  }, [sensorId, liveMeasurement]);
+
   return history;
 };
 
@@ -326,16 +442,16 @@ const useUserLocation = (role, sensors) => {
 // telemetryData==null   → нет телеметрии совсем  → серый "Нет данных"
 // telemetryData!=null   → есть данные            → по значению
 const SensorCard = ({ sensor, telemetryData, isOffline = false }) => {
-  const temp = (!isOffline && telemetryData != null) ? telemetryData.temperature ?? null : null;
-  const hum  = (!isOffline && telemetryData != null) ? telemetryData.humidity    ?? null : null;
+  const temp = (!isOffline && telemetryData != null) ? getTelemetryTemp(telemetryData) ?? null : null;
+  const hum  = (!isOffline && telemetryData != null) ? getTelemetryHum(telemetryData)  ?? null : null;
 
   const battery = sensor.battery_level ?? null;
   const bc = battery == null ? "#555" : battery > 50 ? "#01e676" : battery > 20 ? "#ffd550" : "#ff5b5b";
 
   // История загружается ВСЕГДА — чтобы пороги были видны даже без живых данных
-  const history = useSensorHistory(sensor.id);
-  const tempH = history?.measurements?.map(m => m.temperature) ?? null;
-  const humH  = history?.measurements?.map(m => m.humidity)    ?? null;
+  const history = useSensorHistory(sensor.id, telemetryData);
+  const tempH = history.map(m => getTelemetryTemp(m)).filter(isFiniteValue);
+  const humH  = history.map(m => getTelemetryHum(m)).filter(isFiniteValue);
 
   // Статус определяем явно: offline → problem, нет телеметрии → nodata, иначе по значению
   const tSt = isOffline

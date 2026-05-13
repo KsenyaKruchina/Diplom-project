@@ -265,6 +265,7 @@ const getLabels = (period) => {
 
 const CHART_POINTS = { day: 24, week: 48, month: 60, year: 52 };
 const API_LIMITS   = { day: 96, week: 336, month: 720, year: 1000 };
+const LIVE_REFRESH_INTERVAL_MS = 5000;
 
 const genFallback = (n) => Array.from({ length: n }, (_, i) => 20 + Math.sin(i / 2) * 5);
 
@@ -594,6 +595,7 @@ export const Analytics = () => {
 
   // ── Загрузка телеметрии ──────────────────────────────────────────────────────
   useEffect(() => {
+    let cancelled = false;
     const sensorIds = selectedChartSensorIds();
 
     if (sensorIds.length === 0) {
@@ -604,8 +606,8 @@ export const Analytics = () => {
       return;
     }
 
-    const load = async () => {
-      setHistLoading(true);
+    const load = async ({ silent = false } = {}) => {
+      if (!silent) setHistLoading(true);
       setHistError("");
 
       const uiPeriod = chartPeriod;
@@ -646,6 +648,8 @@ export const Analytics = () => {
         const temps = averageSeries(perSensor.map(item => item.temp));
         const hums = averageSeries(perSensor.map(item => item.hum));
 
+        if (cancelled) return;
+
         setChartTemp(temps);
         setChartHum(hums);
 
@@ -664,17 +668,26 @@ export const Analytics = () => {
         }
 
       } catch (err) {
+        if (cancelled) return;
         console.error("[Analytics] Ошибка загрузки телеметрии:", err);
         setHistError(err.message || "Ошибка загрузки данных");
         setChartTemp([]);
         setChartHum([]);
         setLatestData(null);
       } finally {
-        setHistLoading(false);
+        if (!cancelled && !silent) setHistLoading(false);
       }
     };
 
     load();
+    const intervalId = window.setInterval(() => {
+      load({ silent: true });
+    }, LIVE_REFRESH_INTERVAL_MS);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+    };
   }, [selectedChartSensorIds, filterLocation, filterControlUnit, chartPeriod, customRange]);
 
   // ── Опции для экспорта с учётом роли ──

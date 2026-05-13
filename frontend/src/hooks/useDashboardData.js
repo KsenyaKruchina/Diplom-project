@@ -15,6 +15,16 @@ import { getAlarms } from "../services/alarmsService";
 import { wsService } from "../services/websocketService";
 import { apiRequest } from "../services/api";
 
+const LIVE_REFRESH_INTERVAL_MS = 5000;
+
+const normalizeSensorId = (value) => {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) && String(value).trim() !== "" ? numeric : value;
+};
+const getMeasurementSensorId = (data) => normalizeSensorId(data.sensor_id ?? data.sensorId ?? data.id);
+const getMeasurementTemperature = (data) => data.temp ?? data.temperature;
+const getMeasurementHumidity = (data) => data.hum ?? data.humidity;
+
 export const useDashboardData = () => {
   const [locations, setLocations]   = useState([]);
   const [sensors,   setSensors]     = useState([]);
@@ -28,8 +38,8 @@ export const useDashboardData = () => {
 
   // Загрузить все данные 
 
-  const fetchAll = useCallback(async () => {
-    setLoading(true);
+  const fetchAll = useCallback(async ({ silent = false } = {}) => {
+    if (!silent) setLoading(true);
     setError(null);
 
     try {
@@ -57,7 +67,7 @@ export const useDashboardData = () => {
     } catch (err) {
       if (mountedRef.current) setError(err.message);
     } finally {
-      if (mountedRef.current) setLoading(false);
+      if (mountedRef.current && !silent) setLoading(false);
     }
   }, []);
 
@@ -66,7 +76,12 @@ export const useDashboardData = () => {
   useEffect(() => {
     mountedRef.current = true;
     fetchAll();
+    const intervalId = window.setInterval(() => {
+      fetchAll({ silent: true });
+    }, LIVE_REFRESH_INTERVAL_MS);
+
     return () => {
+      window.clearInterval(intervalId);
       mountedRef.current = false;
     };
   }, [fetchAll]);
@@ -96,13 +111,15 @@ export const useDashboardData = () => {
     const unsubMeasurement = wsService.on("new_measurement", (data) => {
       // data = { type, sensor_id, sensor_name, temp, hum, is_alarm }
       if (!mountedRef.current) return;
+      const sensorId = getMeasurementSensorId(data);
+      if (sensorId == null) return;
 
       setTelemetry((prev) => {
         const next = new Map(prev);
-        next.set(data.sensor_id, {
-          temperature: data.temp,
-          humidity: data.hum,
-          timestamp: new Date().toISOString(),
+        next.set(sensorId, {
+          temperature: getMeasurementTemperature(data),
+          humidity: getMeasurementHumidity(data),
+          timestamp: data.timestamp ?? new Date().toISOString(),
         });
         return next;
       });

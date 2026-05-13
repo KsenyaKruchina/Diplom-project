@@ -6,6 +6,10 @@ import { apiRequest } from "../services/api";
 import { getTelemetryHistory, getTelemetryLast24h } from "../services/telemetryService";
 import { wsService } from "../services/websocketService";
 
+const getMeasurementSensorId = (data) => data.sensor_id ?? data.sensorId ?? data.id;
+const getMeasurementTemperature = (data) => data.temp ?? data.temperature;
+const getMeasurementHumidity = (data) => data.hum ?? data.humidity;
+
 // ─── Прореживание массива до нужного кол-ва точек ────────────────────────────
 const downsample = (arr, target) => {
   if (!arr || arr.length === 0) return [];
@@ -88,11 +92,14 @@ export const useAnalyticsData = () => {
   // ── WebSocket: live-обновления ─────────────────────────────────────────────
   useEffect(() => {
     const unsubscribe = wsService.on("new_measurement", (event) => {
-      if (activeSensorId.current && event.sensor_id === activeSensorId.current) {
+      if (
+        activeSensorId.current &&
+        String(getMeasurementSensorId(event) ?? "") === String(activeSensorId.current)
+      ) {
         setHistory((prev) => {
-          const temp = [...prev.temp, event.temp].slice(-500);
-          const hum  = [...prev.hum,  event.hum].slice(-500);
-          const ts   = [...prev.timestamps, new Date().toISOString()].slice(-500);
+          const temp = [...prev.temp, getMeasurementTemperature(event)].slice(-500);
+          const hum  = [...prev.hum,  getMeasurementHumidity(event)].slice(-500);
+          const ts   = [...prev.timestamps, event.timestamp ?? new Date().toISOString()].slice(-500);
           return { temp, hum, timestamps: ts };
         });
       }
