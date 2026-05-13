@@ -4,12 +4,11 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import "./Analytics.css";
 import { useAnalyticsData } from "../hooks/useAnalyticsData";
-import { getToken } from "../services/api";
+import { BASE_URL, getToken } from "../services/api";
 
 // ── Константы ─────────────────────────────────────────────────────────────────
 
-const BASE_URL = "http://157.90.127.202/api/v1";
-const TELEMETRY_BASE = "http://157.90.127.202:8000/api/v1";
+const TELEMETRY_BASE = BASE_URL;
 const HISTORY_KEY = "analytics_export_history";
 
 const authHeaders = () => ({
@@ -58,6 +57,8 @@ const extractMeasurements = (apiResponse) => {
   return [];
 };
 
+const sameId = (a, b) => String(a ?? "") === String(b ?? "");
+
 const downsample = (arr, target) => {
   if (!arr || arr.length === 0) return [];
   if (arr.length <= target) return arr;
@@ -66,6 +67,22 @@ const downsample = (arr, target) => {
     const idx = Math.round(i * step);
     return arr[Math.min(idx, arr.length - 1)];
   });
+};
+
+const averageSeries = (seriesList) => {
+  const valid = seriesList.filter(arr => Array.isArray(arr) && arr.length > 0);
+  if (valid.length === 0) return [];
+
+  const maxLength = Math.max(...valid.map(arr => arr.length));
+  return Array.from({ length: maxLength }, (_, i) => {
+    const values = valid
+      .map(arr => arr[i])
+      .filter(v => v != null && !isNaN(Number(v)))
+      .map(Number);
+
+    if (values.length === 0) return null;
+    return values.reduce((sum, v) => sum + v, 0) / values.length;
+  }).filter(v => v != null);
 };
 
 // ── Download ──────────────────────────────────────────────────────────────────
@@ -462,6 +479,8 @@ const EXPORT_FORMATS = [
 // ── Main ──────────────────────────────────────────────────────────────────────
 export const Analytics = () => {
   const {
+    sensors,
+    controlUnits,
     sensorOptions,
     locationOptions,
     controlUnitOptions,
@@ -539,13 +558,49 @@ export const Analytics = () => {
     setExportError("");
   }, [reportType]);
 
+  const getSensorControlUnit = useCallback((sensor) => {
+    return controlUnits.find(cu =>
+      sameId(cu.id, sensor.control_unit_id) ||
+      (sensor.control_unit_id == null && sameId(cu.id, sensor.group_id))
+    );
+  }, [controlUnits]);
+
+  const getSensorLocationId = useCallback((sensor) => {
+    const unit = getSensorControlUnit(sensor);
+    return unit?.location_id ?? unit?.group_id ?? sensor.location_id ?? sensor.group_id ?? null;
+  }, [getSensorControlUnit]);
+
+  const selectedChartSensorIds = useCallback(() => {
+    if (filterSensor) return [filterSensor];
+
+    if (filterControlUnit) {
+      return sensors
+        .filter(sensor => {
+          const unit = getSensorControlUnit(sensor);
+          return sameId(sensor.control_unit_id, filterControlUnit) ||
+                 sameId(unit?.id, filterControlUnit);
+        })
+        .map(sensor => String(sensor.id));
+    }
+
+    if (filterLocation) {
+      return sensors
+        .filter(sensor => sameId(getSensorLocationId(sensor), filterLocation))
+        .map(sensor => String(sensor.id));
+    }
+
+    return [];
+  }, [filterSensor, filterControlUnit, filterLocation, sensors, getSensorControlUnit, getSensorLocationId]);
+
   // ── Загрузка телеметрии ──────────────────────────────────────────────────────
   useEffect(() => {
-    if (!filterSensor) {
+    const sensorIds = selectedChartSensorIds();
+
+    if (sensorIds.length === 0) {
       setChartTemp([]);
       setChartHum([]);
       setLatestData(null);
-      setHistError("");
+      setHistError(filterLocation || filterControlUnit ? "Нет датчиков в выбранном объекте" : "");
       return;
     }
 
@@ -557,40 +612,52 @@ export const Analytics = () => {
       const targetPoints = CHART_POINTS[uiPeriod] || 60;
 
       try {
-        let apiResponse;
-
-        if (customRange) {
-          apiResponse = await fetchSensorHistory(
-            filterSensor,
-            `${customRange.from}T00:00:00`,
-            `${customRange.to}T23:59:59`
-          );
-        } else if (uiPeriod === "day") {
-          apiResponse = await fetchSensorLast24h(filterSensor);
-        } else {
-          const limit = API_LIMITS[uiPeriod] || 500;
-          apiResponse = await fetchSensorHistoryByPeriod(filterSensor, limit);
-        }
-
-        const measurements = extractMeasurements(apiResponse);
-
-        const sorted = [...measurements].sort(
-          (a, b) => new Date(a.timestamp) - new Date(b.timestamp)
+        const responses = await Promise.allSettled(
+          sensorIds.map(sensorId => {
+            if (customRange) {
+              return fetchSensorHistory(
+                sensorId,
+                `${customRange.from}T00:00:00`,
+                `${customRange.to}T23:59:59`
+              );
+            }
+            if (uiPeriod === "day") return fetchSensorLast24h(sensorId);
+            const limit = API_LIMITS[uiPeriod] || 500;
+            return fetchSensorHistoryByPeriod(sensorId, limit);
+          })
         );
 
-        const sampled = downsample(sorted, targetPoints);
+        const perSensor = responses
+          .filter(r => r.status === "fulfilled")
+          .map(r => {
+            const measurements = extractMeasurements(r.value);
+            const sorted = [...measurements].sort(
+              (a, b) => new Date(a.timestamp) - new Date(b.timestamp)
+            );
+            const sampled = downsample(sorted, targetPoints);
+            const latest = r.value?.latest ?? (sorted.length > 0 ? sorted[sorted.length - 1] : null);
+            return {
+              temp: sampled.map(m => m.temperature).filter(v => v != null && !isNaN(v)),
+              hum:  sampled.map(m => m.humidity).filter(v => v != null && !isNaN(v)),
+              latest,
+            };
+          });
 
-        const temps = sampled.map(m => m.temperature).filter(v => v != null && !isNaN(v));
-        const hums  = sampled.map(m => m.humidity).filter(v => v != null && !isNaN(v));
+        const temps = averageSeries(perSensor.map(item => item.temp));
+        const hums = averageSeries(perSensor.map(item => item.hum));
 
         setChartTemp(temps);
         setChartHum(hums);
 
-        const latest = apiResponse?.latest ?? (sorted.length > 0 ? sorted[sorted.length - 1] : null);
-        if (latest) {
+        const latestValues = perSensor
+          .map(item => item.latest)
+          .filter(Boolean);
+        if (latestValues.length > 0) {
+          const tempVals = latestValues.map(m => m.temperature).filter(v => v != null && !isNaN(v)).map(Number);
+          const humVals = latestValues.map(m => m.humidity).filter(v => v != null && !isNaN(v)).map(Number);
           setLatestData({
-            temperature: latest.temperature ?? null,
-            humidity:    latest.humidity    ?? null,
+            temperature: tempVals.length ? tempVals.reduce((sum, v) => sum + v, 0) / tempVals.length : null,
+            humidity: humVals.length ? humVals.reduce((sum, v) => sum + v, 0) / humVals.length : null,
           });
         } else {
           setLatestData(null);
@@ -608,7 +675,7 @@ export const Analytics = () => {
     };
 
     load();
-  }, [filterSensor, chartPeriod, customRange]);
+  }, [selectedChartSensorIds, filterLocation, filterControlUnit, chartPeriod, customRange]);
 
   // ── Опции для экспорта с учётом роли ──
   const exportOptions = useCallback(() => {
@@ -685,8 +752,10 @@ export const Analytics = () => {
   const labels = getLabels(chartPeriod);
   const n = CHART_POINTS[chartPeriod] || 30;
 
-  const displayTemp = chartTemp.length > 0 ? chartTemp : (!filterSensor ? genFallback(n) : []);
-  const displayHum  = chartHum.length  > 0 ? chartHum  : (!filterSensor ? genFallback(n) : []);
+  const hasActiveFilter = filterSensor || filterLocation || filterControlUnit;
+
+  const displayTemp = chartTemp.length > 0 ? chartTemp : (!hasActiveFilter ? genFallback(n) : []);
+  const displayHum  = chartHum.length  > 0 ? chartHum  : (!hasActiveFilter ? genFallback(n) : []);
 
   const chartSubLabel = filterSensor
     ? sensorOptions.find(s => s.value === filterSensor)?.label
@@ -695,8 +764,6 @@ export const Analytics = () => {
       : filterLocation
         ? locationOptions.find(l => l.value === filterLocation)?.label
         : "Все датчики (демо)";
-
-  const hasActiveFilter = filterSensor || filterLocation || filterControlUnit;
 
   // ── Render ────────────────────────────────────────────────────────────────────
   return (
@@ -800,7 +867,7 @@ export const Analytics = () => {
                   <div style={{height:130,display:"flex",alignItems:"center",justifyContent:"center",color:"#555",fontSize:"13px"}}>
                     Загрузка...
                   </div>
-                ) : data.length === 0 && filterSensor ? (
+                ) : data.length === 0 && hasActiveFilter ? (
                   <div style={{height:130,display:"flex",alignItems:"center",justifyContent:"center",color:"#555",fontSize:"13px"}}>
                     Нет данных за выбранный период
                   </div>

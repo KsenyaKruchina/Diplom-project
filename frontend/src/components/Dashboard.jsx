@@ -4,74 +4,33 @@ import "./Dashboard.css";
 import { useAuth } from "../context/AuthContext";
 import { useDashboardData } from "../hooks/useDashboardData";
 import { updateAlarmStatus, alarmToNotification, countAlarms } from "../services/alarmsService";
-
-const BASE_URL = "http://157.90.127.202:8000";
+import { apiRequest, apiUpload, BASE_URL } from "../services/api";
+import { updateSensorPosition } from "../services/sensorsService";
 
 // ─── API helpers ──────────────────────────────────────────────────────────────
-const getToken = () => localStorage.getItem("token");
+// Используем единый apiRequest из services/api.js вместо хардкода BASE_URL
 
-const apiGet = async (path) => {
-  const res = await fetch(`${BASE_URL}${path}`, {
-    headers: { Authorization: `Bearer ${getToken()}` },
-  });
-  if (!res.ok) throw new Error(`API ${res.status}`);
-  return res.json();
-};
+const apiGet = (path) => apiRequest(path);
 
-const apiPatch = async (path, body) => {
-  const res = await fetch(`${BASE_URL}${path}`, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${getToken()}` },
-    body: JSON.stringify(body),
-  });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err.detail || `Ошибка ${res.status}`);
-  }
-  return res.json();
-};
+const apiPatch = (path, body) =>
+  apiRequest(path, { method: "PATCH", body: JSON.stringify(body) });
 
 const apiDelete = async (path) => {
-  const res = await fetch(`${BASE_URL}${path}`, {
-    method: "DELETE",
-    headers: { Authorization: `Bearer ${getToken()}` },
-  });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err.detail || `Ошибка ${res.status}`);
-  }
-  return res.ok;
+  await apiRequest(path, { method: "DELETE" });
+  return true;
 };
 
-const apiUploadPlan = async (locationId, file) => {
+const apiUploadPlan = (locationId, file) => {
   const formData = new FormData();
   formData.append("file", file);
-  const res = await fetch(`${BASE_URL}/api/v1/locations/${locationId}/upload-plan`, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${getToken()}` },
-    body: formData,
-  });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err.detail || `Ошибка загрузки плана: ${res.status}`);
-  }
-  return res.json();
+  return apiUpload(`/locations/${locationId}/upload-plan`, formData, "POST");
 };
 
-const apiCreateLocation = async (name, file) => {
+const apiCreateLocation = (name, file) => {
   const formData = new FormData();
   formData.append("name", name);
   if (file) formData.append("file", file);
-  const res = await fetch(`${BASE_URL}/api/v1/locations/`, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${getToken()}` },
-    body: formData,
-  });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err.detail || `Ошибка создания: ${res.status}`);
-  }
-  return res.json();
+  return apiUpload("/locations/", formData, "POST");
 };
 
 // ─── Построение URL изображения ───────────────────────────────────────────────
@@ -79,7 +38,8 @@ const imgUrl = (image_url) => {
   if (!image_url) return null;
   if (image_url.startsWith("http://") || image_url.startsWith("https://")) return image_url;
   const path = image_url.startsWith("/") ? image_url : `/${image_url}`;
-  return `${BASE_URL}${path}`;
+  const apiOrigin = new URL(BASE_URL, window.location.origin).origin;
+  return `${apiOrigin}${path}`;
 };
 
 // ─── Icons ────────────────────────────────────────────────────────────────────
@@ -104,6 +64,7 @@ const SENSOR_COLORS = { normal: "#01e676", warning: "#ffd550", problem: "#ff5b5b
 const SENSOR_BG     = { normal: "#19282b", warning: "#312c1c", problem: "#321c1b", nodata: "#161616" };
 const STATUS_LABELS = { normal: "Норма",   warning: "Внимание", problem: "Тревога", nodata: "Нет данных" };
 const STATUS_TEXT   = { normal: "#01e676", warning: "#ffd550",  problem: "#ff5b5b", nodata: "#555" };
+const OFFLINE_STATUSES = new Set(["offline", "connection_lost", "no_connection", "no_signal", "lost", "inactive"]);
 
 const getTempStatus = (v, sensor) => {
   const n = parseFloat(v);
@@ -127,6 +88,65 @@ const getHumStatus = (v, sensor) => {
   return (n < 30 || n > 70) ? "warning" : "normal";
 };
 
+const sameId = (a, b) => String(a ?? "") === String(b ?? "");
+
+const hasLocationPlan = (location) => Boolean(imgUrl(location?.image_url));
+
+const isSensorOfflineByState = (sensor) => {
+  if (!sensor) return false;
+  const rawStatus = String(
+    sensor.status ?? sensor.connection_status ?? sensor.signal_status ?? ""
+  ).toLowerCase();
+  const hasNoSignal = sensor.gsm_signal != null && Number(sensor.gsm_signal) <= 0;
+
+  return (
+    sensor.is_online === false ||
+    OFFLINE_STATUSES.has(rawStatus) ||
+    rawStatus.includes("offline") ||
+    rawStatus.includes("lost") ||
+    rawStatus.includes("no_signal") ||
+    rawStatus.includes("connection_lost") ||
+    hasNoSignal
+  );
+};
+
+const isSensorOffline = (sensor, offlineSensorIds) =>
+  offlineSensorIds?.has(sensor?.id) || isSensorOfflineByState(sensor);
+
+const normalizePlanCoord = (value, fallback = 0.5) => {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return fallback;
+  if (n > 1) return Math.max(0, Math.min(1, n / 100));
+  return Math.max(0, Math.min(1, n));
+};
+
+const getSensorLocationId = (sensor, controlUnits = []) => {
+  const unit = controlUnits.find((u) =>
+    sameId(u.id, sensor.control_unit_id) ||
+    (sensor.control_unit_id == null && sameId(u.id, sensor.group_id))
+  );
+
+  if (unit) return unit.location_id ?? unit.group_id ?? null;
+  return sensor.location_id ?? sensor.group_id ?? null;
+};
+
+const DASHBOARD_ACTIVE_LOCATION_KEY = "dashboard_active_location_id";
+
+const readSavedActiveLocation = () => {
+  try {
+    return localStorage.getItem(DASHBOARD_ACTIVE_LOCATION_KEY);
+  } catch {
+    return null;
+  }
+};
+
+const saveActiveLocation = (locId) => {
+  try {
+    if (locId == null) localStorage.removeItem(DASHBOARD_ACTIVE_LOCATION_KEY);
+    else localStorage.setItem(DASHBOARD_ACTIVE_LOCATION_KEY, String(locId));
+  } catch {}
+};
+
 // ─── MiniChart ────────────────────────────────────────────────────────────────
 // Все расчёты (toY, диапазон) происходят ДО ветвления — пороги рисуются всегда.
 // Не использует вложенные компоненты (вызывают проблемы с рендерингом в SVG).
@@ -135,11 +155,11 @@ const MiniChart = ({ data, color, isOffline = false, thresholds = {} }) => {
 
   // 1. Собираем пороги
   const tEntries = [
-    { val: thresholds.alarmMin,   col: "#ff5b5b" },
-    { val: thresholds.alarmMax,   col: "#ff5b5b" },
-    { val: thresholds.warningMin, col: "#ffd550" },
-    { val: thresholds.warningMax, col: "#ffd550" },
-  ].filter(t => t.val != null && !isNaN(Number(t.val)));
+    { val: thresholds.alarmMin   ?? 0, col: "#ff5b5b", label: "Amin" },
+    { val: thresholds.alarmMax   ?? 0, col: "#ff5b5b", label: "Amax" },
+    { val: thresholds.warningMin ?? 0, col: "#ffd550", label: "Wmin" },
+    { val: thresholds.warningMax ?? 0, col: "#ffd550", label: "Wmax" },
+  ].filter(t => !isNaN(Number(t.val)));
 
   // 2. История: фильтруем null/NaN
   const vals = Array.isArray(data)
@@ -175,20 +195,17 @@ const MiniChart = ({ data, color, isOffline = false, thresholds = {} }) => {
     // Разрешаем небольшой выход за края (1px) — пороги у границ всё равно видны
     if (y < -2 || y > H + 2) return null;
     const clampedY = Math.max(1, Math.min(H - 1, y));
+    const labelY = Math.max(7, Math.min(H - 2, clampedY + (i % 2 === 0 ? -2 : 8)));
     return (
       <g key={`th-${i}`}>
         <line
           x1="0" y1={clampedY} x2={W} y2={clampedY}
           stroke={t.col} strokeWidth="1.2" strokeDasharray="5,3" opacity="0.8"
         />
-        <rect
-          x={W - 27} y={clampedY - 9} width={26} height={10} rx="2"
-          fill="#0a0a0a" opacity="0.9"
-        />
         <text
-          x={W - 2} y={clampedY - 1}
-          fill={t.col} fontSize="6.5" textAnchor="end"
-          opacity="1" fontFamily="monospace" fontWeight="600"
+          x={W - 2} y={labelY}
+          fill={t.col} fontSize="6.2" textAnchor="end"
+          opacity="0.95" fontFamily="monospace" fontWeight="600"
         >
           {Number(t.val).toFixed(1)}
         </text>
@@ -224,7 +241,7 @@ const MiniChart = ({ data, color, isOffline = false, thresholds = {} }) => {
           {thresholdSvg}
         </svg>
         <div style={{ display:"flex", justifyContent:"center", fontSize:9, color:"#3a3a3a", marginTop:2 }}>
-          {tEntries.length > 0 ? "нет истории" : "нет данных"}
+          нет истории
         </div>
       </div>
     );
@@ -253,7 +270,7 @@ const useSensorHistory = (sensorId) => {
   const [history, setHistory] = useState(null);
   useEffect(() => {
     if (!sensorId) return;
-    apiGet(`/api/v1/telemetry/${sensorId}/history?limit=24`)
+    apiGet(`/telemetry/${sensorId}/history?limit=24`)
       .then(d => setHistory(d))
       .catch(() => setHistory(null));
   }, [sensorId]);
@@ -274,7 +291,7 @@ const useUserLocation = (role, sensors) => {
     const load = async () => {
       setLoading(true);
       try {
-        const me = await apiGet("/api/v1/users/me");
+        const me = await apiGet("/users/me");
         const locationId = me.location_id ?? (sensors.length > 0 ? sensors[0]?.group_id : null);
 
         if (!locationId) {
@@ -282,7 +299,7 @@ const useUserLocation = (role, sensors) => {
           return;
         }
 
-        const loc = await apiGet(`/api/v1/locations/${locationId}`);
+        const loc = await apiGet(`/locations/${locationId}`);
         setLocation(loc);
       } catch (e) {
         if (sensors.length > 0 && sensors[0]?.group_id) {
@@ -655,9 +672,10 @@ const EditSensorModal = ({ sensor, onClose, onSave }) => {
 };
 
 // ─── FloorPlan ────────────────────────────────────────────────────────────────
-const FloorPlan = ({ activeLoc, locSensors, telemetry, canEdit, dragAllMode, onPositionSave, pendingPositions, onPendingPositionChange }) => {
+const FloorPlan = ({ activeLoc, locSensors, telemetry, offlineSensorIds, canEdit, dragAllMode, onPositionSave, pendingPositions, onPendingPositionChange }) => {
   const containerRef = useRef(null);
   const [localPositions, setLocalPositions] = useState({});
+  const [imageAspect, setImageAspect] = useState(null);
   const dragging = useRef(null);
   const didDrag = useRef(false);
 
@@ -665,9 +683,18 @@ const FloorPlan = ({ activeLoc, locSensors, telemetry, canEdit, dragAllMode, onP
 
   useEffect(() => {
     const p = {};
-    locSensors.forEach(s => { p[s.id] = { x: s.pos_x ?? 50, y: s.pos_y ?? 50 }; });
+    locSensors.forEach(s => {
+      p[s.id] = {
+        x: normalizePlanCoord(s.pos_x),
+        y: normalizePlanCoord(s.pos_y),
+      };
+    });
     setLocalPositions(p);
   }, [locSensors]);
+
+  useEffect(() => {
+    setImageAspect(null);
+  }, [activeLoc?.image_url]);
 
   const startDrag = useCallback((clientX, clientY, sensor) => {
     if (!dragAllMode || !containerRef.current) return;
@@ -677,8 +704,8 @@ const FloorPlan = ({ activeLoc, locSensors, telemetry, canEdit, dragAllMode, onP
       sensorId: sensor.id,
       startClientX: clientX,
       startClientY: clientY,
-      startPosX: effectivePositions[sensor.id]?.x ?? sensor.pos_x ?? 50,
-      startPosY: effectivePositions[sensor.id]?.y ?? sensor.pos_y ?? 50,
+      startPosX: effectivePositions[sensor.id]?.x ?? normalizePlanCoord(sensor.pos_x),
+      startPosY: effectivePositions[sensor.id]?.y ?? normalizePlanCoord(sensor.pos_y),
       rectW: rect.width,
       rectH: rect.height,
     };
@@ -687,11 +714,11 @@ const FloorPlan = ({ activeLoc, locSensors, telemetry, canEdit, dragAllMode, onP
   const moveDrag = useCallback((clientX, clientY) => {
     if (!dragging.current) return;
     const { sensorId, startClientX, startClientY, startPosX, startPosY, rectW, rectH } = dragging.current;
-    const dx = ((clientX - startClientX) / rectW) * 100;
-    const dy = ((clientY - startClientY) / rectH) * 100;
-    if (Math.abs(dx) > 0.5 || Math.abs(dy) > 0.5) didDrag.current = true;
-    const nx = Math.max(2, Math.min(98, startPosX + dx));
-    const ny = Math.max(2, Math.min(98, startPosY + dy));
+    const dx = (clientX - startClientX) / rectW;
+    const dy = (clientY - startClientY) / rectH;
+    if (Math.abs(dx) > 0.005 || Math.abs(dy) > 0.005) didDrag.current = true;
+    const nx = Math.max(0.02, Math.min(0.98, startPosX + dx));
+    const ny = Math.max(0.02, Math.min(0.98, startPosY + dy));
     if (dragAllMode) {
       onPendingPositionChange(sensorId, { x: nx, y: ny });
     } else {
@@ -715,25 +742,43 @@ const FloorPlan = ({ activeLoc, locSensors, telemetry, canEdit, dragAllMode, onP
 
   const pinStyle = (s) => {
     const tel    = telemetry.get(s.id);
-    const status = getTempStatus(tel?.temperature, s);
+    const status = isSensorOffline(s, offlineSensorIds) ? "problem" : getTempStatus(tel?.temperature, s);
     const col    = SENSOR_COLORS[status];
     const bg     = SENSOR_BG[status];
     const pos    = effectivePositions[s.id];
-    return { col, bg, status, tel, left: pos ? `${pos.x}%` : "50%", top: pos ? `${pos.y}%` : "50%" };
+    const x = normalizePlanCoord(pos?.x);
+    const y = normalizePlanCoord(pos?.y);
+    return { col, bg, status, tel, left: `${x * 100}%`, top: `${y * 100}%` };
   };
 
   return (
     <div
       ref={containerRef}
       className="floor-plan-wrap"
-      style={{ cursor: dragging.current ? "grabbing" : (dragAllMode ? "grab" : "default"), userSelect: "none", touchAction: "none" }}
+      style={{
+        cursor: dragging.current ? "grabbing" : (dragAllMode ? "grab" : "default"),
+        userSelect: "none",
+        touchAction: "none",
+        ...(planUrl ? { aspectRatio: imageAspect || "16 / 9", height: "auto" } : {}),
+      }}
       onMouseMove={e => moveDrag(e.clientX, e.clientY)}
       onMouseUp={() => endDrag()}
       onMouseLeave={() => { if (dragging.current) dragging.current = null; }}
     >
       {planUrl ? (
         <>
-          <img src={planUrl} alt="Floor plan" className="floor-image" draggable={false}/>
+          <img
+            src={planUrl}
+            alt="Floor plan"
+            className="floor-image"
+            draggable={false}
+            onLoad={e => {
+              const { naturalWidth, naturalHeight } = e.currentTarget;
+              if (naturalWidth > 0 && naturalHeight > 0) {
+                setImageAspect(`${naturalWidth} / ${naturalHeight}`);
+              }
+            }}
+          />
           <div className="floor-image-overlay">
             {locSensors.map(s => {
               const { col, bg, tel, left, top } = pinStyle(s);
@@ -762,23 +807,13 @@ const FloorPlan = ({ activeLoc, locSensors, telemetry, canEdit, dragAllMode, onP
           </div>
         </>
       ) : (
-        <svg className="floor-svg" viewBox="0 0 500 340" xmlns="http://www.w3.org/2000/svg">
-          <rect x="10" y="10" width="480" height="320" rx="8" fill="none" stroke="#2a2a2a" strokeWidth="1.5"/>
-          <text x="250" y="170" fill="#2a2a2a" fontSize="13" textAnchor="middle">{activeLoc?.name || "Нет плана помещения"}</text>
-          {locSensors.map(s => {
-            const { col, bg, tel, left, top } = pinStyle(s);
-            const cx = (parseFloat(left) / 100) * 480 + 10;
-            const cy = (parseFloat(top)  / 100) * 320 + 10;
-            return (
-              <g key={s.id} onMouseDown={e => dragAllMode && startDrag(e.clientX, e.clientY, s)} style={{ cursor: dragAllMode ? "grab" : "pointer" }}>
-                <circle cx={cx} cy={cy} r="22" fill={bg} stroke={col} strokeWidth="1.5"/>
-                <text x={cx} y={cy - 6} fill={col} fontSize="7" textAnchor="middle" fontWeight="700">{s.name.slice(0, 5)}</text>
-                <text x={cx} y={cy + 3} fill={col} fontSize="6.5" textAnchor="middle">{tel ? `${parseFloat(tel.temperature).toFixed(1)}°C` : "—"}</text>
-                <text x={cx} y={cy + 12} fill={col} fontSize="6.5" textAnchor="middle">{tel ? `${parseFloat(tel.humidity).toFixed(0)}%` : "—"}</text>
-              </g>
-            );
-          })}
-        </svg>
+        <div className="floor-empty-state">
+          <div className="floor-empty-icon"><IconPin/></div>
+          <div className="floor-empty-title">Добавьте мнемосхему</div>
+          <div className="floor-empty-text">
+            Для локации «{activeLoc?.name || "Без названия"}» не загружено изображение плана. После добавления мнемосхемы датчики появятся на плане.
+          </div>
+        </div>
       )}
     </div>
   );
@@ -788,6 +823,7 @@ const FloorPlan = ({ activeLoc, locSensors, telemetry, canEdit, dragAllMode, onP
 const FloorPanel = ({
   locations,
   sensors,
+  controlUnits,
   telemetry,
   onAddLocation,
   onEditLocation,
@@ -799,10 +835,11 @@ const FloorPanel = ({
   isNonAdmin,
   userLocation,
   onActiveLocationChange,
+  offlineSensorIds,
 }) => {
   // FIX #1: activeLocId живёт отдельно и не сбрасывается при обновлении locations.
   // Инициализируем один раз (lazy initializer), не через useEffect на locations.
-  const [activeLocId,    setActiveLocId]    = useState(() => null);
+  const [activeLocId,    setActiveLocId]    = useState(() => readSavedActiveLocation());
   const [showAdd,        setShowAdd]        = useState(false);
   const [editingLoc,     setEditingLoc]     = useState(null);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -821,17 +858,32 @@ const FloorPanel = ({
     if (initializedRef.current) return;        // уже инициализировано — выходим
     if (!isNonAdmin && locations.length > 0) {
       initializedRef.current = true;
-      const initId = locations[0]?.id ?? null;
+      const savedId = readSavedActiveLocation();
+      const initId = locations.some(l => sameId(l.id, savedId))
+        ? savedId
+        : locations[0]?.id ?? null;
       setActiveLocId(initId);
+      saveActiveLocation(initId);
       onActiveLocationChange?.(initId);
     }
   }, [locations, isNonAdmin]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (isNonAdmin && userLocation?.id) {
+      saveActiveLocation(userLocation.id);
       onActiveLocationChange?.(userLocation.id);
     }
   }, [isNonAdmin, userLocation]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (isNonAdmin || locations.length === 0 || activeLocId == null) return;
+    if (!locations.some(l => sameId(l.id, activeLocId))) {
+      const nextId = locations[0]?.id ?? null;
+      setActiveLocId(nextId);
+      saveActiveLocation(nextId);
+      onActiveLocationChange?.(nextId);
+    }
+  }, [locations, activeLocId, isNonAdmin]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -847,12 +899,16 @@ const FloorPanel = ({
 
   const activeLoc = isNonAdmin
     ? userLocation
-    : (locations.find(l => l.id === effectiveId) || locations[0]);
+    : (locations.find(l => sameId(l.id, effectiveId)) || locations[0]);
 
-  const locSensors = sensors.filter(s => s.group_id === activeLoc?.id);
+  const locSensors = sensors.filter(
+    s => sameId(getSensorLocationId(s, controlUnits), activeLoc?.id)
+  );
+  const activeLocHasPlan = hasLocationPlan(activeLoc);
 
   const handleLocationSelect = (locId) => {
     setActiveLocId(locId);
+    saveActiveLocation(locId);
     setIsDropdownOpen(false);
     onActiveLocationChange?.(locId);
   };
@@ -894,7 +950,12 @@ const FloorPanel = ({
 
   const enterDragAllMode = () => {
     const initialPositions = {};
-    locSensors.forEach(s => { initialPositions[s.id] = { x: s.pos_x ?? 50, y: s.pos_y ?? 50 }; });
+    locSensors.forEach(s => {
+      initialPositions[s.id] = {
+        x: normalizePlanCoord(s.pos_x),
+        y: normalizePlanCoord(s.pos_y),
+      };
+    });
     setPendingPositions(initialPositions);
     setDragAllMode(true);
   };
@@ -927,7 +988,7 @@ const FloorPanel = ({
                 {locations.map(loc => (
                   <button
                     key={loc.id}
-                    className={`location-dropdown-item ${loc.id === effectiveId ? "active" : ""}`}
+                    className={`location-dropdown-item ${sameId(loc.id, effectiveId) ? "active" : ""}`}
                     onClick={() => handleLocationSelect(loc.id)}
                   >
                     <IconPin/> {loc.name}
@@ -961,8 +1022,9 @@ const FloorPanel = ({
         {activeLoc && (
           <FloorPlan
             activeLoc={activeLoc}
-            locSensors={locSensors}
+            locSensors={activeLocHasPlan ? locSensors : []}
             telemetry={telemetry}
+            offlineSensorIds={offlineSensorIds}
             canEdit={canEdit}
             dragAllMode={dragAllMode}
             onPositionSave={handlePositionSave}
@@ -986,7 +1048,7 @@ const FloorPanel = ({
               <span><span className="legend-dot" style={{ background: "#ff5b5b" }}/> Тревога</span>
             </div>
             <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-              {canDragSensors && activeLoc && (
+              {canDragSensors && activeLoc && activeLocHasPlan && (
                 <button
                   className="btn-location-name"
                   onClick={enterDragAllMode}
@@ -1036,8 +1098,9 @@ const FloorPanel = ({
             await onDeleteLocation(id);
             setEditingLoc(null);
             // FIX #1: если удалили активную локацию — сбрасываем выбор
-            if (activeLocId === id) {
+            if (sameId(activeLocId, id)) {
               setActiveLocId(null);
+              saveActiveLocation(null);
               initializedRef.current = false; // разрешаем повторную инициализацию
             }
           }}
@@ -1053,7 +1116,16 @@ const Dashboard = () => {
 
   const canDragSensors = role === "admin";
 
-  const { locations: rawLocations, sensors, telemetry, alarms, loading, error, refetch } = useDashboardData();
+  const {
+    locations: rawLocations,
+    sensors,
+    controlUnits,
+    telemetry,
+    alarms,
+    loading,
+    error,
+    refetch,
+  } = useDashboardData();
 
   const { location: userLocation, loading: locationLoading } = useUserLocation(role, sensors);
 
@@ -1071,12 +1143,12 @@ const Dashboard = () => {
 
     const locationSensorIds = new Set(
       sensors
-        .filter(s => s.group_id === activeLocationId)
+        .filter(s => sameId(getSensorLocationId(s, controlUnits), activeLocationId))
         .map(s => s.id)
     );
 
     return alarms.filter(a => locationSensorIds.has(a.sensor_id));
-  }, [alarms, sensors, activeLocationId, isNonAdmin]);
+  }, [alarms, sensors, controlUnits, activeLocationId, isNonAdmin]);
 
   // Множество sensor_id с активной тревогой connection_lost
   const offlineSensorIds = useMemo(() => {
@@ -1096,19 +1168,29 @@ const Dashboard = () => {
   };
 
   const handleEditLocation = async (id, name, file) => {
-    try { await apiPatch(`/api/v1/locations/${id}`, { name }); }
+    try { await apiPatch(`/locations/${id}`, { name }); }
     catch (e) { console.warn("PATCH /locations не поддержан:", e.message); }
     if (file) await apiUploadPlan(id, file);
     refetch();
   };
 
   const handleDeleteLocation = async (id) => {
-    await apiDelete(`/api/v1/locations/${id}`);
+    await apiDelete(`/locations/${id}`);
     refetch();
   };
 
   const handleUpdateSensor = async (id, payload) => {
-    await apiPatch(`/api/v1/sensors/${id}`, payload);
+    const keys = Object.keys(payload || {});
+    const isPositionOnly =
+      keys.length === 2 &&
+      keys.includes("pos_x") &&
+      keys.includes("pos_y");
+
+    if (isPositionOnly) {
+      await updateSensorPosition(id, payload.pos_x, payload.pos_y);
+    } else {
+      await apiPatch(`/sensors/${id}`, payload);
+    }
     refetch();
   };
 
@@ -1125,8 +1207,10 @@ const Dashboard = () => {
   // чтобы не путать данные разных локаций.
   const sensorCards = useMemo(() => {
     if (!activeLocationId) return [];
-    return sensors.filter(s => s.group_id === activeLocationId);
-  }, [sensors, activeLocationId]);
+    const activeLoc = locations.find(l => sameId(l.id, activeLocationId));
+    if (!hasLocationPlan(activeLoc)) return [];
+    return sensors.filter(s => sameId(getSensorLocationId(s, controlUnits), activeLocationId));
+  }, [sensors, controlUnits, locations, activeLocationId]);
 
   if (loading || (isNonAdmin && locationLoading)) return (
     <div style={{ minHeight: "100vh", background: "#0a0a0a", display: "flex", alignItems: "center", justifyContent: "center", color: "#929292", fontFamily: '"Inter",sans-serif', fontSize: 14 }}>
@@ -1155,6 +1239,7 @@ const Dashboard = () => {
           <FloorPanel
             locations={locations}
             sensors={sensors}
+            controlUnits={controlUnits}
             telemetry={telemetry}
             onAddLocation={handleAddLocation}
             onEditLocation={handleEditLocation}
@@ -1166,6 +1251,7 @@ const Dashboard = () => {
             isNonAdmin={isNonAdmin}
             userLocation={userLocation}
             onActiveLocationChange={setActiveLocationId}
+            offlineSensorIds={offlineSensorIds}
           />
           <section className="panel notif-panel">
             <div className="panel-header">
@@ -1195,7 +1281,7 @@ const Dashboard = () => {
                 key={sensor.id}
                 sensor={sensor}
                 telemetryData={telemetry.get(sensor.id)}
-                isOffline={offlineSensorIds.has(sensor.id)}
+                isOffline={isSensorOffline(sensor, offlineSensorIds)}
               />
             ))}
           </div>

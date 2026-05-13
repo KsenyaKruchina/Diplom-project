@@ -1,11 +1,8 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import ReactDOM from "react-dom";
 import "./Reports.css";
-import { apiRequest } from "../services/api";
-import { getToken } from "../services/api";
+import { apiRequest, getToken, BASE_URL } from "../services/api";
 import { wsService } from "../services/websocketService";
-
-const BASE_URL = "http://157.90.127.202/api/v1";
 
 // ── Storage helpers ───────────────────────────────────────────────────────────
 const getStorageKey = (user) => {
@@ -31,6 +28,8 @@ const saveHistory = (user, history) => {
     localStorage.setItem(key, JSON.stringify(history.slice(0, 100)));
   } catch {}
 };
+
+const sameId = (a, b) => String(a ?? "") === String(b ?? "");
 
 // иконки
 const IconSearch = () => (
@@ -324,11 +323,12 @@ function FilterChip({ label, onRemove }) {
 }
 
 // ── Comment Edit Modal ────────────────────────────────────────────────────────
-function CommentModal({ alarmId, value, onSave, onClose }) {
+function CommentModal({ alarm, value, onSave, onClose }) {
   const [val, setVal] = useState(value || "");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const textareaRef = useRef(null);
+  const alarmId = alarm.id;
 
   useEffect(() => { textareaRef.current?.focus(); }, []);
 
@@ -336,11 +336,28 @@ function CommentModal({ alarmId, value, onSave, onClose }) {
     setSaving(true);
     setError("");
     try {
-      const updated = await apiRequest(`/alarms/${alarmId}/comment`, {
-        method: "PATCH",
-        body: JSON.stringify({ comment: val }),
-      });
-      onSave(updated);
+      let updated;
+      try {
+        updated = await apiRequest(`/alarms/${alarmId}/comment`, {
+          method: "PATCH",
+          body: JSON.stringify({
+            status: alarm.status,
+            comment: val,
+            user_comment: val,
+          }),
+        });
+      } catch (err) {
+        if (!/ресурс не найден/i.test(err.message || "")) throw err;
+        updated = await apiRequest(`/alarms/${alarmId}`, {
+          method: "PATCH",
+          body: JSON.stringify({
+            status: alarm.status,
+            user_comment: val,
+            comment: val,
+          }),
+        });
+      }
+      onSave(updated || { ...alarm, user_comment: val });
       onClose();
     } catch (err) {
       setError(err.message || "Ошибка сохранения комментария");
@@ -349,7 +366,7 @@ function CommentModal({ alarmId, value, onSave, onClose }) {
     }
   };
 
-  return (
+  return ReactDOM.createPortal(
     <div className="rp-modal-overlay" onClick={onClose}>
       <div className="rp-modal" onClick={e => e.stopPropagation()}>
         <div className="rp-modal-header">
@@ -375,7 +392,8 @@ function CommentModal({ alarmId, value, onSave, onClose }) {
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 
@@ -463,7 +481,7 @@ function DescriptionCell({ alarm, onUpdate }) {
       </span>
       {modalOpen && (
         <CommentModal
-          alarmId={alarm.id}
+          alarm={alarm}
           value={alarm.user_comment || ""}
           onSave={onUpdate}
           onClose={() => setModalOpen(false)}
@@ -1234,9 +1252,6 @@ export const Reports = () => {
   const [loading, setLoading]     = useState(true);
   const [loadError, setLoadError] = useState("");
 
-  // ── НОВОЕ: отслеживаем состояние WS-соединения ────────────────────────────
-  // Показываем пользователю индикатор — живое соединение или нет.
-  // Это также помогает понять, потерял ли он real-time обновления.
   const [wsConnected, setWsConnected] = useState(
     () => wsService.ws?.readyState === WebSocket.OPEN
   );
@@ -1266,10 +1281,6 @@ export const Reports = () => {
 
   const ROWS_PER_PAGE = 10;
 
-  // ── НОВОЕ: подписка на WS-соединение/разрыв ───────────────────────────────
-  // wsService не умеет сообщать о connect/disconnect через .on() —
-  // поэтому опрашиваем readyState каждые 3 секунды.
-  // Это дешевле чем патчить wsService, и достаточно для UI-индикатора.
   useEffect(() => {
     const interval = setInterval(() => {
       const isOpen = wsService.ws?.readyState === WebSocket.OPEN;
@@ -1422,10 +1433,17 @@ export const Reports = () => {
     if (!tableLocation) return null;
     return new Set(
       sensors
-        .filter(s => Number(s.group_id) === Number(tableLocation.id))
+        .filter(s => {
+          const unit = controlUnits.find(cu =>
+            sameId(cu.id, s.control_unit_id) ||
+            (s.control_unit_id == null && sameId(cu.id, s.group_id))
+          );
+          const locationId = unit?.location_id ?? unit?.group_id ?? s.location_id ?? s.group_id;
+          return sameId(locationId, tableLocation.id);
+        })
         .map(s => s.id)
     );
-  }, [tableLocation, sensors]);
+  }, [tableLocation, sensors, controlUnits]);
 
   const filtered = alarms.filter(a => {
     if (locationSensorIds && !locationSensorIds.has(Number(a.sensor_id))) return false;
@@ -1488,24 +1506,6 @@ export const Reports = () => {
         </div>
 
         {loadError && <div className="rp-error-banner">{loadError}</div>}
-
-        {/* НОВОЕ: баннер предупреждения при потере WS-соединения */}
-        {!wsConnected && (
-          <div style={{
-            background: "#321c1b",
-            border: "1px solid #ff525240",
-            borderRadius: 8,
-            padding: "8px 14px",
-            marginBottom: 12,
-            fontSize: 13,
-            color: "#ff5252",
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-          }}>
-            ⚠️ Нет соединения с сервером — live-обновления недоступны. Нажмите «Обновить» для актуальных данных.
-          </div>
-        )}
 
         <div className="rp-card rp-table-card">
           <div className="rp-table-topbar">

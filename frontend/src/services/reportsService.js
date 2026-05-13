@@ -1,12 +1,9 @@
 // frontend/src/services/reportsService.js
 // ─── Сервис для скачивания отчётов ───────────────────────────────────────────
 //
-// Использует getToken() из api.js — тот же ключ "token" в localStorage.
-// BASE_URL берётся из VITE_API_BASE_URL (как и везде в проекте).
+// Использует getToken() и BASE_URL из api.js — единый источник правды.
 
-import { getToken } from "./api";
-
-const BASE_URL = import.meta.env.VITE_API_BASE_URL || "/api/v1";
+import { getToken, BASE_URL } from "./api";
 
 // ─── Маппинг UI-периодов → API-значения ──────────────────────────────────────
 export const PERIOD_MAP = {
@@ -17,12 +14,13 @@ export const PERIOD_MAP = {
 };
 
 // ─── Внутренний хелпер: скачать файл через авторизованный запрос ─────────────
-const downloadBlob = async (path, fallbackFilename) => {
+const downloadBlob = async (path, fallbackFilename, accept = "*/*") => {
   const token = getToken();
 
   const response = await fetch(`${BASE_URL}${path}`, {
     headers: {
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      Accept: accept,
     },
   });
 
@@ -34,7 +32,11 @@ const downloadBlob = async (path, fallbackFilename) => {
     let msg = `Ошибка ${response.status}`;
     try {
       const err = await response.json();
-      if (err.detail) msg = typeof err.detail === "string" ? err.detail : JSON.stringify(err.detail);
+      if (err.detail)
+        msg =
+          typeof err.detail === "string"
+            ? err.detail
+            : JSON.stringify(err.detail);
     } catch {}
     throw new Error(msg);
   }
@@ -58,36 +60,59 @@ const downloadBlob = async (path, fallbackFilename) => {
   URL.revokeObjectURL(url);
 };
 
+const ACCEPT_MAP = {
+  pdf:  "application/pdf",
+  xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  csv:  "text/csv",
+};
+
 // ─── Скачать отчёт по датчику за предустановленный период ────────────────────
 export const downloadPeriodReport = async (sensorId, period, format = "xlsx") => {
   const params = new URLSearchParams({ period, format });
   await downloadBlob(
     `/reports/download-period/${sensorId}?${params}`,
-    `report_sensor_${sensorId}_${period}.${format}`
+    `report_sensor_${sensorId}_${period}.${format}`,
+    ACCEPT_MAP[format]
   );
 };
 
 // ─── Скачать отчёт по датчику за произвольный диапазон ───────────────────────
-export const downloadRangeReport = async (sensorId, startDate, endDate, format = "xlsx") => {
+export const downloadRangeReport = async (
+  sensorId,
+  startDate,
+  endDate,
+  format = "xlsx"
+) => {
   const params = new URLSearchParams({
-    period: "custom",
+    period:     "custom",
     start_date: startDate.slice(0, 10),
     end_date:   endDate.slice(0, 10),
     format,
   });
   await downloadBlob(
     `/reports/download-period/${sensorId}?${params}`,
-    `report_sensor_${sensorId}_${startDate.slice(0,10)}_${endDate.slice(0,10)}.${format}`
+    `report_sensor_${sensorId}_${startDate.slice(0, 10)}_${endDate.slice(0, 10)}.${format}`,
+    ACCEPT_MAP[format]
   );
 };
 
 // ─── Скачать сводный отчёт по локации ────────────────────────────────────────
-export const downloadLocationReport = async (locationId, period, format = "xlsx") => {
+export const downloadLocationReport = async (
+  locationId,
+  period,
+  format = "xlsx"
+) => {
   const params = new URLSearchParams({ period, format });
   await downloadBlob(
     `/reports/download-period-location/${locationId}?${params}`,
-    `report_location_${locationId}_${period}.${format}`
+    `report_location_${locationId}_${period}.${format}`,
+    ACCEPT_MAP[format]
   );
 };
 
-export default { downloadPeriodReport, downloadRangeReport, downloadLocationReport, PERIOD_MAP };
+export default {
+  downloadPeriodReport,
+  downloadRangeReport,
+  downloadLocationReport,
+  PERIOD_MAP,
+};

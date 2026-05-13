@@ -46,15 +46,31 @@ export const createSensor = async (sensorData) => {
 };
 
 /**
- * Обновить название или позицию датчика (admin и editor).
+ * Обновить название датчика или другие поля (admin и editor).
+ * Для drag-and-drop координат используй updateSensorPosition().
  * @param {number} sensorId
- * @param {object} updates - { name?, pos_x?, pos_y? }
+ * @param {object} updates
  * @returns {object} Sensor
  */
 export const updateSensor = async (sensorId, updates) => {
   return apiRequest(`/sensors/${sensorId}`, {
     method: "PATCH",
     body: JSON.stringify(updates),
+  });
+};
+
+/**
+ * Обновить только позицию датчика на мнемосхеме.
+ * Backend contract: PATCH /sensors/{id}/position с телом { pos_x, pos_y }.
+ * @param {number} sensorId
+ * @param {number} posX
+ * @param {number} posY
+ * @returns {object} Sensor
+ */
+export const updateSensorPosition = async (sensorId, posX, posY) => {
+  return apiRequest(`/sensors/${sensorId}/position`, {
+    method: "PATCH",
+    body: JSON.stringify({ pos_x: posX, pos_y: posY }),
   });
 };
 

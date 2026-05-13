@@ -19,6 +19,7 @@ export default defineConfig({
         target: "http://157.90.127.202:8000",
         changeOrigin: true,
         secure: false,
+        ws: true,
       },
 
       // WebSocket → бэкенд FastAPI

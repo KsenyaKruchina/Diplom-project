@@ -1,47 +1,20 @@
 // frontend/src/components/Sensors.jsx
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import "./Sensors.css";
-
-const BASE_URL = "http://157.90.127.202:8000";
-const getToken = () => localStorage.getItem("token");
+import { apiRequest } from "../services/api";
 
 // ─── API helpers ──────────────────────────────────────────────────────────────
 const apiFetch = async (path, opts = {}) => {
-  const res = await fetch(`${BASE_URL}${path}`, {
-    ...opts,
-    headers: {
-      Authorization: `Bearer ${getToken()}`,
-      ...(opts.body && !(opts.body instanceof FormData) ? { "Content-Type": "application/json" } : {}),
-      ...opts.headers,
-    },
-  });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    let message;
-    if (Array.isArray(err.detail)) {
-      message = err.detail
-        .map(e => {
-          const field = Array.isArray(e.loc) ? e.loc.filter(l => l !== "body").join(".") : "";
-          return field ? `${field}: ${e.msg}` : e.msg;
-        })
-        .join("; ");
-    } else {
-      message = err.detail || `Ошибка ${res.status}`;
-    }
-    const error = new Error(message);
-    error.status = res.status;
-    error.raw = err;
-    console.error(`API error ${res.status} on ${path}:`, err);
-    throw error;
-  }
-  const text = await res.text();
-  return text ? JSON.parse(text) : {};
+  const normalizedPath = path.replace(/^\/api\/v1(?=\/|$)/, "");
+  return apiRequest(normalizedPath, opts);
 };
 
 const apiGet    = (path)        => apiFetch(path);
 const apiPatch  = (path, body)  => apiFetch(path, { method: "PATCH",  body: JSON.stringify(body) });
 const apiPost   = (path, body)  => apiFetch(path, { method: "POST",   body: JSON.stringify(body) });
 const apiDelete = (path)        => apiFetch(path, { method: "DELETE" });
+
+const sameId = (a, b) => String(a ?? "") === String(b ?? "");
 
 // ─── LocalStorage helpers for location order ──────────────────────────────────
 const LOC_ORDER_KEY = "sensors_location_order";
@@ -228,6 +201,18 @@ const ChartLegend = ({ sensor, type }) => {
 };
 
 // ─── ThresholdTable ───────────────────────────────────────────────────────────
+const ThresholdInput = ({ value, onChange, placeholder, color }) => (
+  <input
+    className="sn-th-input"
+    type="text"
+    inputMode="decimal"
+    value={value === null ? "" : value}
+    onChange={e => onChange(e.target.value)}
+    placeholder={placeholder}
+    style={{ "--inp-focus": color }}
+  />
+);
+
 const ThresholdTable = ({ form, setVal, type }) => {
   const unit = type === "temp" ? "°C" : "%";
   const prefix = type === "temp" ? "temp" : "hum";
@@ -237,18 +222,6 @@ const ThresholdTable = ({ form, setVal, type }) => {
     { key: "warning", color: "#ffd550", bg: "#29220a", label: "🟡 Внимание" },
     { key: "alarm",   color: "#ff5b5b", bg: "#2a100f", label: "🔴 Тревога" },
   ];
-
-  const NumInput = ({ fkey, placeholder, color }) => (
-    <input
-      className="sn-th-input"
-      type="text"
-      inputMode="decimal"
-      value={form[fkey] === null ? "" : form[fkey]}
-      onChange={e => setVal(fkey, e.target.value)}
-      placeholder={placeholder}
-      style={{ "--inp-focus": color }}
-    />
-  );
 
   return (
     <div className="sn-th-table">
@@ -267,9 +240,19 @@ const ThresholdTable = ({ form, setVal, type }) => {
             <span className="sn-th-level-label" style={{ color }}>{label}</span>
           </div>
           <div className="sn-th-col-minmax">
-            <NumInput fkey={`${key}_min_${prefix}`} placeholder="—" color={color}/>
+            <ThresholdInput
+              value={form[`${key}_min_${prefix}`]}
+              onChange={value => setVal(`${key}_min_${prefix}`, value)}
+              placeholder="—"
+              color={color}
+            />
             <span className="sn-th-range-sep" style={{ color: "#444" }}>—</span>
-            <NumInput fkey={`${key}_max_${prefix}`} placeholder="—" color={color}/>
+            <ThresholdInput
+              value={form[`${key}_max_${prefix}`]}
+              onChange={value => setVal(`${key}_max_${prefix}`, value)}
+              placeholder="—"
+              color={color}
+            />
           </div>
         </div>
       ))}
@@ -658,7 +641,7 @@ const CreateBlockModal = ({ locations, onClose, onSave }) => {
                 <span className="sn-cbu-preview-label">Локация</span>
                 <span className="sn-cbu-preview-val">
                   {form.location_id
-                    ? locations.find(l => l.id === Number(form.location_id))?.name ?? "—"
+                    ? locations.find(l => sameId(l.id, form.location_id))?.name ?? "—"
                     : "—"}
                 </span>
               </span>
@@ -744,10 +727,13 @@ const CreateBlockModal = ({ locations, onClose, onSave }) => {
 
 // ─── Modal: Добавить датчик ─────────────────────────────────
 const AddSensorModal = ({ locations, blocks, defaultBlockId, onClose, onSave }) => {
+  const initialBlockId = blocks.some(b => String(b.id) === String(defaultBlockId))
+    ? defaultBlockId
+    : blocks[0]?.id ?? "";
   const [form, setForm] = useState({
     sensor_id: "",
     name: "",
-    control_unit_id: defaultBlockId ?? blocks[0]?.id ?? "",
+    control_unit_id: initialBlockId,
     normal_min_temp: "", normal_max_temp: "",
     warning_min_temp: "", warning_max_temp: "",
     alarm_min_temp: "", alarm_max_temp: "",
@@ -763,6 +749,7 @@ const AddSensorModal = ({ locations, blocks, defaultBlockId, onClose, onSave }) 
   const parseOpt = v => (v === "" || v == null) ? null : parseFloat(v);
 
   const selectedBlock = blocks.find(b => String(b.id) === String(form.control_unit_id));
+  const selectedLocationId = selectedBlock?.location_id ?? selectedBlock?.group_id ?? null;
 
   const handleSave = async () => {
     if (!form.sensor_id.trim())     { setErr("Введите ID датчика"); return; }
@@ -774,7 +761,9 @@ const AddSensorModal = ({ locations, blocks, defaultBlockId, onClose, onSave }) 
       await onSave({
         sensor_id:        form.sensor_id.trim(),
         name:             form.name.trim(),
-        control_unit_id:  form.control_unit_id,
+        control_unit_id:  Number(form.control_unit_id),
+        location_id:      selectedLocationId != null ? Number(selectedLocationId) : null,
+        group_id:         selectedLocationId != null ? Number(selectedLocationId) : null,
         normal_min_temp:  parseOpt(form.normal_min_temp),
         normal_max_temp:  parseOpt(form.normal_max_temp),
         warning_min_temp: parseOpt(form.warning_min_temp),
@@ -875,7 +864,7 @@ const AddSensorModal = ({ locations, blocks, defaultBlockId, onClose, onSave }) 
                   style={{ width: "100%" }}
                 >
                   {blocks.map(b => {
-                    const loc = locations.find(l => l.id === (b.location_id ?? b.group_id));
+                    const loc = locations.find(l => sameId(l.id, b.location_id ?? b.group_id));
                     return (
                       <option key={b.id} value={b.id}>
                         {b.name} (ID: {b.id}){loc ? ` · ${loc.name}` : ""}
@@ -1070,10 +1059,14 @@ const BlockCard = ({
 
   const childSensors = allSensors.filter(s => {
     if (isSyntheticBlock) {
-      return s.group_id === syntheticLocId;
+      const hasRealBlock = allBlocks.some(b =>
+        !String(b.id).startsWith("__synthetic__") &&
+        (sameId(s.control_unit_id, b.id) || sameId(s.group_id, b.id))
+      );
+      return !hasRealBlock && sameId(s.location_id ?? s.group_id, syntheticLocId);
     }
-    return String(s.control_unit_id) === String(block.id) ||
-           String(s.group_id)        === String(block.id);
+    return sameId(s.control_unit_id, block.id) ||
+           sameId(s.group_id, block.id);
   });
 
   useEffect(() => {
@@ -1081,7 +1074,7 @@ const BlockCard = ({
   }, [childSensors.length]);
 
   const orderedSensors = isReorderMode
-    ? sensorOrder.map(id => childSensors.find(s => s.id === id)).filter(Boolean)
+    ? sensorOrder.map(id => childSensors.find(s => sameId(s.id, id))).filter(Boolean)
     : childSensors;
 
   const battery  = block.battery_level ?? null;
@@ -1353,10 +1346,8 @@ const LocationSection = ({
     if (isSearching) setExpanded(true);
   }, [isSearching]);
 
-  const locBlocks = blocks.filter(b => b.group_id === location.id || b.location_id === location.id);
-  const totalSensors = allSensors.filter(s =>
-    locBlocks.some(b => b.id === s.group_id || b.id === s.control_unit_id)
-  ).length;
+  const locBlocks = blocks.filter(b => sameId(b.group_id, location.id) || sameId(b.location_id, location.id));
+  const totalSensors = allSensors.length;
 
   return (
     <div
@@ -1446,8 +1437,8 @@ const Sensors = () => {
       const saved = loadLocOrder();
       if (saved && saved.length > 0) {
         const existingIds = locs.map(l => l.id);
-        const filtered = saved.filter(id => existingIds.includes(id));
-        const newIds = existingIds.filter(id => !filtered.includes(id));
+        const filtered = saved.filter(id => existingIds.some(existingId => sameId(existingId, id)));
+        const newIds = existingIds.filter(id => !filtered.some(savedId => sameId(savedId, id)));
         setLocOrder([...filtered, ...newIds]);
       } else {
         setLocOrder(locs.map(l => l.id));
@@ -1556,8 +1547,8 @@ const Sensors = () => {
   const filteredSensors = sensors.filter(s => {
     const sBlock = blocks.find(b => String(b.id) === String(s.control_unit_id ?? s.group_id));
     const loc = sBlock
-      ? locations.find(l => l.id === (sBlock.location_id ?? sBlock.group_id))
-      : locations.find(l => l.id === s.group_id);
+      ? locations.find(l => sameId(l.id, sBlock.location_id ?? sBlock.group_id))
+      : locations.find(l => sameId(l.id, s.location_id ?? s.group_id));
 
     const matchSearch = !isSearching
       || String(s.id).includes(q)
@@ -1565,59 +1556,66 @@ const Sensors = () => {
       || loc?.name?.toLowerCase().includes(q)
       || sBlock?.name?.toLowerCase().includes(q);
     const matchLoc = !selectedLocation || (sBlock
-      ? (sBlock.location_id === selectedLocation || sBlock.group_id === selectedLocation)
-      : s.group_id === selectedLocation);
+      ? (sameId(sBlock.location_id, selectedLocation) || sameId(sBlock.group_id, selectedLocation))
+      : sameId(s.location_id ?? s.group_id, selectedLocation));
     return matchSearch && matchLoc;
   });
 
-  const orderedLocations = locOrder.map(id => locations.find(l => l.id === id)).filter(Boolean);
+  const orderedLocations = locOrder.map(id => locations.find(l => sameId(l.id, id))).filter(Boolean);
 
   const getBlocksForLocation = (locId) => {
-    const real = blocks.filter(b => b.location_id === locId || b.group_id === locId);
-
-    const realBlockIds = new Set(real.map(b => String(b.id)));
-    const orphanSensors = sensors.filter(s => {
-      const cuId = String(s.control_unit_id ?? s.group_id ?? "");
-      return s.group_id === locId && !realBlockIds.has(cuId);
+    const realBlocks = blocks.filter(b => sameId(b.location_id, locId) || sameId(b.group_id, locId));
+    const directSensors = sensors.filter(s => {
+      const attachedToBlock = realBlocks.some(b =>
+        sameId(s.control_unit_id, b.id) || sameId(s.group_id, b.id)
+      );
+      return !attachedToBlock && sameId(s.location_id ?? s.group_id, locId);
     });
 
-    const syntheticBlocks = orphanSensors.length > 0 ? [{
-      id: `__synthetic__${locId}`,
-      name: locations.find(l => l.id === locId)?.name ?? `Блок #${locId}`,
-      location_id: locId,
-      group_id: locId,
-      __synthetic: true,
-      status: orphanSensors.some(s => s.status === "active") ? "active" : "offline",
-      battery_level: null,
-      gsm_signal: null,
-      sim_balance: null,
-    }] : [];
+    if (directSensors.length === 0) return realBlocks;
 
-    if (real.length === 0 && syntheticBlocks.length === 0) {
-      return [{
+    const locName = locations.find(l => sameId(l.id, locId))?.name ?? `Локация #${locId}`;
+    return [
+      ...realBlocks,
+      {
         id: `__synthetic__${locId}`,
-        name: locations.find(l => l.id === locId)?.name ?? `Блок #${locId}`,
+        name: `${locName} · без ЦБУ`,
         location_id: locId,
         group_id: locId,
         __synthetic: true,
-        status: "offline",
+        status: directSensors.some(s => s.status === "active" || s.status === "online") ? "active" : "offline",
         battery_level: null,
         gsm_signal: null,
         sim_balance: null,
-      }];
-    }
-
-    return [...real, ...syntheticBlocks];
+        sensors_count: directSensors.length,
+      },
+    ];
   };
 
-  const allBlocksForModal = blocks.length > 0
-    ? blocks
-    : locations.map(loc => ({
-        id: loc.id,
-        name: loc.name,
-        location_id: loc.id,
-        group_id: loc.id,
-      }));
+  const getSensorsForLocation = (locId) => {
+    const locBlocks = blocks.filter(b => sameId(b.location_id, locId) || sameId(b.group_id, locId));
+    return sensors.filter(s => {
+      const viaBlock = locBlocks.some(b =>
+        sameId(s.control_unit_id, b.id) || sameId(s.group_id, b.id)
+      );
+      return viaBlock || sameId(s.location_id ?? s.group_id, locId);
+    });
+  };
+
+  const hasLocationContent = (locId) =>
+    getBlocksForLocation(locId).length > 0 || getSensorsForLocation(locId).length > 0;
+
+  const visibleLocations = orderedLocations.filter(loc => hasLocationContent(loc.id));
+  const dropdownLocations = locations.filter(loc => hasLocationContent(loc.id));
+
+  useEffect(() => {
+    if (!selectedLocation) return;
+    if (!dropdownLocations.some(loc => sameId(loc.id, selectedLocation))) {
+      setSelectedLocation(null);
+    }
+  }, [selectedLocation, dropdownLocations]);
+
+  const allBlocksForModal = blocks;
 
   if (loading) return (
     <div className="sn-container" style={{ display:"flex", alignItems:"center", justifyContent:"center", minHeight:"100vh", color:"#555", fontSize: 14 }}>
@@ -1706,7 +1704,7 @@ const Sensors = () => {
             <div className="sn-loc-dropdown-wrap" ref={dropdownRef}>
               <button className="sn-loc-dropdown-btn" onClick={() => setShowLocDropdown(v => !v)}>
                 <IconMapPin/>
-                <span>{selectedLocation ? locations.find(l => l.id === selectedLocation)?.name : "Все локации"}</span>
+                <span>{selectedLocation ? locations.find(l => sameId(l.id, selectedLocation))?.name : "Все локации"}</span>
                 <IconChevDown/>
               </button>
               {showLocDropdown && (
@@ -1717,10 +1715,10 @@ const Sensors = () => {
                   >
                     Все локации
                   </div>
-                  {locations.map(loc => (
+                  {dropdownLocations.map(loc => (
                     <div
                       key={loc.id}
-                      className={`sn-loc-option ${selectedLocation === loc.id ? "sn-loc-option--active" : ""}`}
+                      className={`sn-loc-option ${sameId(selectedLocation, loc.id) ? "sn-loc-option--active" : ""}`}
                       onClick={() => { setSelectedLocation(loc.id); setShowLocDropdown(false); }}
                     >
                       <IconMapPin/>
@@ -1728,7 +1726,9 @@ const Sensors = () => {
                       <span className="sn-loc-option-count">
                         {sensors.filter(s => {
                           const b = blocks.find(bl => String(bl.id) === String(s.control_unit_id ?? s.group_id));
-                          return b ? (b.location_id === loc.id || b.group_id === loc.id) : s.group_id === loc.id;
+                          return b
+                            ? (sameId(b.location_id, loc.id) || sameId(b.group_id, loc.id))
+                            : sameId(s.location_id ?? s.group_id, loc.id);
                         }).length}
                       </span>
                     </div>
@@ -1759,19 +1759,11 @@ const Sensors = () => {
           </div>
         ) : (
           <div className="sn-locations-list" onDragEnd={handleLocDragEnd}>
-            {orderedLocations.length === 0 && <div className="sn-empty-state">Нет локаций</div>}
-            {orderedLocations.map(loc => {
-              if (selectedLocation && loc.id !== selectedLocation) return null;
+            {visibleLocations.length === 0 && <div className="sn-empty-state">Нет локаций с ЦБУ</div>}
+            {visibleLocations.map(loc => {
+              if (selectedLocation && !sameId(loc.id, selectedLocation)) return null;
               const locBlocks = getBlocksForLocation(loc.id);
-              const locSensors = sensors.filter(s => {
-                const viaBlock = locBlocks.some(b => {
-                  if (String(b.id).startsWith("__synthetic__")) return false;
-                  return String(s.control_unit_id) === String(b.id) ||
-                         String(s.group_id)        === String(b.id);
-                });
-                if (viaBlock) return true;
-                return s.group_id === loc.id;
-              });
+              const locSensors = getSensorsForLocation(loc.id);
 
               return (
                 <LocationSection

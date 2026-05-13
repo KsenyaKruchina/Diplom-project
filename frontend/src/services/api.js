@@ -1,32 +1,34 @@
 // frontend/src/services/api.js
-// Базовый API-клиент 
+// Базовый API-клиент
 // Все запросы к бэкенду идут через этот файл.
 // Он автоматически подставляет токен и обрабатывает ошибки.
 
-// URL ИЗ ПЕРЕМЕННЫХ ОКРУЖЕНИЯ
-const BASE_URL = import.meta.env.VITE_API_BASE_URL || "/api/v1";
+// URL из переменных окружения.
+// В dev-режиме Vite проксирует /api → http://157.90.127.202:8000
+// В продакшне nginx делает то же самое.
+// Если нужно переопределить — задай VITE_API_BASE_URL в .env
+export const BASE_URL = import.meta.env.VITE_API_BASE_URL || "/api/v1";
 
-console.log("API Base URL:", BASE_URL); 
-
-// Вспомогательные функции хранения токена в localStorage
-
-export const getToken = () => localStorage.getItem("token");
-export const setToken = (token) => localStorage.setItem("token", token);
+// ─── Токен хранится под одним ключом во всём приложении ──────────────────────
+// ВАЖНО: ключ "token" — единственный используемый ключ.
+// apiClient.js (старый файл) использовал "access_token" — это была ошибка.
+export const getToken    = () => localStorage.getItem("token");
+export const setToken    = (t) => localStorage.setItem("token", t);
 export const removeToken = () => localStorage.removeItem("token");
 
-// Основная функция всех запросов 
+// ─── Основная функция всех запросов ──────────────────────────────────────────
 /**
  * Универсальная функция для всех HTTP-запросов.
  * Автоматически добавляет Authorization-заголовок.
  * При 401 — удаляет токен и редиректит на /login.
  *
- * @param {string} path - путь после /api/v1, например "/sensors/"
+ * @param {string} path - путь после BASE_URL, например "/sensors/"
  * @param {object} options - стандартные fetch-опции (method, body, headers...)
- * @returns {Promise<any>} 
+ * @returns {Promise<any>}
  */
 export const apiRequest = async (path, options = {}) => {
   const token = getToken();
-// заголовки запросов
+
   const headers = {
     "Content-Type": "application/json",
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -34,8 +36,7 @@ export const apiRequest = async (path, options = {}) => {
   };
 
   const url = `${BASE_URL}${path}`;
-  console.log(`📡 ${options.method || 'GET'} ${url}`); // Для отладки
-//Делаем запрос. fetch — встроенная функция браузера для HTTP-запросов. await — ждём ответа. response — это ответ сервера.
+
   const response = await fetch(url, {
     ...options,
     headers,
@@ -70,6 +71,7 @@ export const apiRequest = async (path, options = {}) => {
             : JSON.stringify(errorData.detail);
       }
     } catch {
+      // ignore JSON parse error
     }
     throw new Error(errorMessage);
   }
@@ -80,10 +82,8 @@ export const apiRequest = async (path, options = {}) => {
   return response.json();
 };
 
-// Специальная функция для multipart/form-data (загрузка файлов)
-
-//Для загрузки файлов — НЕ ставим Content-Type, браузер сам добавит boundary.
- 
+// ─── Специальная функция для multipart/form-data (загрузка файлов) ────────────
+// Для загрузки файлов — НЕ ставим Content-Type, браузер сам добавит boundary.
 export const apiUpload = async (path, formData, method = "POST") => {
   const token = getToken();
 
@@ -113,38 +113,73 @@ export const apiUpload = async (path, formData, method = "POST") => {
   return response.json();
 };
 
-//  Специальная функция для логина (form-urlencoded)
+// ─── Специальная функция для скачивания бинарных файлов (blob) ───────────────
+export const apiDownload = async (path, fallbackFilename) => {
+  const token = getToken();
 
+  const response = await fetch(`${BASE_URL}${path}`, {
+    headers: {
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+  });
+
+  if (response.status === 401) {
+    removeToken();
+    window.location.href = "/login";
+    return;
+  }
+
+  if (!response.ok) {
+    let msg = `Ошибка ${response.status}`;
+    try {
+      const err = await response.json();
+      if (err.detail) msg = typeof err.detail === "string" ? err.detail : JSON.stringify(err.detail);
+    } catch {}
+    throw new Error(msg);
+  }
+
+  let filename = fallbackFilename;
+  const disposition = response.headers.get("Content-Disposition");
+  if (disposition) {
+    const match = disposition.match(/filename[^;=\n]*=([^;\n]*)/);
+    if (match) filename = match[1].replace(/['"]/g, "").trim();
+  }
+
+  const blob = await response.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+};
+
+// ─── Специальная функция для логина (form-urlencoded) ─────────────────────────
 // Логин использует application/x-www-form-urlencoded — это требование OAuth2/FastAPI.
- 
 export const apiLogin = async (username, password) => {
   const url = `${BASE_URL}/auth/login`;
-  console.log("🔐 Login URL:", url); // Для отладки
-  
+
   const response = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({ username, password }),
   });
 
-  console.log("📡 Login response status:", response.status); // Для отладки
-
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
-    console.error("❌ Login error:", errorData); // Для отладки
     throw new Error(errorData.detail || "Неверный логин или пароль");
   }
 
   const data = await response.json();
-  console.log("✅ Login success, token received"); // Для отладки
   return data; // { access_token, token_type }
 };
 
-
 /**
- * Получение локаций пользователя с учётом роли
+ * Получение локаций пользователя с учётом роли.
  * - Admin: все локации
- * - Editor/Viewer: только свои локации (бэкенд должен возвращать только их)
+ * - Editor/Viewer: только свои локации (бэкенд фильтрует)
  */
 export const getUserLocations = async () => {
   const data = await apiRequest("/locations/");
@@ -152,48 +187,43 @@ export const getUserLocations = async () => {
 };
 
 /**
- * Получение датчиков пользователя с фильтрацией по локациям
+ * Получение датчиков пользователя с фильтрацией по локациям.
  * - Admin: все датчики
  * - Editor/Viewer: только датчики из своих локаций
  */
 export const getUserSensors = async () => {
-  // Получаем все датчики
   const allSensors = await apiRequest("/sensors/");
-  
-  // Получаем локации пользователя (уже отфильтрованные бэкендом)
+
   const userLocations = await getUserLocations();
-  const userLocationIds = userLocations.map(loc => loc.id);
-  
-  // Если пользователь admin, возвращаем все датчики
-  const token = getToken();
-  // Проверяем роль через отдельный запрос (или можно сохранить в контексте)
+  const userLocationIds = userLocations.map((loc) => loc.id);
+
   try {
-    const userInfo = await apiRequest("/auth/me");
+    const userInfo = await apiRequest("/users/me");
     if (userInfo?.role === "admin") {
       return allSensors || [];
     }
   } catch (e) {
     console.error("Failed to get user role:", e);
   }
-  
-  // Для editor и viewer — фильтруем датчики по своим локациям
+
   if (userLocationIds.length > 0 && allSensors) {
-    return allSensors.filter(sensor => userLocationIds.includes(sensor.group_id));
+    return allSensors.filter((sensor) =>
+      userLocationIds.includes(sensor.group_id)
+    );
   }
-  
+
   return allSensors || [];
 };
 
 /**
- * Проверка доступа к датчику перед редактированием
- * @param {number} sensorId - ID датчика
- * @returns {Promise<boolean>} - есть ли доступ
+ * Проверка доступа к датчику перед редактированием.
+ * @param {number} sensorId
+ * @returns {Promise<boolean>}
  */
 export const canAccessSensor = async (sensorId) => {
   try {
     const userLocations = await getUserLocations();
-    const userLocationIds = userLocations.map(loc => loc.id);
-    
+    const userLocationIds = userLocations.map((loc) => loc.id);
     const sensor = await apiRequest(`/sensors/${sensorId}`);
     return userLocationIds.includes(sensor?.group_id);
   } catch {

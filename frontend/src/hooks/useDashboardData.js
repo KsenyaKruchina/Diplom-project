@@ -13,10 +13,12 @@ import { getSensors } from "../services/sensorsService";
 import { getLatestForSensors } from "../services/telemetryService";
 import { getAlarms } from "../services/alarmsService";
 import { wsService } from "../services/websocketService";
+import { apiRequest } from "../services/api";
 
 export const useDashboardData = () => {
   const [locations, setLocations]   = useState([]);
   const [sensors,   setSensors]     = useState([]);
+  const [controlUnits, setControlUnits] = useState([]);
   const [telemetry, setTelemetry]   = useState(new Map()); // sensorId -> { temperature, humidity, timestamp }
   const [alarms,    setAlarms]      = useState([]);
   const [loading,   setLoading]     = useState(true);
@@ -32,10 +34,11 @@ export const useDashboardData = () => {
 
     try {
       // Загружаем параллельно
-      const [locs, sens, alm] = await Promise.all([
+      const [locs, sens, alm, units] = await Promise.all([
         getLocations().catch(() => []),
         getSensors().catch(() => []),
         getAlarms({ status: null, limit: 50 }).catch(() => []),
+        apiRequest("/control-units/").catch(() => []),
       ]);
 
       if (!mountedRef.current) return;
@@ -43,6 +46,7 @@ export const useDashboardData = () => {
       setLocations(locs || []);
       setSensors(sens || []);
       setAlarms(alm || []);
+      setControlUnits(Array.isArray(units) ? units : []);
 
       // Загружаем телеметрию для каждого датчика
       if (sens && sens.length > 0) {
@@ -70,11 +74,7 @@ export const useDashboardData = () => {
   //  WebSocket: обновление телеметрии в реальном времени 
 
   useEffect(() => {
-    // Синхронизация позиций датчиков на мнемосхеме 
-    // Когда Flutter (или другой браузер) сохраняет позицию датчика через
-    // PATCH /sensors/{id}, сервер рассылает это событие всем WS-клиентам.
-    // Обновляем только координаты конкретного датчика — без перезагрузки списка.
-    const unsubPosition = wsService.on("sensor_position_updated", (data) => {
+    const applySensorPosition = (data) => {
       // data = { type, sensor_id, pos_x, pos_y }
       if (!mountedRef.current) return;
       setSensors((prev) =>
@@ -84,7 +84,13 @@ export const useDashboardData = () => {
             : s
         )
       );
-    });
+    };
+
+    // Синхронизация позиций датчиков на мнемосхеме.
+    // Основное событие по контракту: sensor_position.
+    // sensor_position_updated оставлен для совместимости со старым бэком.
+    const unsubPosition = wsService.on("sensor_position", applySensorPosition);
+    const unsubPositionLegacy = wsService.on("sensor_position_updated", applySensorPosition);
 
     // Обработчик нового измерения
     const unsubMeasurement = wsService.on("new_measurement", (data) => {
@@ -121,18 +127,37 @@ export const useDashboardData = () => {
         .catch(() => {});
     });
 
+    const refreshStructure = () => {
+      if (mountedRef.current) fetchAll();
+    };
+
+    const unsubSensorCreated = wsService.on("sensor_created", refreshStructure);
+    const unsubSensorUpdated = wsService.on("sensor_updated", refreshStructure);
+    const unsubSensorDeleted = wsService.on("sensor_deleted", refreshStructure);
+    const unsubUnitCreated = wsService.on("control_unit_created", refreshStructure);
+    const unsubUnitUpdated = wsService.on("control_unit_updated", refreshStructure);
+    const unsubLocationCreated = wsService.on("location_created", refreshStructure);
+
     return () => {
       unsubPosition();
+      unsubPositionLegacy();
       unsubMeasurement();
       unsubAlarm();
+      unsubSensorCreated();
+      unsubSensorUpdated();
+      unsubSensorDeleted();
+      unsubUnitCreated();
+      unsubUnitUpdated();
+      unsubLocationCreated();
     };
-  }, []);
+  }, [fetchAll]);
 
   //  Вернуть данные 
 
   return {
     locations,  // LocationGroup[]
     sensors,    // Sensor[]
+    controlUnits,
     telemetry,  // Map<sensorId, { temperature, humidity, timestamp }>
     alarms,     // AlarmEvent[]
     loading,
