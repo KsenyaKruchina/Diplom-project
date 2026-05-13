@@ -185,6 +185,26 @@ const IconTrash = () => (
   </svg>
 );
 
+// ─── Иконка индикатора WS-соединения ─────────────────────────────────────────
+// Показывает пользователю, есть ли живое соединение с сервером.
+// connected=true → зелёная точка, connected=false → красная точка с пульсацией.
+const WsStatusDot = ({ connected }) => (
+  <span
+    title={connected ? "Подключено (live)" : "Нет соединения — данные могут быть устаревшими"}
+    style={{
+      display: "inline-block",
+      width: 8,
+      height: 8,
+      borderRadius: "50%",
+      background: connected ? "#01e676" : "#ff5252",
+      // Мигание при отсутствии соединения — визуальная подсказка пользователю
+      animation: connected ? "none" : "rp-ws-pulse 1.2s ease-in-out infinite",
+      marginLeft: 6,
+      flexShrink: 0,
+    }}
+  />
+);
+
 // ── Словари / маппинги ────────────────────────────────────────────────────────
 const STATUS_MAP = {
   new:          { label: "Новая",      color: "#ff5252", bg: "#321c1b" },
@@ -221,41 +241,30 @@ const PERIOD_OPTIONS = [
   { key: "custom", label: "Свой диапазон" },
 ];
 
-// ── FIX: правильные endpoints из документации ─────────────────────────────────
-// Полные отчёты (с KPI, графиками температуры/влажности, журналом тревог)
-// используют download-period-*, а НЕ download-events-*
 const REPORT_TYPE_OPTIONS = [
   {
     key:               "location",
     label:             "По локации",
     icon:              <IconLocation />,
-    // GET /api/v1/reports/download-period-location/{location_id}
     periodEndpoint:    "download-period-location",
-    // GET /api/v1/reports/download-events-location/{location_id}
     eventsEndpoint:    "download-events-location",
   },
   {
     key:               "control_unit",
     label:             "По ЦБУ",
     icon:              <IconBuilding />,
-    // GET /api/v1/reports/download-period-control-unit/{control_unit_id}
     periodEndpoint:    "download-period-control-unit",
-    // GET /api/v1/reports/download-events-control-unit/{control_unit_id}
     eventsEndpoint:    "download-events-control-unit",
   },
   {
     key:               "sensor",
     label:             "По датчику",
     icon:              <IconSensor />,
-    // GET /api/v1/reports/download-period/{sensor_id}
     periodEndpoint:    "download-period",
-    // GET /api/v1/reports/download-events-sensor/{sensor_id}
     eventsEndpoint:    "download-events-sensor",
   },
 ];
 
-// FIX: CSV доступен только для полных отчётов (download-period-*).
-// Для download-events-* доступны только pdf и xlsx — проверяем это при выборе.
 const FORMAT_OPTIONS = [
   { key: "pdf",  label: "PDF формат",   color: "#ff5252",  ext: "pdf",  contentType: "application/pdf" },
   { key: "xlsx", label: "Excel формат", color: "#01e676",  ext: "xlsx", contentType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" },
@@ -375,6 +384,17 @@ function StatusPicker({ alarm, onUpdate }) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [optimisticStatus, setOptimisticStatus] = useState(null);
+
+  // Сбрасываем optimisticStatus когда приходит обновление через WebSocket.
+  // Без этого: пользователь кликает → PATCH отправлен → WS-событие приходит раньше
+  // чем PATCH завершился → setOptimisticStatus(null) не вызван → визуальный баг.
+  const prevAlarmStatus = useRef(alarm.status);
+  useEffect(() => {
+    if (prevAlarmStatus.current !== alarm.status) {
+      prevAlarmStatus.current = alarm.status;
+      setOptimisticStatus(null); // WS обновил статус — убираем optimistic
+    }
+  }, [alarm.status]);
 
   const currentStatus = optimisticStatus ?? alarm.status;
   const st = STATUS_MAP[currentStatus] || STATUS_MAP.new;
@@ -516,13 +536,7 @@ function CalendarPicker({ onChange }) {
   );
 }
 
-// ── FIX: исправленная функция скачивания отчёта ───────────────────────────────
-// Документация требует:
-// 1. Сначала проверить HTTP status
-// 2. Если не 2xx — читать тело как текст/JSON и показать пользователю сообщение
-// 3. Для xlsx и pdf дополнительно проверить Content-Type
-// 4. Только после успешного status сохранять body как файл
-// 5. Освобождать object URL после скачивания
+// ── downloadReport ────────────────────────────────────────────────────────────
 const CONTENT_TYPE_MAP = {
   pdf:  "application/pdf",
   xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -545,8 +559,6 @@ const downloadReport = async (path, fallbackFilename, format) => {
     },
   });
 
-  // FIX: сначала проверяем статус — при ошибке читаем тело как текст/JSON,
-  // НЕ сохраняем как файл (иначе Excel покажет "формат файла недопустим")
   if (!response.ok) {
     let errorMessage = `Ошибка ${response.status}`;
 
@@ -588,13 +600,10 @@ const downloadReport = async (path, fallbackFilename, format) => {
     throw new Error(errorMessage);
   }
 
-  // FIX: проверяем Content-Type только для xlsx и pdf.
-  // Если сервер вернул не тот тип — не сохраняем файл.
   if (format === "xlsx" || format === "pdf") {
     const contentType = response.headers.get("Content-Type") || "";
     const expectedType = CONTENT_TYPE_MAP[format];
     if (!contentType.includes(expectedType)) {
-      // Сервер мог вернуть JSON-ошибку с кодом 2xx (нестандартно, но бывает)
       let serverMsg = `Сервер вернул неожиданный Content-Type: ${contentType}`;
       try {
         const body = await response.text();
@@ -605,11 +614,9 @@ const downloadReport = async (path, fallbackFilename, format) => {
     }
   }
 
-  // FIX: имя файла берём из Content-Disposition, иначе используем fallback
   let fname = fallbackFilename;
   const cd = response.headers.get("Content-Disposition");
   if (cd) {
-    // Поддерживаем filename и filename*
     const fnStar = cd.match(/filename\*=(?:UTF-8'')?([^;\n]+)/i);
     const fn     = cd.match(/filename[^*;=\n]*=([^;\n]*)/i);
     if (fnStar) {
@@ -627,11 +634,10 @@ const downloadReport = async (path, fallbackFilename, format) => {
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
-  // FIX: освобождаем object URL после скачивания
   URL.revokeObjectURL(url);
 };
 
-// ── Generic Selector (Location / ControlUnit / Sensor) ───────────────────────
+// ── EntitySelector ────────────────────────────────────────────────────────────
 function EntitySelector({ value, onChange, items, loading, error, placeholder, icon }) {
   const [open, setOpen] = useState(false);
   const triggerRef = useRef(null);
@@ -902,8 +908,7 @@ function ExportCard({
 }) {
   const [exportFmt, setExportFmt]           = useState("pdf");
   const [reportType, setReportType]         = useState("location");
-  // FIX: переключатель между полным отчётом и только журналом событий
-  const [reportMode, setReportMode]         = useState("period"); // "period" | "events"
+  const [reportMode, setReportMode]         = useState("period");
   const [selectedLocation, setSelectedLocation]       = useState(null);
   const [selectedControlUnit, setSelectedControlUnit] = useState(null);
   const [selectedSensor, setSelectedSensor]           = useState(null);
@@ -942,7 +947,6 @@ function ExportCard({
     );
   }, [sensors, isAdmin, currentUser]);
 
-  // FIX: CSV недоступен для режима "только события" — автосброс при переключении
   const handleReportModeChange = (mode) => {
     setReportMode(mode);
     setExportError("");
@@ -1013,14 +1017,10 @@ function ExportCard({
         entityName = selectedSensor.name || selectedSensor.serial_number || `Датчик #${entityId}`;
       }
 
-      // FIX: выбираем endpoint в зависимости от режима отчёта
-      // - "period" → download-period-* (полный отчёт: KPI + графики + журнал тревог)
-      // - "events" → download-events-* (только журнал событий)
       const endpointSlug = reportMode === "period"
         ? rtConfig.periodEndpoint
         : rtConfig.eventsEndpoint;
 
-      // FIX: формируем query parameters согласно документации
       let params;
       if (periodKey === "custom") {
         if (!customRange?.start || !customRange?.end) throw new Error("Выберите диапазон дат");
@@ -1028,7 +1028,7 @@ function ExportCard({
           period:     "custom",
           start_date: customRange.start.toISOString().slice(0, 10),
           end_date:   customRange.end.toISOString().slice(0, 10),
-          format:     exportFmt,  // "pdf" | "xlsx" | "csv"
+          format:     exportFmt,
         });
       } else {
         params = new URLSearchParams({
@@ -1042,9 +1042,7 @@ function ExportCard({
       const timeStr = now.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
       const fallbackFilename = `report_${rtConfig.key}_${entityId}_${now.toISOString().slice(0, 10)}.${exportFmt}`;
 
-      // FIX: путь формируется по шаблону /api/v1/reports/{endpoint}/{entityId}?{params}
       const path = `/reports/${endpointSlug}/${entityId}?${params}`;
-
       await downloadReport(path, fallbackFilename, exportFmt);
 
       const fmtLabel = exportFmt.toUpperCase();
@@ -1079,7 +1077,6 @@ function ExportCard({
     (reportType === "sensor"       && selectedSensor)
   );
 
-  // FIX: CSV недоступен для режима "только события"
   const availableFormats = reportMode === "events"
     ? FORMAT_OPTIONS.filter(f => f.key !== "csv")
     : FORMAT_OPTIONS;
@@ -1092,7 +1089,6 @@ function ExportCard({
     <div className="rp-card rp-export-card">
       <h2 className="rp-card-title">Экспортировать данные</h2>
 
-      {/* FIX: переключатель режима отчёта */}
       <div className="rp-filter-label">Режим отчёта</div>
       <div className="rp-report-type-row" style={{ marginBottom: 12 }}>
         <button
@@ -1111,7 +1107,6 @@ function ExportCard({
         </button>
       </div>
 
-      {/* Выбор формата — CSV недоступен для events */}
       <div className="rp-format-row">
         {availableFormats.map(fmt => (
           <button
@@ -1208,7 +1203,6 @@ function ExportCard({
         <span className="rp-period-label">Выбранный период</span>
       </div>
 
-      {/* FIX: подсказка какой endpoint будет использован */}
       {hasSelection && (
         <div style={{ fontSize: "11px", color: "#929292", marginTop: 4, lineHeight: 1.4 }}>
           {reportMode === "period"
@@ -1240,6 +1234,13 @@ export const Reports = () => {
   const [loading, setLoading]     = useState(true);
   const [loadError, setLoadError] = useState("");
 
+  // ── НОВОЕ: отслеживаем состояние WS-соединения ────────────────────────────
+  // Показываем пользователю индикатор — живое соединение или нет.
+  // Это также помогает понять, потерял ли он real-time обновления.
+  const [wsConnected, setWsConnected] = useState(
+    () => wsService.ws?.readyState === WebSocket.OPEN
+  );
+
   const [locations, setLocations]             = useState([]);
   const [loadingLocs, setLoadingLocs]         = useState(true);
   const [locationsError, setLocationsError]   = useState("");
@@ -1264,6 +1265,18 @@ export const Reports = () => {
   const [sortDir, setSortDir] = useState("desc");
 
   const ROWS_PER_PAGE = 10;
+
+  // ── НОВОЕ: подписка на WS-соединение/разрыв ───────────────────────────────
+  // wsService не умеет сообщать о connect/disconnect через .on() —
+  // поэтому опрашиваем readyState каждые 3 секунды.
+  // Это дешевле чем патчить wsService, и достаточно для UI-индикатора.
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const isOpen = wsService.ws?.readyState === WebSocket.OPEN;
+      setWsConnected(isOpen);
+    }, 3000);
+    return () => clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     const load = async () => {
@@ -1329,20 +1342,69 @@ export const Reports = () => {
 
   useEffect(() => { loadAlarms(); }, [loadAlarms]);
 
+  // ── WebSocket-подписки ────────────────────────────────────────────────────
   useEffect(() => {
+    // 1. Обновление статуса / комментария существующей тревоги.
+    //    Бэкенд шлёт: { type: "alarm_updated", alarm_id, new_status, resolved_at, user_comment }
     const unsubStatus = wsService.on("alarm_updated", (event) => {
       setAlarms(prev => prev.map(a =>
         a.id === event.alarm_id
-          ? { ...a, status: event.new_status, resolved_at: event.resolved_at, user_comment: event.user_comment ?? a.user_comment }
+          ? {
+              ...a,
+              status:       event.new_status,
+              resolved_at:  event.resolved_at,
+              user_comment: event.user_comment ?? a.user_comment,
+            }
           : a
       ));
     });
+
+    // 2. Только комментарий обновился.
+    //    Бэкенд шлёт: { type: "alarm_comment_updated", alarm_id, user_comment }
     const unsubComment = wsService.on("alarm_comment_updated", (event) => {
       setAlarms(prev => prev.map(a =>
-        a.id === event.alarm_id ? { ...a, user_comment: event.user_comment } : a
+        a.id === event.alarm_id
+          ? { ...a, user_comment: event.user_comment }
+          : a
       ));
     });
-    return () => { unsubStatus(); unsubComment(); };
+
+    // ── НОВОЕ: новая тревога появилась на сервере ─────────────────────────
+    // Бэкенд может слать событие с типом "new_alarm" или "alarm_created" —
+    // уточни у бэкендера точное название типа и поля объекта тревоги.
+    // Здесь подписываемся на оба варианта — сработает тот, который придёт.
+    //
+    // Ожидаемая структура события:
+    //   { type: "new_alarm", alarm: { id, severity, alarm_type, sensor_id,
+    //                                  description, status, timestamp, ... } }
+    const handleNewAlarm = (event) => {
+      const alarm = event.alarm || event; // поддерживаем два варианта структуры
+      if (!alarm?.id) return;
+      setAlarms(prev => {
+        // Защита от дублей: если тревога уже есть в списке — не добавляем
+        if (prev.some(a => a.id === alarm.id)) return prev;
+        // Добавляем новую тревогу в начало списка (самые новые сверху)
+        return [alarm, ...prev];
+      });
+    };
+    const unsubNewAlarm1 = wsService.on("new_alarm",     handleNewAlarm);
+    const unsubNewAlarm2 = wsService.on("alarm_created", handleNewAlarm);
+
+    // ── НОВОЕ: тревога удалена ────────────────────────────────────────────
+    // Бэкенд шлёт: { type: "alarm_deleted", alarm_id: 42 }
+    const unsubDeleted = wsService.on("alarm_deleted", (event) => {
+      if (!event?.alarm_id) return;
+      setAlarms(prev => prev.filter(a => a.id !== event.alarm_id));
+    });
+
+    // Отписываемся от всех событий при размонтировании компонента
+    return () => {
+      unsubStatus();
+      unsubComment();
+      unsubNewAlarm1();
+      unsubNewAlarm2();
+      unsubDeleted();
+    };
   }, []);
 
   const updateAlarm = useCallback((updated) => {
@@ -1405,9 +1467,20 @@ export const Reports = () => {
 
   return (
     <div className="rp-container">
+      {/*
+        НОВОЕ: добавить в Reports.css анимацию для мигания точки:
+        @keyframes rp-ws-pulse {
+          0%, 100% { opacity: 1; }
+          50%       { opacity: 0.2; }
+        }
+      */}
       <main className="rp-main">
         <div className="rp-page-header">
-          <h1 className="rp-page-title">Уведомления</h1>
+          {/* НОВОЕ: заголовок с индикатором WS-соединения */}
+          <h1 className="rp-page-title" style={{ display: "flex", alignItems: "center" }}>
+            Уведомления
+            <WsStatusDot connected={wsConnected} />
+          </h1>
           <button className="rp-refresh-btn" onClick={loadAlarms} disabled={loading} title="Обновить">
             <IconRefresh />
             {loading ? "Загрузка..." : "Обновить"}
@@ -1415,6 +1488,24 @@ export const Reports = () => {
         </div>
 
         {loadError && <div className="rp-error-banner">{loadError}</div>}
+
+        {/* НОВОЕ: баннер предупреждения при потере WS-соединения */}
+        {!wsConnected && (
+          <div style={{
+            background: "#321c1b",
+            border: "1px solid #ff525240",
+            borderRadius: 8,
+            padding: "8px 14px",
+            marginBottom: 12,
+            fontSize: 13,
+            color: "#ff5252",
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+          }}>
+            ⚠️ Нет соединения с сервером — live-обновления недоступны. Нажмите «Обновить» для актуальных данных.
+          </div>
+        )}
 
         <div className="rp-card rp-table-card">
           <div className="rp-table-topbar">
