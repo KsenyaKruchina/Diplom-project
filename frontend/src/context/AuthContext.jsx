@@ -78,6 +78,7 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   const role = user?.role ?? null;
+  const isReadOnly = role === "viewer" || role === "reader";
 
   // Объект value, который будет доступен всем компонентам, использующим useAuth().
   const value = {
@@ -91,18 +92,22 @@ export const AuthProvider = ({ children }) => {
 
     isAdmin:  role === "admin",
     isEditor: role === "editor",
-    isViewer: role === "viewer",
+    isViewer: isReadOnly,
 
     // Редактирование локаций — admin + editor
 
     // Редактирование порогов датчиков — admin + editor
     canEdit: role === "admin" || role === "editor",
+    canEditThresholds: role === "admin" || role === "editor",
 
     // Создание датчиков — только admin
     canCreateSensor: role === "admin",
+    canDeleteSensor: role === "admin",
 
     // Создание/удаление локаций — только admin
     canCreateLocation: role === "admin",
+    canCreateControlUnit: role === "admin",
+    canManageControlUnits: role === "admin",
 
     // Изменение порядка локаций и датчиков — только admin
     canReorder: role === "admin",
@@ -114,7 +119,7 @@ export const AuthProvider = ({ children }) => {
     canViewUsers: role === "admin" || role === "editor",
 
     // Просмотр локаций и датчиков — все авторизованные
-    canViewLocations: role === "admin" || role === "editor" || role === "viewer",
+    canViewLocations: role === "admin" || role === "editor" || isReadOnly,
     
     // Вспомогательная функция для проверки доступа к датчику
     canAccessLocation: (locationId) => {

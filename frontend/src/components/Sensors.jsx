@@ -4,6 +4,7 @@ import "./Sensors.css";
 import { apiRequest } from "../services/api";
 import { getLatestForSensors } from "../services/telemetryService";
 import { wsService } from "../services/websocketService";
+import { useAuth } from "../context/AuthContext";
 
 // ─── API helpers ──────────────────────────────────────────────────────────────
 const apiFetch = async (path, opts = {}) => {
@@ -150,72 +151,72 @@ const Sparkline = ({ color, data, sensor, type }) => {
   const unit = type === "temp" ? "°C" : "%";
 
   return (
-    <svg
-      width="100%"
-      height={h}
-      viewBox={`0 0 ${w} ${h}`}
-      preserveAspectRatio="none"
-      style={{ cursor: "crosshair" }}
-      onPointerDown={handlePointSelect}
-    >
-      <defs>
-        <linearGradient id={`sg-${color.replace("#","")}-${type}`} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor={color} stopOpacity="0.25"/>
-          <stop offset="100%" stopColor={color} stopOpacity="0"/>
-        </linearGradient>
-      </defs>
-      {type === "temp" && sensor && <>
-        {renderBand(sensor.normal_min_temp, sensor.normal_max_temp, "#01e676")}
-        {renderBand(sensor.warning_min_temp, sensor.normal_min_temp, "#ffd550")}
-        {renderBand(sensor.normal_max_temp, sensor.warning_max_temp, "#ffd550")}
-      </>}
-      {type === "hum" && sensor && <>
-        {renderBand(sensor.normal_min_hum, sensor.normal_max_hum, "#01e676")}
-        {renderBand(sensor.warning_min_hum, sensor.normal_min_hum, "#ffd550")}
-        {renderBand(sensor.normal_max_hum, sensor.warning_max_hum, "#ffd550")}
-      </>}
-      {type === "temp" && sensor && <>
-        {renderLine(sensor.alarm_max_temp,   "#ff5b5b", "5,3")}
-        {renderLine(sensor.alarm_min_temp,   "#ff5b5b", "5,3")}
-        {renderLine(sensor.warning_max_temp, "#ffd550", "5,3")}
-        {renderLine(sensor.warning_min_temp, "#ffd550", "5,3")}
-        {renderLine(sensor.normal_max_temp,  "#01e676", "3,3")}
-        {renderLine(sensor.normal_min_temp,  "#01e676", "3,3")}
-      </>}
-      {type === "hum" && sensor && <>
-        {renderLine(sensor.alarm_max_hum,   "#ff5b5b", "5,3")}
-        {renderLine(sensor.alarm_min_hum,   "#ff5b5b", "5,3")}
-        {renderLine(sensor.warning_max_hum, "#ffd550", "5,3")}
-        {renderLine(sensor.warning_min_hum, "#ffd550", "5,3")}
-        {renderLine(sensor.normal_max_hum,  "#01e676", "3,3")}
-        {renderLine(sensor.normal_min_hum,  "#01e676", "3,3")}
-      </>}
-      <polygon points={`0,${h} ${pts} ${w},${h}`} fill={`url(#sg-${color.replace("#","")}-${type})`}/>
-      <polyline points={pts} fill="none" stroke={color} strokeWidth="2" strokeLinejoin="round"/>
+    <div style={{ position: "relative", height: h }}>
+      <svg
+        width="100%"
+        height={h}
+        viewBox={`0 0 ${w} ${h}`}
+        preserveAspectRatio="none"
+        style={{ cursor: "crosshair", display: "block" }}
+        onPointerDown={handlePointSelect}
+      >
+        <defs>
+          <linearGradient id={`sg-${color.replace("#","")}-${type}`} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={color} stopOpacity="0.25"/>
+            <stop offset="100%" stopColor={color} stopOpacity="0"/>
+          </linearGradient>
+        </defs>
+        {type === "temp" && sensor && <>
+          {renderBand(sensor.normal_min_temp, sensor.normal_max_temp, "#01e676")}
+          {renderBand(sensor.warning_min_temp, sensor.normal_min_temp, "#ffd550")}
+          {renderBand(sensor.normal_max_temp, sensor.warning_max_temp, "#ffd550")}
+        </>}
+        {type === "hum" && sensor && <>
+          {renderBand(sensor.normal_min_hum, sensor.normal_max_hum, "#01e676")}
+          {renderBand(sensor.warning_min_hum, sensor.normal_min_hum, "#ffd550")}
+          {renderBand(sensor.normal_max_hum, sensor.warning_max_hum, "#ffd550")}
+        </>}
+        {type === "temp" && sensor && <>
+          {renderLine(sensor.alarm_max_temp,   "#ff5b5b", "5,3")}
+          {renderLine(sensor.alarm_min_temp,   "#ff5b5b", "5,3")}
+          {renderLine(sensor.warning_max_temp, "#ffd550", "5,3")}
+          {renderLine(sensor.warning_min_temp, "#ffd550", "5,3")}
+          {renderLine(sensor.normal_max_temp,  "#01e676", "3,3")}
+          {renderLine(sensor.normal_min_temp,  "#01e676", "3,3")}
+        </>}
+        {type === "hum" && sensor && <>
+          {renderLine(sensor.alarm_max_hum,   "#ff5b5b", "5,3")}
+          {renderLine(sensor.alarm_min_hum,   "#ff5b5b", "5,3")}
+          {renderLine(sensor.warning_max_hum, "#ffd550", "5,3")}
+          {renderLine(sensor.warning_min_hum, "#ffd550", "5,3")}
+          {renderLine(sensor.normal_max_hum,  "#01e676", "3,3")}
+          {renderLine(sensor.normal_min_hum,  "#01e676", "3,3")}
+        </>}
+        <polygon points={`0,${h} ${pts} ${w},${h}`} fill={`url(#sg-${color.replace("#","")}-${type})`}/>
+        <polyline points={pts} fill="none" stroke={color} strokeWidth="2" strokeLinejoin="round"/>
+        {selectedPoint && (
+          <g pointerEvents="none">
+            <line
+              x1={selectedPoint.x} y1="0" x2={selectedPoint.x} y2={h}
+              stroke={color} strokeWidth="1.2" strokeDasharray="4,3" opacity="0.8"
+            />
+            <circle cx={selectedPoint.x} cy={selectedPoint.y} r="3.8" fill="#101010" stroke={color} strokeWidth="1.8"/>
+          </g>
+        )}
+      </svg>
       {selectedPoint && (
-        <g pointerEvents="none">
-          <line
-            x1={selectedPoint.x} y1="0" x2={selectedPoint.x} y2={h}
-            stroke={color} strokeWidth="1.2" strokeDasharray="4,3" opacity="0.8"
-          />
-          <circle cx={selectedPoint.x} cy={selectedPoint.y} r="3.8" fill="#101010" stroke={color} strokeWidth="1.8"/>
-          <rect
-            x={Math.max(3, Math.min(w - 59, selectedPoint.x - 29))}
-            y={Math.max(3, selectedPoint.y - 22)}
-            width="56" height="16" rx="4"
-            fill="#111" stroke={color} strokeWidth="0.9" opacity="0.96"
-          />
-          <text
-            x={Math.max(31, Math.min(w - 31, selectedPoint.x))}
-            y={Math.max(14, selectedPoint.y - 11)}
-            fill={color} fontSize="9" textAnchor="middle"
-            fontFamily="monospace" fontWeight="700"
-          >
-            {selectedPoint.value.toFixed(1)}{unit}
-          </text>
-        </g>
+        <div
+          className="sn-spark-tooltip"
+          style={{
+            "--spark-color": color,
+            left: `clamp(32px, ${(selectedPoint.x / w) * 100}%, calc(100% - 32px))`,
+            top: `clamp(20px, ${(selectedPoint.y / h) * 100}%, calc(100% - 4px))`,
+          }}
+        >
+          {selectedPoint.value.toFixed(1)}{unit}
+        </div>
       )}
-    </svg>
+    </div>
   );
 };
 
@@ -1024,7 +1025,17 @@ const AddSensorModal = ({ locations, blocks, defaultBlockId, onClose, onSave }) 
 };
 
 // ─── SensorMiniCard ───────────────────────────────────────────────────────────
-const SensorMiniCard = ({ sensor, isReorderMode, onDragStart, onDragOver, onDrop, onEditThresholds, onDeleteSensor }) => {
+const SensorMiniCard = ({
+  sensor,
+  isReorderMode,
+  onDragStart,
+  onDragOver,
+  onDrop,
+  onEditThresholds,
+  onDeleteSensor,
+  canEditThresholds,
+  canDeleteSensor,
+}) => {
   const st = STATUS[getSensorStatus(sensor)];
   const history = useSensorHistory(sensor.id);
   const tempData = history
@@ -1058,14 +1069,18 @@ const SensorMiniCard = ({ sensor, isReorderMode, onDragStart, onDragOver, onDrop
               <span className="sn-status-dot" style={{ background: st.color }}/>
               {st.label}
             </span>
-            {!isReorderMode && (
+            {!isReorderMode && (canEditThresholds || canDeleteSensor) && (
               <>
-                <button className="sn-icon-btn" onClick={() => setShowEdit(true)} title="Настроить пороги">
-                  <IconEdit/>
-                </button>
-                <button className="sn-icon-btn sn-icon-btn--danger" onClick={() => setShowDeleteConfirm(true)} title="Удалить датчик">
-                  <IconTrash/>
-                </button>
+                {canEditThresholds && (
+                  <button className="sn-icon-btn" onClick={() => setShowEdit(true)} title="Настроить пороги">
+                    <IconEdit/>
+                  </button>
+                )}
+                {canDeleteSensor && (
+                  <button className="sn-icon-btn sn-icon-btn--danger" onClick={() => setShowDeleteConfirm(true)} title="Удалить датчик">
+                    <IconTrash/>
+                  </button>
+                )}
               </>
             )}
           </div>
@@ -1116,7 +1131,7 @@ const SensorMiniCard = ({ sensor, isReorderMode, onDragStart, onDragOver, onDrop
         )}
       </div>
 
-      {showEdit && (
+      {showEdit && canEditThresholds && (
         <ThresholdsModal
           sensor={sensor}
           onClose={() => setShowEdit(false)}
@@ -1126,7 +1141,7 @@ const SensorMiniCard = ({ sensor, isReorderMode, onDragStart, onDragOver, onDrop
           }}
         />
       )}
-      {showDeleteConfirm && (
+      {showDeleteConfirm && canDeleteSensor && (
         <ConfirmModal
           title="Удалить датчик"
           message={`Удалить датчик «${sensor.name}» (ID: ${sensor.id})? Это действие необратимо.`}
@@ -1153,6 +1168,7 @@ const BlockCard = ({
   onEditBlock,
   onDeleteBlock,
   onDeleteSensor,
+  permissions,
   isSearching,
 }) => {
   const [expanded, setExpanded] = useState(false);
@@ -1178,6 +1194,9 @@ const BlockCard = ({
 
   const isSyntheticBlock = String(block.id).startsWith("__synthetic__");
   const syntheticLocId = isSyntheticBlock ? block.location_id ?? block.group_id : null;
+  const canAddSensor = permissions?.canCreateSensor;
+  const canManageBlock = permissions?.canManageControlUnits;
+  const canReorder = permissions?.canReorder;
 
   const childSensors = allSensors.filter(s => {
     if (isSyntheticBlock) {
@@ -1317,22 +1336,26 @@ const BlockCard = ({
             {!isReorderMode ? (
               expanded && (
                 <>
-                  <button
-                    className="sn-add-sensor-btn"
-                    title="Добавить датчик в этот ЦБУ"
-                    onClick={e => { e.stopPropagation(); onAddSensor(block); }}
-                  >
-                    <IconPlus/> Датчик
-                  </button>
-                  <button
-                    className="sn-reorder-btn"
-                    title="Порядок датчиков (двойной клик)"
-                    onDoubleClick={() => { setSensorOrder(childSensors.map(s => s.id)); setIsReorderMode(true); }}
-                    onClick={e => e.stopPropagation()}
-                  >
-                    <IconDrag/> <span>Порядок</span>
-                  </button>
-                  {!isSyntheticBlock && (
+                  {canAddSensor && (
+                    <button
+                      className="sn-add-sensor-btn"
+                      title="Добавить датчик в этот ЦБУ"
+                      onClick={e => { e.stopPropagation(); onAddSensor(block); }}
+                    >
+                      <IconPlus/> Датчик
+                    </button>
+                  )}
+                  {canReorder && (
+                    <button
+                      className="sn-reorder-btn"
+                      title="Порядок датчиков (двойной клик)"
+                      onDoubleClick={() => { setSensorOrder(childSensors.map(s => s.id)); setIsReorderMode(true); }}
+                      onClick={e => e.stopPropagation()}
+                    >
+                      <IconDrag/> <span>Порядок</span>
+                    </button>
+                  )}
+                  {!isSyntheticBlock && canManageBlock && (
                     <>
                       <button
                         className="sn-icon-btn"
@@ -1385,9 +1408,11 @@ const BlockCard = ({
             {orderedSensors.length === 0 && (
               <div className="sn-empty-sensors">
                 <div style={{ marginBottom: 12, color: "#555" }}>Нет датчиков в этом ЦБУ</div>
-                <button className="sn-add-sensor-btn-empty" onClick={() => onAddSensor(block)}>
-                  <IconPlus/> Добавить датчик
-                </button>
+                {canAddSensor && (
+                  <button className="sn-add-sensor-btn-empty" onClick={() => onAddSensor(block)}>
+                    <IconPlus/> Добавить датчик
+                  </button>
+                )}
               </div>
             )}
             {orderedSensors.map(sensor => (
@@ -1400,6 +1425,8 @@ const BlockCard = ({
                 onDrop={() => {}}
                 onEditThresholds={onEditThresholds}
                 onDeleteSensor={onDeleteSensor}
+                canEditThresholds={permissions?.canEditThresholds}
+                canDeleteSensor={permissions?.canDeleteSensor}
               />
             ))}
           </div>
@@ -1407,7 +1434,7 @@ const BlockCard = ({
       </div>
 
       {/* Редактирование ЦБУ */}
-      {showEditBlock && (
+      {showEditBlock && canManageBlock && (
         <EditBlockModal
           block={block}
           locations={locations}
@@ -1420,7 +1447,7 @@ const BlockCard = ({
       )}
 
       {/* Удаление: датчиков нет — простое подтверждение */}
-      {deleteState === "confirmEmpty" && (
+      {deleteState === "confirmEmpty" && canManageBlock && (
         <ConfirmModal
           title="Удалить ЦБУ"
           message={`Удалить блок «${block.name}» (ID: ${block.id})? Датчиков не привязано. Это действие необратимо.`}
@@ -1431,7 +1458,7 @@ const BlockCard = ({
       )}
 
       {/* Удаление: датчики есть — предупреждение с выбором */}
-      {deleteState === "hasSensors" && (
+      {deleteState === "hasSensors" && canManageBlock && (
         <DeleteBlockWithSensorsModal
           block={block}
           attachedSensors={blockSensors}
@@ -1456,6 +1483,7 @@ const LocationSection = ({
   onEditBlock,
   onDeleteBlock,
   onDeleteSensor,
+  permissions,
   isReorderLocMode,
   onLocDragStart,
   onLocDragOver,
@@ -1507,6 +1535,7 @@ const LocationSection = ({
               onEditBlock={onEditBlock}
               onDeleteBlock={onDeleteBlock}
               onDeleteSensor={onDeleteSensor}
+              permissions={permissions}
               isSearching={isSearching}
             />
           ))}
@@ -1518,6 +1547,16 @@ const LocationSection = ({
 
 // ─── Main Sensors Component ───────────────────────────────────────────────────
 const Sensors = () => {
+  const auth = useAuth();
+  const permissions = {
+    canCreateSensor: auth.canCreateSensor,
+    canCreateControlUnit: auth.canCreateControlUnit ?? auth.isAdmin,
+    canManageControlUnits: auth.canManageControlUnits ?? auth.isAdmin,
+    canEditThresholds: auth.canEditThresholds ?? auth.canEdit,
+    canDeleteSensor: auth.canDeleteSensor ?? auth.isAdmin,
+    canReorder: auth.canReorder,
+  };
+
   const [locations,  setLocations]  = useState([]);
   const [blocks,     setBlocks]     = useState([]);
   const [sensors,    setSensors]    = useState([]);
@@ -1621,26 +1660,31 @@ const Sensors = () => {
   }, []);
 
   const handleEditThresholds = async (sensorId, payload) => {
+    if (!permissions.canEditThresholds) return;
     await apiPatch(`/api/v1/sensors/${sensorId}/thresholds`, payload);
     await fetchAll();
   };
 
   const handleAddSensor = async (payload) => {
+    if (!permissions.canCreateSensor) return;
     await apiPost("/api/v1/sensors/create_sensor", payload);
     await fetchAll();
   };
 
   const handleCreateBlock = async (payload) => {
+    if (!permissions.canCreateControlUnit) return;
     await apiPost("/api/v1/control-units/register", payload);
     await fetchAll();
   };
 
   const handleDeleteSensor = async (sensorId) => {
+    if (!permissions.canDeleteSensor) return;
     await apiDelete(`/api/v1/sensors/${sensorId}`);
     await fetchAll();
   };
 
   const handleEditBlock = async (blockId, payload) => {
+    if (!permissions.canManageControlUnits) return;
     await apiPatch(`/api/v1/control-units/${blockId}`, payload);
     await fetchAll();
   };
@@ -1649,6 +1693,7 @@ const Sensors = () => {
   // detach=true  → DELETE /api/v1/control-units/{id}?detach_sensors=true
   // detach=false → DELETE /api/v1/control-units/{id}  (обычное, только если нет датчиков)
   const handleDeleteBlock = async (blockId, detach = false) => {
+    if (!permissions.canManageControlUnits) return;
     const url = detach
       ? `/api/v1/control-units/${blockId}?detach_sensors=true`
       : `/api/v1/control-units/${blockId}`;
@@ -1657,6 +1702,7 @@ const Sensors = () => {
   };
 
   const handleReorderSensors = async (blockId, orderedIds) => {
+    if (!permissions.canReorder) return;
     await Promise.all(
       orderedIds.map((id, idx) =>
         apiPatch(`/api/v1/sensors/${id}/position`, { position: idx })
@@ -1681,6 +1727,7 @@ const Sensors = () => {
   const handleLocDragEnd = () => { locDragSrc.current = null; };
 
   const handleSaveLocOrder = async () => {
+    if (!permissions.canReorder) return;
     saveLocOrder(locOrder);
     try {
       await Promise.all(
@@ -1790,29 +1837,36 @@ const Sensors = () => {
             <h1 className="sn-page-title">Датчики</h1>
             <p className="sn-page-sub">Мониторинг в реальном времени · {sensors.length} датчиков · {locations.length} локаций</p>
           </div>
+          {(permissions.canReorder || permissions.canCreateSensor || permissions.canCreateControlUnit) && (
           <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
             {!isReorderLocMode ? (
               <>
-                <button
-                  className="sn-reorder-loc-btn"
-                  onDoubleClick={() => { setLocOrder(locations.map(l => l.id)); setIsReorderLocMode(true); }}
-                  title="Изменить порядок локаций (двойной клик)"
-                >
-                  <IconDrag/> Порядок локаций
-                </button>
-                <button
-                  className="sn-add-btn sn-add-btn--secondary"
-                  onClick={() => { setAddSensorBlock(null); setShowAddSensor(true); }}
-                  title="Добавить датчик к существующему ЦБУ"
-                >
-                  <IconPlus/> Датчик
-                </button>
-                <button
-                  className="sn-add-btn"
-                  onClick={() => setShowCreateBlock(true)}
-                >
-                  <IconBlock/> Создать ЦБУ
-                </button>
+                {permissions.canReorder && (
+                  <button
+                    className="sn-reorder-loc-btn"
+                    onDoubleClick={() => { setLocOrder(locations.map(l => l.id)); setIsReorderLocMode(true); }}
+                    title="Изменить порядок локаций (двойной клик)"
+                  >
+                    <IconDrag/> Порядок локаций
+                  </button>
+                )}
+                {permissions.canCreateSensor && (
+                  <button
+                    className="sn-add-btn sn-add-btn--secondary"
+                    onClick={() => { setAddSensorBlock(null); setShowAddSensor(true); }}
+                    title="Добавить датчик к существующему ЦБУ"
+                  >
+                    <IconPlus/> Датчик
+                  </button>
+                )}
+                {permissions.canCreateControlUnit && (
+                  <button
+                    className="sn-add-btn"
+                    onClick={() => setShowCreateBlock(true)}
+                  >
+                    <IconBlock/> Создать ЦБУ
+                  </button>
+                )}
               </>
             ) : (
               <>
@@ -1833,6 +1887,7 @@ const Sensors = () => {
               </>
             )}
           </div>
+          )}
         </div>
 
         {!isReorderLocMode && (
@@ -1904,6 +1959,8 @@ const Sensors = () => {
                   onDrop={() => {}}
                   onEditThresholds={handleEditThresholds}
                   onDeleteSensor={handleDeleteSensor}
+                  canEditThresholds={permissions.canEditThresholds}
+                  canDeleteSensor={permissions.canDeleteSensor}
                 />
               ))}
             </div>
@@ -1930,6 +1987,7 @@ const Sensors = () => {
                   onEditBlock={handleEditBlock}
                   onDeleteBlock={handleDeleteBlock}
                   onDeleteSensor={handleDeleteSensor}
+                  permissions={permissions}
                   isReorderLocMode={isReorderLocMode}
                   onLocDragStart={() => handleLocDragStart(loc.id)}
                   onLocDragOver={() => handleLocDragOver(loc.id)}
