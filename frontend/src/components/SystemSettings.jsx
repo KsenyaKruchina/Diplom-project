@@ -74,6 +74,17 @@ const IconBuilding = () => (
     <rect x="9" y="5" width="2" height="2" rx="0.3" stroke="currentColor" strokeWidth="1.1"/>
   </svg>
 );
+const IconSun = () => (
+  <svg width="17" height="17" viewBox="0 0 24 24" fill="none">
+    <circle cx="12" cy="12" r="4" stroke="currentColor" strokeWidth="1.7"/>
+    <path d="M12 2v2.2M12 19.8V22M4.9 4.9l1.6 1.6M17.5 17.5l1.6 1.6M2 12h2.2M19.8 12H22M4.9 19.1l1.6-1.6M17.5 6.5l1.6-1.6" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round"/>
+  </svg>
+);
+const IconMoon = () => (
+  <svg width="17" height="17" viewBox="0 0 24 24" fill="none">
+    <path d="M20 15.3A8.3 8.3 0 0 1 8.7 4 8.3 8.3 0 1 0 20 15.3z" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round"/>
+  </svg>
+);
 
 // ── Avatar ────────────────────────────────────────────────────────
 const AVATAR_COLORS = ["#ffd550", "#07bcd4", "#01e676", "#ff5b5b", "#b47afe", "#ff8c42"];
@@ -89,7 +100,7 @@ const Avatar = ({ name, color, size = 28 }) => {
 
 // ── Constants ──────────────────────────────────────────────────────
 const ROLE_LABELS = { admin: "Админ", editor: "Редактор", viewer: "Читатель" };
-const ROLE_COLORS = { admin: "#ffd550", editor: "#07bcd4", viewer: "#929292" };
+const ROLE_COLORS = { admin: "#ffd550", editor: "#07bcd4", viewer: "#64748b" };
 const STATUS_STYLE = {
   online:  { color: "#01e676", dot: "#01e676", label: "Онлайн" },
   offline: { color: "#ff5b5b", dot: "#ff5b5b", label: "Оффлайн" },
@@ -455,8 +466,6 @@ const MyLocationUsersPanel = ({ myLocation, currentUser, onUserAdded }) => {
     });
     if (onUserAdded) onUserAdded(withLocation);
   };
-
-  if (loading) return <div className="ss-loading ss-loading--inline">Загрузка пользователей...</div>;
 
   return (
     <div className="ss-users-panel">
@@ -824,7 +833,7 @@ const NoLocationPlaceholder = () => (
 );
 
 // ── Main Component ─────────────────────────────────────────────────
-export const SystemSettings = () => {
+export const SystemSettings = ({ theme = "dark", onThemeChange = () => {} }) => {
   const { isViewer, isAdmin, isEditor } = useAuth();
 
   const [profile, setProfile]     = useState(null);
@@ -935,16 +944,6 @@ export const SystemSettings = () => {
     window.location.href = "/login";
   };
 
-  if (loading) {
-    return (
-      <div className="ss-container">
-        <main className="ss-main">
-          <div className="ss-loading">Загрузка данных...</div>
-        </main>
-      </div>
-    );
-  }
-
   if (error) {
     return (
       <div className="ss-container">
@@ -1012,6 +1011,35 @@ export const SystemSettings = () => {
                 Вы можете редактировать своё имя. Для расширенного доступа обратитесь к администратору.
               </div>
             )}
+          </div>
+
+          <div className="ss-card ss-theme-card">
+            <div className="ss-card-header ss-theme-card-header">
+              <div>
+                <h2 className="ss-card-title">Внешний вид</h2>
+                <p className="ss-theme-subtitle">Выберите тему интерфейса</p>
+              </div>
+              <div className="ss-theme-toggle" role="group" aria-label="Тема интерфейса">
+                <button
+                  type="button"
+                  className={`ss-theme-option${theme === "dark" ? " ss-theme-option--active" : ""}`}
+                  onClick={() => onThemeChange("dark")}
+                  aria-pressed={theme === "dark"}
+                >
+                  <IconMoon />
+                  <span>Темная</span>
+                </button>
+                <button
+                  type="button"
+                  className={`ss-theme-option${theme === "light" ? " ss-theme-option--active" : ""}`}
+                  onClick={() => onThemeChange("light")}
+                  aria-pressed={theme === "light"}
+                >
+                  <IconSun />
+                  <span>Светлая</span>
+                </button>
+              </div>
+            </div>
           </div>
 
           {isAdmin && (

@@ -219,6 +219,34 @@ body {
     align-self: flex-end; /* Выравнивание по правому краю внутри flex-контейнера */
 }
 
+@media (max-width: 760px) {
+  .dashboard-main,
+  .sn-main,
+  .an-main,
+  .rp-main,
+  .ss-main {
+    padding: 20px 14px 24px !important;
+  }
+
+  .dashboard-title,
+  .sn-page-title,
+  .an-page-title,
+  .rp-page-title,
+  .ss-page-title {
+    font-size: 20px !important;
+    line-height: 1.2 !important;
+    letter-spacing: 0 !important;
+    margin: 0 0 4px !important;
+  }
+
+  .dashboard-header,
+  .sn-page-header,
+  .an-page-header,
+  .rp-page-header {
+    margin: 0 !important;
+  }
+}
+
 /* Удаляем стили для кнопок, так как они не используются */
 /* .btn-completed больше не нужен */
 

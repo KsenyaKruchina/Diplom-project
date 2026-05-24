@@ -121,7 +121,7 @@ const IconClose = () => (
 );
 const IconPDF = () => (
   <svg width="52" height="52" viewBox="0 0 52 52" fill="none">
-    <rect x="8" y="4" width="28" height="36" rx="3" fill="#1a1a1a" stroke="#ff5252" strokeWidth="1.5"/>
+    <rect x="8" y="4" width="28" height="36" rx="3" fill="var(--export-icon-bg, #1a1a1a)" stroke="#ff5252" strokeWidth="1.5"/>
     <path d="M36 4l8 8h-8V4z" fill="#ff5252" fillOpacity="0.5"/>
     <line x1="14" y1="16" x2="30" y2="16" stroke="#ff5252" strokeWidth="1.4" strokeLinecap="round"/>
     <line x1="14" y1="21" x2="30" y2="21" stroke="#ff5252" strokeWidth="1.4" strokeLinecap="round"/>
@@ -131,7 +131,7 @@ const IconPDF = () => (
 );
 const IconExcel = () => (
   <svg width="52" height="52" viewBox="0 0 52 52" fill="none">
-    <rect x="8" y="4" width="28" height="36" rx="3" fill="#1a1a1a" stroke="#01e676" strokeWidth="1.5"/>
+    <rect x="8" y="4" width="28" height="36" rx="3" fill="var(--export-icon-bg, #1a1a1a)" stroke="#01e676" strokeWidth="1.5"/>
     <path d="M36 4l8 8h-8V4z" fill="#01e676" fillOpacity="0.5"/>
     <line x1="14" y1="16" x2="30" y2="16" stroke="#01e676" strokeWidth="1.4" strokeLinecap="round"/>
     <line x1="14" y1="21" x2="30" y2="21" stroke="#01e676" strokeWidth="1.4" strokeLinecap="round"/>
@@ -141,7 +141,7 @@ const IconExcel = () => (
 );
 const IconCSV = () => (
   <svg width="52" height="52" viewBox="0 0 52 52" fill="none">
-    <rect x="8" y="4" width="28" height="36" rx="3" fill="#1a1a1a" stroke="#29b6f6" strokeWidth="1.5"/>
+    <rect x="8" y="4" width="28" height="36" rx="3" fill="var(--export-icon-bg, #1a1a1a)" stroke="#29b6f6" strokeWidth="1.5"/>
     <path d="M36 4l8 8h-8V4z" fill="#29b6f6" fillOpacity="0.5"/>
     <line x1="14" y1="16" x2="30" y2="16" stroke="#29b6f6" strokeWidth="1.4" strokeLinecap="round"/>
     <line x1="14" y1="21" x2="30" y2="21" stroke="#29b6f6" strokeWidth="1.4" strokeLinecap="round"/>
@@ -206,13 +206,13 @@ const WsStatusDot = ({ connected }) => (
 
 // ── Словари / маппинги ────────────────────────────────────────────────────────
 const STATUS_MAP = {
-  new:          { label: "Новая",      color: "#ff5252", bg: "#321c1b" },
-  acknowledged: { label: "В работе",   color: "#ffd550", bg: "#312c1c" },
-  resolved:     { label: "Устранено",  color: "#01e676", bg: "#19282b" },
+  new:          { label: "Новая",      color: "#ff5252", bg: "var(--status-error-bg, #321c1b)" },
+  acknowledged: { label: "В работе",   color: "#ffd550", bg: "var(--status-warning-bg, #312c1c)" },
+  resolved:     { label: "Устранено",  color: "#01e676", bg: "var(--status-ok-bg, #19282b)" },
 };
 const SEVERITY_MAP = {
   critical: { label: "Критическая", color: "#ff5252" },
-  warning:  { label: "Внимание",    color: "#ffd550" },
+  warning:  { label: "Внимание",    color: "#c68400" },
 };
 const ALARM_TYPE_MAP = {
   temperature:     "Температура",
@@ -467,7 +467,7 @@ function StatusPicker({ alarm, onUpdate }) {
 // ── Description cell ──────────────────────────────────────────────────────────
 function DescriptionCell({ alarm, onUpdate }) {
   const [modalOpen, setModalOpen] = useState(false);
-  const displayText = alarm.user_comment || alarm.description || "—";
+  const displayText = alarm.description || "—";
 
   return (
     <>
@@ -1130,7 +1130,7 @@ function ExportCard({
           <button
             key={fmt.key}
             className={`rp-format-btn ${exportFmt === fmt.key ? "rp-format-btn--active" : ""}`}
-            style={exportFmt === fmt.key ? { borderColor: fmt.color } : {}}
+            style={exportFmt === fmt.key ? { borderColor: fmt.color, backgroundColor: `${fmt.color}18`, color: fmt.color } : {}}
             onClick={() => setExportFmt(fmt.key)}
           >
             {fmt.key === "pdf"  && <IconPDF />}
@@ -1470,6 +1470,19 @@ export const Reports = () => {
 
   const totalPages = Math.max(1, Math.ceil(sorted.length / ROWS_PER_PAGE));
   const pageData   = sorted.slice((page - 1) * ROWS_PER_PAGE, page * ROWS_PER_PAGE);
+  const paginationItems = (() => {
+    if (totalPages <= 7) return Array.from({ length: totalPages }, (_, i) => i + 1);
+
+    const items = [1];
+    const start = Math.max(2, page - 1);
+    const end = Math.min(totalPages - 1, page + 1);
+
+    if (start > 2) items.push("start-ellipsis");
+    for (let p = start; p <= end; p += 1) items.push(p);
+    if (end < totalPages - 1) items.push("end-ellipsis");
+    items.push(totalPages);
+    return items;
+  })();
 
   const activeFilters = [
     filterSeverity && { key: "severity", label: `Критичность: ${SEVERITY_MAP[filterSeverity]?.label}`, clear: () => setFilterSeverity("") },
@@ -1575,21 +1588,20 @@ export const Reports = () => {
           </div>
 
           <div className="rp-table-body">
-            {loading && <div className="rp-empty-state">Загрузка событий...</div>}
-            {!loading && pageData.length === 0 && (
+            {pageData.length === 0 && (
               <div className="rp-empty-state">
                 {alarms.length === 0 ? "Нет тревог" : "Нет событий, соответствующих фильтрам"}
               </div>
             )}
-            {!loading && pageData.map((row) => {
+            {pageData.map((row) => {
               const sev = SEVERITY_MAP[row.severity] || { label: row.severity, color: "#929292" };
               const typeLabel = ALARM_TYPE_MAP[row.alarm_type] || row.alarm_type || "—";
               return (
-                <div key={row.id} className="rp-table-row">
+                <div key={row.id} className={`rp-table-row rp-event-card rp-event-card--${row.severity || "default"}`}>
                   <div className="rp-td">{row.id}</div>
                   <div className="rp-td" style={{ color: sev.color }}>{sev.label}</div>
                   <div className="rp-td rp-td--gap"><IconMessage />{typeLabel}</div>
-                  <div className="rp-td" style={{ color: "#929292" }}>#{row.sensor_id}</div>
+                  <div className="rp-td" style={{ color: "var(--text-secondary)" }}>#{row.sensor_id}</div>
                   <div className="rp-td"><DescriptionCell alarm={row} onUpdate={updateAlarm} /></div>
                   <div className="rp-td"><StatusPicker alarm={row} onUpdate={updateAlarm} /></div>
                   <div className="rp-td">{formatDateTime(row.timestamp)}</div>
@@ -1601,11 +1613,15 @@ export const Reports = () => {
 
           <div className="rp-pagination">
             <span className="rp-pagination-count">{filtered.length} записей</span>
-            <button className="rp-page-btn" onClick={() => setPage(p => Math.max(1, p - 1))}><IconChevLeft /></button>
-            {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => (
-              <button key={p} className={`rp-page-num ${page === p ? "rp-page-num--active" : ""}`} onClick={() => setPage(p)}>{p}</button>
+            <button className="rp-page-btn" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}><IconChevLeft /></button>
+            {paginationItems.map(item => (
+              typeof item === "number" ? (
+                <button key={item} className={`rp-page-num ${page === item ? "rp-page-num--active" : ""}`} onClick={() => setPage(item)}>{item}</button>
+              ) : (
+                <span key={item} className="rp-page-ellipsis">...</span>
+              )
             ))}
-            <button className="rp-page-btn" onClick={() => setPage(p => Math.min(totalPages, p + 1))}><IconChevRight /></button>
+            <button className="rp-page-btn" onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}><IconChevRight /></button>
           </div>
         </div>
 

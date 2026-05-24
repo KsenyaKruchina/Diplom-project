@@ -157,7 +157,7 @@
   top: calc(100% + 4px);
   left: 0;
   right: 0;
-  background-color: #1a1a1a;
+  background-color: var(--bg-card, #1a1a1a);
   border: 1px solid rgba(255,255,255,0.1);
   border-radius: 8px;
   overflow: hidden;
@@ -276,7 +276,7 @@
 
 .an-chart-area {
   min-height: 130px;
-  background-color: #111;
+  background-color: var(--chart-bg);
   border-radius: 8px;
   overflow: hidden;
   padding: 4px 0;
@@ -580,12 +580,38 @@
   .an-dropdown { min-width: 100%; width: 100%; }
 }
 
+@media (max-width: 760px) {
+  .an-filter-bar,
+  .an-filter-section,
+  .an-export-context {
+    overflow: visible;
+  }
+
+  .an-dropdown-menu,
+  .an-hier-dropdown-menu {
+    top: auto;
+    bottom: calc(100% + 6px);
+    max-height: min(52vh, 280px);
+    z-index: 10000;
+  }
+
+  .an-hierarchy-selector,
+  .an-export-context-row {
+    align-items: stretch;
+  }
+
+  .an-hier-step {
+    max-width: none;
+    width: 100%;
+  }
+}
+
 /* ─── Hierarchy Filter Section ──────────────────────────────────────────────── */
 
 .an-filter-section {
   margin-bottom: 20px;
-  background: #111;
-  border: 1px solid #1f1f1f;
+  background: var(--chart-bg);
+  border: 1px solid rgba(255,255,255,0.08);
   border-radius: 12px;
   padding: 16px 20px;
 }
@@ -844,9 +870,9 @@
   gap: 7px;
   padding: 8px 16px;
   border-radius: 8px;
-  border: 1px solid #2a2a2a;
-  background-color: #111;
-  color: #555;
+  border: 1px solid var(--format-idle-border, #2a2a2a);
+  background-color: var(--format-idle-bg, #111);
+  color: var(--format-idle-text, #555);
   font-size: 13px;
   font-weight: 500;
   font-family: "Inter", Helvetica, sans-serif;
@@ -857,7 +883,7 @@
 
 .an-report-type-btn:hover:not(.an-report-type-btn--active) {
   border-color: #3a3a3a;
-  background-color: #161616;
+  background-color: var(--format-idle-bg, #161616);
   color: #888;
 }
 

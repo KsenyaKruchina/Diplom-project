@@ -318,24 +318,33 @@ const IconControlUnit = ({ color = "#a78bfa" }) => (
   </svg>
 );
 const IconPDF = () => (
-  <svg width="44" height="44" viewBox="0 0 44 44" fill="none">
-    <rect x="6" y="3" width="24" height="30" rx="2.5" fill="#1a1a1a" stroke="#ff5252" strokeWidth="1.4"/>
-    <path d="M30 3l8 8h-8V3z" fill="#ff5252" fillOpacity="0.5"/>
-    <text x="22" y="41" textAnchor="middle" fill="#ff5252" fontSize="8" fontFamily="Inter, sans-serif" fontWeight="700">PDF</text>
+  <svg width="52" height="52" viewBox="0 0 52 52" fill="none">
+    <rect x="8" y="4" width="28" height="36" rx="3" fill="var(--export-icon-bg, #1a1a1a)" stroke="#ff5252" strokeWidth="1.5"/>
+    <path d="M36 4l8 8h-8V4z" fill="#ff5252" fillOpacity="0.5"/>
+    <line x1="14" y1="16" x2="30" y2="16" stroke="#ff5252" strokeWidth="1.4" strokeLinecap="round"/>
+    <line x1="14" y1="21" x2="30" y2="21" stroke="#ff5252" strokeWidth="1.4" strokeLinecap="round"/>
+    <line x1="14" y1="26" x2="24" y2="26" stroke="#ff5252" strokeWidth="1.4" strokeLinecap="round"/>
+    <text x="26" y="47" textAnchor="middle" fill="#ff5252" fontSize="9" fontFamily="Inter, sans-serif" fontWeight="700">PDF</text>
   </svg>
 );
 const IconXLSX = () => (
-  <svg width="44" height="44" viewBox="0 0 44 44" fill="none">
-    <rect x="6" y="3" width="24" height="30" rx="2.5" fill="#1a1a1a" stroke="#01e676" strokeWidth="1.4"/>
-    <path d="M30 3l8 8h-8V3z" fill="#01e676" fillOpacity="0.5"/>
-    <text x="22" y="41" textAnchor="middle" fill="#01e676" fontSize="8" fontFamily="Inter, sans-serif" fontWeight="700">XLSX</text>
+  <svg width="52" height="52" viewBox="0 0 52 52" fill="none">
+    <rect x="8" y="4" width="28" height="36" rx="3" fill="var(--export-icon-bg, #1a1a1a)" stroke="#01e676" strokeWidth="1.5"/>
+    <path d="M36 4l8 8h-8V4z" fill="#01e676" fillOpacity="0.5"/>
+    <line x1="14" y1="16" x2="30" y2="16" stroke="#01e676" strokeWidth="1.4" strokeLinecap="round"/>
+    <line x1="14" y1="21" x2="30" y2="21" stroke="#01e676" strokeWidth="1.4" strokeLinecap="round"/>
+    <line x1="14" y1="26" x2="24" y2="26" stroke="#01e676" strokeWidth="1.4" strokeLinecap="round"/>
+    <text x="26" y="47" textAnchor="middle" fill="#01e676" fontSize="9" fontFamily="Inter, sans-serif" fontWeight="700">XLSX</text>
   </svg>
 );
 const IconCSV = () => (
-  <svg width="44" height="44" viewBox="0 0 44 44" fill="none">
-    <rect x="6" y="3" width="24" height="30" rx="2.5" fill="#1a1a1a" stroke="#64b5f6" strokeWidth="1.4"/>
-    <path d="M30 3l8 8h-8V3z" fill="#64b5f6" fillOpacity="0.5"/>
-    <text x="22" y="41" textAnchor="middle" fill="#64b5f6" fontSize="8" fontFamily="Inter, sans-serif" fontWeight="700">CSV</text>
+  <svg width="52" height="52" viewBox="0 0 52 52" fill="none">
+    <rect x="8" y="4" width="28" height="36" rx="3" fill="var(--export-icon-bg, #1a1a1a)" stroke="#64b5f6" strokeWidth="1.5"/>
+    <path d="M36 4l8 8h-8V4z" fill="#64b5f6" fillOpacity="0.5"/>
+    <line x1="14" y1="16" x2="30" y2="16" stroke="#64b5f6" strokeWidth="1.4" strokeLinecap="round"/>
+    <line x1="14" y1="21" x2="30" y2="21" stroke="#64b5f6" strokeWidth="1.4" strokeLinecap="round"/>
+    <line x1="14" y1="26" x2="24" y2="26" stroke="#64b5f6" strokeWidth="1.4" strokeLinecap="round"/>
+    <text x="26" y="47" textAnchor="middle" fill="#64b5f6" fontSize="9" fontFamily="Inter, sans-serif" fontWeight="700">CSV</text>
   </svg>
 );
 
@@ -437,7 +446,7 @@ const DatePickerModal = ({ onClose, onApply }) => {
 
 // ── LineChart ─────────────────────────────────────────────────────────────────
 const LineChart = ({ data, color, height = 130 }) => {
-  if (!data || data.length < 2) return <div style={{height, background:"#111", borderRadius:8}}/>;
+  if (!data || data.length < 2) return <div style={{height, background:"var(--chart-bg)", borderRadius:8}}/>;
   const W = 520, H = height;
   const min = Math.min(...data), max = Math.max(...data);
   const range = max - min || 1;
@@ -825,9 +834,6 @@ export const Analytics = () => {
             </button>
           )}
 
-          {histLoading && (
-            <span style={{ fontSize: "12px", color: "#929292" }}>Загрузка данных...</span>
-          )}
           {histError && (
             <span style={{ fontSize: "12px", color: "#ff5252" }}>{histError}</span>
           )}
@@ -987,7 +993,7 @@ export const Analytics = () => {
               style={{
                 borderColor:     currentFormatCfg.color,
                 color:           currentFormatCfg.color,
-                backgroundColor: exportFormat === "pdf" ? "#1a1010" : exportFormat === "xlsx" ? "#0f1a12" : "#0f1318",
+                backgroundColor: currentFormatCfg.bg,
                 opacity:         exportLoading ? 0.7 : 1,
               }}
               onClick={doExport}

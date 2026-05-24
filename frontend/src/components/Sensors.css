@@ -61,11 +61,19 @@
 }
 
 .sn-page-sub {
-  font-size: 14px;
-  font-weight: 300;
+  font-size: 15px;
+  font-weight: 500;
   color: var(--text);
   letter-spacing: -0.2px;
   opacity: 0.7;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.sn-page-meta {
+  color: var(--muted);
+  font-size: 13px;
 }
 
 /* ── Add Sensor Button ───────────────────────────────────────── */
@@ -90,27 +98,12 @@
   background-color: #e6ad00;
 }
 
-/* ── Reorder Locations Button ────────────────────────────────── */
-.sn-reorder-loc-btn {
+.sn-header-actions {
   display: flex;
+  gap: 10px;
   align-items: center;
-  gap: 7px;
-  height: 38px;
-  padding: 0 16px;
-  background-color: rgba(255,255,255,0.06);
-  border: 1px solid rgba(255,255,255,0.1);
-  border-radius: 10px;
-  color: var(--muted);
-  font-size: 12px;
-  font-weight: 500;
-  font-family: "Inter", Helvetica, sans-serif;
-  cursor: pointer;
-  transition: all 0.15s;
-}
-
-.sn-reorder-loc-btn:hover {
-  background-color: rgba(255,255,255,0.1);
-  color: var(--text);
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
 /* ── Controls Row ────────────────────────────────────────────── */
@@ -241,16 +234,10 @@
 .sn-location-section {
   margin-bottom: 8px;
   transition: opacity 0.15s;
-}
-
-.sn-location-section--reorder {
-  cursor: grab;
-  opacity: 0.9;
-}
-
-.sn-location-section--reorder:active {
-  cursor: grabbing;
-  opacity: 0.7;
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 16px;
+  background: rgba(255,255,255,0.025);
+  padding: 6px;
 }
 
 .sn-location-header {
@@ -263,11 +250,7 @@
   cursor: pointer;
   transition: background-color 0.15s;
   margin-bottom: 12px;
-}
-
-.sn-location-section--reorder .sn-location-header {
-  border: 1px dashed rgba(255,194,7,0.3);
-  background-color: rgba(255,194,7,0.04);
+  border: 1px solid rgba(255,255,255,0.06);
 }
 
 .sn-location-header:hover { background-color: rgba(255,255,255,0.06); }
@@ -279,13 +262,13 @@
 }
 
 .sn-location-name {
-  font-size: 18px;
-  font-weight: 600;
+  font-size: 19px;
+  font-weight: 700;
   color: var(--text);
 }
 
 .sn-location-meta {
-  font-size: 12px;
+  font-size: 13px;
   color: var(--muted);
   margin-left: 8px;
 }
@@ -313,6 +296,8 @@
   box-shadow: var(--border-in);
   margin-bottom: 16px;
   overflow: hidden;
+  border: 1px solid rgba(255,255,255,0.08);
+  border-left: 4px solid rgba(255,194,7,0.8);
 }
 
 .sn-block-header {
@@ -323,6 +308,7 @@
   cursor: pointer;
   transition: background-color 0.15s;
   border-bottom: 1px solid rgba(255,255,255,0.05);
+  background: rgba(255,194,7,0.025);
 }
 
 .sn-block-header:hover { background-color: rgba(255,255,255,0.03); }
@@ -346,7 +332,7 @@
 }
 
 .sn-block-id-tag {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--muted);
   background-color: rgba(255,255,255,0.06);
   padding: 4px 8px;
@@ -355,8 +341,8 @@
 }
 
 .sn-block-name {
-  font-size: 16px;
-  font-weight: 600;
+  font-size: 18px;
+  font-weight: 700;
   color: var(--text);
 }
 
@@ -525,7 +511,7 @@
 }
 
 .sn-sensor-id-tag {
-  font-size: 10px;
+  font-size: 12px;
   color: var(--muted);
   background-color: rgba(255,255,255,0.06);
   padding: 3px 7px;
@@ -534,8 +520,8 @@
 }
 
 .sn-sensor-name {
-  font-size: 14px;
-  font-weight: 500;
+  font-size: 16px;
+  font-weight: 700;
   color: var(--text);
 }
 
@@ -543,8 +529,8 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 11px;
-  font-weight: 500;
+  font-size: 12px;
+  font-weight: 700;
   padding: 4px 10px;
   border-radius: 20px;
   letter-spacing: -0.2px;
@@ -581,8 +567,8 @@
 }
 
 .sn-sensor-val-num {
-  font-size: 16px;
-  font-weight: 600;
+  font-size: 18px;
+  font-weight: 700;
   letter-spacing: -0.3px;
 }
 
@@ -596,12 +582,13 @@
 .sn-chart-wrap {
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: 7px;
 }
 
 .sn-chart-label {
-  font-size: 10px;
+  font-size: 12px;
   color: var(--muted);
+  font-weight: 700;
   display: flex;
   align-items: center;
   gap: 4px;
@@ -619,16 +606,118 @@
   display: flex;
   align-items: center;
   gap: 4px;
-  font-size: 9px;
+  font-size: 10.5px;
   color: var(--muted);
   letter-spacing: -0.1px;
 }
 
 .sn-chart-box {
-  background-color: rgba(0,0,0,0.3);
+  background-color: var(--chart-bg);
   border-radius: 8px;
   overflow: hidden;
-  min-height: 88px;
+  min-height: 126px;
+  padding: 8px 8px 7px;
+  border: 1px solid rgba(255,255,255,0.06);
+}
+
+.sn-chart-periods {
+  display: inline-flex;
+  align-self: flex-start;
+  gap: 4px;
+  padding: 3px;
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 9px;
+  background: rgba(255,255,255,0.035);
+}
+
+.sn-chart-period-btn {
+  min-height: 26px;
+  padding: 0 10px;
+  border: none;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.sn-chart-period-btn--active {
+  background: var(--accent);
+  color: #000;
+}
+
+.sn-chart-frame {
+  display: grid;
+  grid-template-columns: 46px minmax(0, 1fr);
+  grid-template-rows: auto 18px;
+  gap: 3px 8px;
+}
+
+.sn-chart-y-axis {
+  grid-row: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  color: var(--muted);
+  font-size: 9px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  text-align: right;
+  padding: 2px 0;
+}
+
+.sn-chart-plot {
+  position: relative;
+  min-width: 0;
+}
+
+.sn-chart-x-axis {
+  grid-column: 2;
+  display: flex;
+  justify-content: space-between;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 9px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.sn-chart-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.sn-chart-stats span {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+  min-width: 0;
+  padding: 5px 7px;
+  border-radius: 7px;
+  background: rgba(255,255,255,0.045);
+  color: var(--text);
+  font-size: 10.5px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.sn-chart-stats b {
+  color: var(--muted);
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.sn-chart-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+  font-size: 11px;
 }
 
 /* ── Search Results ──────────────────────────────────────────── */
@@ -933,7 +1022,7 @@
 }
 
 @media (max-width: 768px) {
-  .sn-page-title { font-size: 24px; }
+  .sn-page-title { font-size: 18px; }
   .sn-page-header { flex-direction: column; }
 
   .sn-sensor-vals { flex-wrap: wrap; gap: 8px; }
@@ -993,8 +1082,8 @@
 
 /* ── Превью карточки ЦБУ / датчика ────────────────────────────────────────── */
 .sn-cbu-preview {
-  background: #111;
-  border: 1px solid #1e1e1e;
+  background: var(--chart-bg);
+  border: 1px solid rgba(255,255,255,0.08);
   border-radius: 10px;
   padding: 14px 16px;
   margin-bottom: 4px;
@@ -1120,8 +1209,8 @@
   min-width: 0;
   height: 32px;
   padding: 0 10px;
-  background: #111;
-  border: 1px solid #222;
+  background: var(--chart-bg);
+  border: 1px solid rgba(255,255,255,0.08);
   border-radius: 6px;
   color: #ccc;
   font-size: 13px;
@@ -1146,7 +1235,97 @@
 }
 
 /* Адаптив для маленьких экранов */
+@media (max-width: 760px) {
+  .sn-page-header {
+    gap: 14px;
+  }
+
+  .sn-header-actions {
+    display: flex;
+    width: auto;
+    gap: 6px;
+    justify-content: flex-end;
+    flex-wrap: nowrap;
+  }
+
+  .sn-header-actions .sn-add-btn {
+    width: auto;
+    justify-content: center;
+    min-width: 42px;
+    height: 42px;
+    padding: 0 9px;
+    gap: 4px;
+    font-size: 11px;
+    white-space: nowrap;
+  }
+
+  .sn-controls-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 8px;
+    width: 100%;
+    align-items: center;
+  }
+
+  .sn-search-box {
+    grid-column: 1;
+    width: 100%;
+    min-width: 0;
+    height: 42px;
+    padding: 0 10px;
+  }
+
+  .sn-search-input {
+    min-width: 0;
+    font-size: 13px;
+  }
+
+  .sn-search-input::placeholder {
+    color: transparent;
+  }
+
+  .sn-controls-row .sn-header-actions {
+    grid-column: 2;
+  }
+
+  .sn-loc-dropdown-wrap,
+  .sn-loc-dropdown-btn {
+    grid-column: 1 / -1;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .sn-loc-dropdown {
+    left: 0;
+    right: 0;
+    min-width: 0;
+  }
+
+  .sn-location-section {
+    padding: 5px;
+    border-radius: 12px;
+  }
+
+  .sn-location-header {
+    align-items: flex-start;
+    gap: 10px;
+    padding: 12px;
+  }
+
+  .sn-location-header-left,
+  .sn-block-name-group {
+    min-width: 0;
+    flex-wrap: wrap;
+  }
+
+  .sn-location-name,
+  .sn-block-name {
+    overflow-wrap: anywhere;
+  }
+}
+
 @media (max-width: 480px) {
+
   .sn-th-col-level {
     flex: 0 0 90px;
   }
@@ -1205,8 +1384,8 @@
 
 /* ── Превью карточки ЦБУ / датчика ────────────────────────────────────────── */
 .sn-cbu-preview {
-  background: #111;
-  border: 1px solid #1e1e1e;
+  background: var(--chart-bg);
+  border: 1px solid rgba(255,255,255,0.08);
   border-radius: 10px;
   padding: 14px 16px;
   margin-bottom: 4px;
@@ -1332,8 +1511,8 @@
   min-width: 0;
   height: 32px;
   padding: 0 10px;
-  background: #111;
-  border: 1px solid #222;
+  background: var(--chart-bg);
+  border: 1px solid rgba(255,255,255,0.08);
   border-radius: 6px;
   color: #ccc;
   font-size: 13px;
@@ -1364,6 +1543,49 @@
   font-size: 13px;
 }
 
+/* ── Modal polish and responsive threshold editor ─────────────────────────── */
+.sn-modal {
+  background: var(--bg-card, #141414);
+  border: 1px solid rgba(255,255,255,0.1);
+}
+
+.sn-modal-tabs {
+  background: color-mix(in srgb, var(--bg-card, #141414) 86%, #000);
+  border-bottom-color: rgba(255,255,255,0.08);
+  overflow-x: auto;
+}
+
+.sn-modal-tab {
+  color: var(--muted);
+}
+
+.sn-cbu-preview,
+.sn-add-info-box {
+  background: var(--chart-bg, #111111);
+  border: 1px solid rgba(255,255,255,0.08);
+}
+
+.sn-th-table {
+  --sn-th-normal-bg: color-mix(in srgb, #01e676 12%, var(--bg-card, #141414));
+  --sn-th-warning-bg: color-mix(in srgb, #ffd550 14%, var(--bg-card, #141414));
+  --sn-th-alarm-bg: color-mix(in srgb, #ff5b5b 13%, var(--bg-card, #141414));
+}
+
+.sn-th-row {
+  border: 1px solid rgba(255,255,255,0.07);
+}
+
+.sn-th-header-row .sn-th-col-level,
+.sn-th-header-row .sn-th-col-minmax span,
+.sn-th-range-sep,
+.sn-th-hint {
+  color: var(--muted);
+}
+
+.sn-th-input {
+  color: var(--text);
+}
+
 @media (max-width: 480px) {
   .sn-th-col-level {
     flex: 0 0 90px;
@@ -1373,5 +1595,72 @@
   }
   .sn-cbu-preview-row {
     gap: 12px;
+  }
+}
+
+@media (max-width: 560px) {
+  .sn-overlay {
+    align-items: flex-end;
+    padding: 10px;
+  }
+
+  .sn-modal {
+    max-width: none;
+    max-height: calc(100dvh - 20px);
+    border-radius: 16px;
+  }
+
+  .sn-modal-header {
+    padding: 16px 16px 12px;
+  }
+
+  .sn-modal-body {
+    padding: 16px;
+    gap: 14px;
+  }
+
+  .sn-modal-tabs {
+    padding: 0 12px;
+  }
+
+  .sn-modal-footer {
+    padding: 12px 16px 16px;
+    gap: 8px;
+  }
+
+  .sn-modal-footer .sn-btn-cancel,
+  .sn-modal-footer .sn-btn-save,
+  .sn-modal-footer .sn-btn-add,
+  .sn-modal-footer .sn-btn-delete {
+    flex: 1;
+    min-width: 0;
+    justify-content: center;
+  }
+
+  .sn-th-header-row {
+    display: none;
+  }
+
+  .sn-th-row {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 10px;
+    padding: 12px;
+  }
+
+  .sn-th-col-level {
+    flex: none;
+    width: 100%;
+  }
+
+  .sn-th-col-minmax {
+    width: 100%;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  }
+
+  .sn-th-input {
+    width: 100%;
+    min-width: 0;
   }
 }

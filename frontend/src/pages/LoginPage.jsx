@@ -10,6 +10,10 @@ const LoginPage = ({ onSuccess }) => {
   const [password, setPassword] = useState("");
   const [loading,  setLoading]  = useState(false);
   const [error,    setError]    = useState("");
+  const [loginTheme, setLoginTheme] = useState("dark");
+
+  const theme = loginTheme === "light" ? loginLightTheme : loginDarkTheme;
+  const s = makeStyles(theme);
 
 
   //e.preventDefault() — отменяем перезагрузку страницы при отправке формы
@@ -29,20 +33,43 @@ const LoginPage = ({ onSuccess }) => {
   };
 
   return (
-    <div style={styles.page}>
-      <div style={styles.card}>
-        <div style={styles.logo}>
-          <span style={styles.logoText}>TEMPERATURA.KZ</span>
+    <div style={s.page}>
+      <div style={s.themeToggle} role="group" aria-label="Тема страницы входа">
+        <button
+          type="button"
+          style={{
+            ...s.themeButton,
+            ...(loginTheme === "dark" ? s.themeButtonActive : {}),
+          }}
+          onClick={() => setLoginTheme("dark")}
+        >
+          Темная
+        </button>
+        <button
+          type="button"
+          style={{
+            ...s.themeButton,
+            ...(loginTheme === "light" ? s.themeButtonActive : {}),
+          }}
+          onClick={() => setLoginTheme("light")}
+        >
+          Светлая
+        </button>
+      </div>
+
+      <div style={s.card}>
+        <div style={s.logo}>
+          <span style={s.logoText}>TEMPERATURA.KZ</span>
         </div>
 
-        <h1 style={styles.title}>Система мониторинга</h1>
-        <p style={styles.subtitle}>Введите данные для входа</p>
+        <h1 style={s.title}>Система мониторинга</h1>
+        <p style={s.subtitle}>Введите данные для входа</p>
 
-        <form onSubmit={handleSubmit} style={styles.form}>
-          <div style={styles.field}>
-            <label style={styles.label}>Логин</label>
+        <form onSubmit={handleSubmit} style={s.form}>
+          <div style={s.field}>
+            <label style={s.label}>Логин</label>
             <input
-              style={styles.input}
+              style={s.input}
               type="text"
               placeholder="admin"
               value={username}
@@ -52,10 +79,10 @@ const LoginPage = ({ onSuccess }) => {
             />
           </div>
 
-          <div style={styles.field}>
-            <label style={styles.label}>Пароль</label>
+          <div style={s.field}>
+            <label style={s.label}>Пароль</label>
             <input
-              style={styles.input}
+              style={s.input}
               type="password"
               placeholder="••••••••"
               value={password}
@@ -65,11 +92,11 @@ const LoginPage = ({ onSuccess }) => {
             />
           </div>
 
-          {error && <div style={styles.error}>{error}</div>}
+          {error && <div style={s.error}>{error}</div>}
 
           <button
             type="submit"
-            style={{ ...styles.btn, opacity: loading ? 0.7 : 1 }}
+            style={{ ...s.btn, opacity: loading ? 0.7 : 1 }}
             disabled={loading}
           >
             {loading ? "Вход..." : "Войти"}
@@ -80,24 +107,48 @@ const LoginPage = ({ onSuccess }) => {
   );
 };
 
-const styles = {
+const loginDarkTheme = {
+  bg: "#0a0a0a",
+  panel: "rgba(49,49,49,0.30)",
+  border: "rgba(255,255,255,0.1)",
+  inputBg: "#111",
+  text: "#ffffff",
+  muted: "#929292",
+  shadow: "0 24px 60px rgba(0,0,0,0.6)",
+  toggleBg: "rgba(49,49,49,0.50)",
+};
+
+const loginLightTheme = {
+  bg: "#f4f6f8",
+  panel: "#ffffff",
+  border: "rgba(16,24,40,0.12)",
+  inputBg: "#f8fafc",
+  text: "#172033",
+  muted: "#667085",
+  shadow: "0 18px 44px rgba(16,24,40,0.12)",
+  toggleBg: "#ffffff",
+};
+
+const makeStyles = (theme) => ({
   page: {
     minHeight: "100vh",
-    background: "#0a0a0a",
+    background: theme.bg,
+    color: theme.text,
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
     padding: "20px",
     fontFamily: '"Inter", Helvetica, sans-serif',
+    position: "relative",
   },
   card: {
-    background: "rgba(49,49,49,0.30)",
-    border: "1px solid rgba(255,255,255,0.1)",
+    background: theme.panel,
+    border: `1px solid ${theme.border}`,
     borderRadius: "16px",
     padding: "40px",
     width: "100%",
     maxWidth: "380px",
-    boxShadow: "0 24px 60px rgba(0,0,0,0.6)",
+    boxShadow: theme.shadow,
     backdropFilter: "blur(12px)",
     display: "flex",
     flexDirection: "column",
@@ -115,25 +166,25 @@ const styles = {
   title: {
     fontSize: "22px",
     fontWeight: "700",
-    color: "#ffffff",
+    color: theme.text,
     margin: 0,
     textAlign: "center",
   },
   subtitle: {
     fontSize: "13px",
-    color: "#929292",
+    color: theme.muted,
     margin: "4px 0 20px",
     textAlign: "center",
   },
   form: { width: "100%", display: "flex", flexDirection: "column", gap: "14px" },
   field: { display: "flex", flexDirection: "column", gap: "6px" },
-  label: { fontSize: "12px", color: "#929292" },
+  label: { fontSize: "12px", color: theme.muted },
   input: {
     padding: "11px 14px",
     borderRadius: "8px",
-    border: "1px solid rgba(255,255,255,0.15)",
-    background: "#111",
-    color: "#fff",
+    border: `1px solid ${theme.border}`,
+    background: theme.inputBg,
+    color: theme.text,
     fontSize: "14px",
     fontFamily: "inherit",
     outline: "none",
@@ -160,6 +211,33 @@ const styles = {
     transition: "opacity 0.15s",
     marginTop: "4px",
   },
-};
+  themeToggle: {
+    position: "absolute",
+    top: 18,
+    right: 18,
+    display: "flex",
+    gap: 4,
+    padding: 4,
+    borderRadius: 12,
+    background: theme.toggleBg,
+    border: `1px solid ${theme.border}`,
+    boxShadow: theme.shadow,
+  },
+  themeButton: {
+    border: "none",
+    borderRadius: 8,
+    background: "transparent",
+    color: theme.muted,
+    padding: "8px 12px",
+    fontSize: 12,
+    fontWeight: 600,
+    fontFamily: "inherit",
+    cursor: "pointer",
+  },
+  themeButtonActive: {
+    background: "#ffc207",
+    color: "#000",
+  },
+});
 
 export default LoginPage;

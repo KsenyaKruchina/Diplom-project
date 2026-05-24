@@ -61,9 +61,14 @@ const IconChevronDown = () => <svg width="14" height="14" viewBox="0 0 24 24" fi
 // ─── Status helpers ───────────────────────────────────────────────────────────
 // "nodata" — нет данных (не online, не offline — просто нет телеметрии)
 const SENSOR_COLORS = { normal: "#01e676", warning: "#ffd550", problem: "#ff5b5b", nodata: "#555" };
-const SENSOR_BG     = { normal: "#19282b", warning: "#312c1c", problem: "#321c1b", nodata: "#161616" };
+const SENSOR_BG     = {
+  normal: "var(--status-ok-bg, #19282b)",
+  warning: "var(--status-warning-bg, #312c1c)",
+  problem: "var(--status-error-bg, #321c1b)",
+  nodata: "var(--status-nodata-bg, #161616)",
+};
 const STATUS_LABELS = { normal: "Норма",   warning: "Внимание", problem: "Тревога", nodata: "Нет данных" };
-const STATUS_TEXT   = { normal: "#01e676", warning: "#ffd550",  problem: "#ff5b5b", nodata: "#555" };
+const STATUS_TEXT   = { normal: "#01b866", warning: "#c68400",  problem: "#ff5b5b", nodata: "#555" };
 const OFFLINE_STATUSES = new Set(["offline", "connection_lost", "no_connection", "no_signal", "lost", "inactive"]);
 
 const getTempStatus = (v, sensor) => {
@@ -463,7 +468,7 @@ const SensorCard = ({ sensor, telemetryData, isOffline = false }) => {
 
   // Цвет числа значения
   const numColor = (st) =>
-    st === "nodata" ? "#3a3a3a" : st === "problem" ? "#ff5b5b" : "#fff";
+    st === "nodata" ? "var(--status-muted-text, #3a3a3a)" : st === "problem" ? "#ff5b5b" : "var(--sensor-value-color, #fff)";
 
   const tempThresholds = {
     warningMin: sensor.warning_min_temp ?? null,
@@ -487,7 +492,7 @@ const SensorCard = ({ sensor, telemetryData, isOffline = false }) => {
             <span style={{
               fontSize:8, fontWeight:700, letterSpacing:"0.4px",
               color:"#ff5b5b", border:"1px solid #ff5b5b55",
-              background:"#321c1b", borderRadius:3, padding:"1px 5px",
+              background:"var(--status-error-bg, #321c1b)", borderRadius:3, padding:"1px 5px",
               textTransform:"uppercase",
             }}>нет связи</span>
           )}
@@ -507,8 +512,8 @@ const SensorCard = ({ sensor, telemetryData, isOffline = false }) => {
           background:  SENSOR_BG[tSt],
         }}>
           <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:6 }}>
-            <span style={{ fontSize:9, color:"#666" }}>🌡 Темп.</span>
-            <span style={{ fontSize:8, color:STATUS_TEXT[tSt], border:`1px solid ${SENSOR_COLORS[tSt]}44`, borderRadius:3, padding:"1px 4px" }}>
+            <span className="sensor-metric-label">🌡 Темп.</span>
+            <span className="sensor-status-label" style={{ color:STATUS_TEXT[tSt], border:`1px solid ${SENSOR_COLORS[tSt]}44` }}>
               {isOffline ? "Нет связи" : STATUS_LABELS[tSt]}
             </span>
           </div>
@@ -527,8 +532,8 @@ const SensorCard = ({ sensor, telemetryData, isOffline = false }) => {
           background:  SENSOR_BG[hSt],
         }}>
           <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:6 }}>
-            <span style={{ fontSize:9, color:"#666" }}>💧 Влажн.</span>
-            <span style={{ fontSize:8, color:STATUS_TEXT[hSt], border:`1px solid ${SENSOR_COLORS[hSt]}44`, borderRadius:3, padding:"1px 4px" }}>
+            <span className="sensor-metric-label">💧 Влажн.</span>
+            <span className="sensor-status-label" style={{ color:STATUS_TEXT[hSt], border:`1px solid ${SENSOR_COLORS[hSt]}44` }}>
               {isOffline ? "Нет связи" : STATUS_LABELS[hSt]}
             </span>
           </div>
@@ -548,9 +553,9 @@ const SensorCard = ({ sensor, telemetryData, isOffline = false }) => {
 // ─── NotificationItem ─────────────────────────────────────────────────────────
 const NotificationItem = ({ type, title, desc, location, alarmId, status, onAcknowledge }) => {
   const C = {
-    error:   { bg: "#321c1b", border: "#ff5b5b", accent: "#ff5b5b" },
-    warning: { bg: "#312c1c", border: "#ffd550", accent: "#ffd550" },
-    ok:      { bg: "#19282b", border: "#01e676", accent: "#01e676" },
+    error:   { bg: "var(--status-error-bg, #321c1b)", border: "#ff5b5b", accent: "#ff5b5b" },
+    warning: { bg: "var(--status-warning-bg, #312c1c)", border: "#ffd550", accent: "#ffd550" },
+    ok:      { bg: "var(--status-ok-bg, #19282b)", border: "#01e676", accent: "#01e676" },
   };
   const c = C[type] || C.error;
   const Icon = type === "error" ? IconError : type === "warning" ? IconWarning : IconCheck;
@@ -791,7 +796,6 @@ const EditSensorModal = ({ sensor, onClose, onSave }) => {
 const FloorPlan = ({ activeLoc, locSensors, telemetry, offlineSensorIds, canEdit, dragAllMode, onPositionSave, pendingPositions, onPendingPositionChange }) => {
   const containerRef = useRef(null);
   const [localPositions, setLocalPositions] = useState({});
-  const [imageAspect, setImageAspect] = useState(null);
   const dragging = useRef(null);
   const didDrag = useRef(false);
 
@@ -807,10 +811,6 @@ const FloorPlan = ({ activeLoc, locSensors, telemetry, offlineSensorIds, canEdit
     });
     setLocalPositions(p);
   }, [locSensors]);
-
-  useEffect(() => {
-    setImageAspect(null);
-  }, [activeLoc?.image_url]);
 
   const startDrag = useCallback((clientX, clientY, sensor) => {
     if (!dragAllMode || !containerRef.current) return;
@@ -870,12 +870,11 @@ const FloorPlan = ({ activeLoc, locSensors, telemetry, offlineSensorIds, canEdit
   return (
     <div
       ref={containerRef}
-      className="floor-plan-wrap"
+      className={`floor-plan-wrap${planUrl ? " floor-plan-wrap--image" : ""}`}
       style={{
         cursor: dragging.current ? "grabbing" : (dragAllMode ? "grab" : "default"),
         userSelect: "none",
         touchAction: "none",
-        ...(planUrl ? { aspectRatio: imageAspect || "16 / 9", height: "auto" } : {}),
       }}
       onMouseMove={e => moveDrag(e.clientX, e.clientY)}
       onMouseUp={() => endDrag()}
@@ -888,12 +887,6 @@ const FloorPlan = ({ activeLoc, locSensors, telemetry, offlineSensorIds, canEdit
             alt="Floor plan"
             className="floor-image"
             draggable={false}
-            onLoad={e => {
-              const { naturalWidth, naturalHeight } = e.currentTarget;
-              if (naturalWidth > 0 && naturalHeight > 0) {
-                setImageAspect(`${naturalWidth} / ${naturalHeight}`);
-              }
-            }}
           />
           <div className="floor-image-overlay">
             {locSensors.map(s => {
@@ -909,7 +902,7 @@ const FloorPlan = ({ activeLoc, locSensors, telemetry, offlineSensorIds, canEdit
                   onTouchEnd={() => { if (dragAllMode) endDrag(); }}
                 >
                   {dragAllMode && (
-                    <div style={{ position: "absolute", top: -7, right: -7, background: "#111", borderRadius: "50%", width: 15, height: 15, display: "flex", alignItems: "center", justifyContent: "center", border: `1px solid ${col}55`, pointerEvents: "none" }}>
+                    <div style={{ position: "absolute", top: -7, right: -7, background: "var(--bg-card)", borderRadius: "50%", width: 15, height: 15, display: "flex", alignItems: "center", justifyContent: "center", border: `1px solid ${col}55`, pointerEvents: "none" }}>
                       <IconEdit/>
                     </div>
                   )}
@@ -1238,12 +1231,11 @@ const Dashboard = () => {
     controlUnits,
     telemetry,
     alarms,
-    loading,
     error,
     refetch,
   } = useDashboardData();
 
-  const { location: userLocation, loading: locationLoading } = useUserLocation(role, sensors);
+  const { location: userLocation } = useUserLocation(role, sensors);
 
   const isNonAdmin = role === "editor" || role === "viewer";
 
@@ -1328,14 +1320,8 @@ const Dashboard = () => {
     return sensors.filter(s => sameId(getSensorLocationId(s, controlUnits), activeLocationId));
   }, [sensors, controlUnits, locations, activeLocationId]);
 
-  if (loading || (isNonAdmin && locationLoading)) return (
-    <div style={{ minHeight: "100vh", background: "#0a0a0a", display: "flex", alignItems: "center", justifyContent: "center", color: "#929292", fontFamily: '"Inter",sans-serif', fontSize: 14 }}>
-      Загрузка данных...
-    </div>
-  );
-
   if (error) return (
-    <div style={{ minHeight: "100vh", background: "#0a0a0a", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 16, color: "#ff5b5b", fontFamily: '"Inter",sans-serif' }}>
+    <div style={{ minHeight: "100vh", background: "var(--bg)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 16, color: "#ff5b5b", fontFamily: '"Inter",sans-serif' }}>
       <div style={{ fontSize: 14 }}>Ошибка загрузки: {error}</div>
       <button onClick={refetch} style={{ padding: "8px 20px", borderRadius: 8, border: "1px solid #ff5b5b", background: "transparent", color: "#ff5b5b", cursor: "pointer", fontFamily: "inherit", fontSize: 13 }}>Повторить</button>
     </div>
@@ -1375,12 +1361,12 @@ const Dashboard = () => {
               <div className="notif-summary">
                 {alarmCounts.critical > 0 && <><span className="dot dot--red"/> {alarmCounts.critical} Критич.</>}
                 {alarmCounts.warning  > 0 && <><span className="dot dot--yellow"/> {alarmCounts.warning} Предупр.</>}
-                {notifications.length === 0 && <span style={{ color: "#01e676", fontSize: 12 }}>Всё в норме ✓</span>}
+                {notifications.length === 0 && <span style={{ color: "#01a85a", fontSize: 14, fontWeight: 700 }}>Всё в норме ✓</span>}
               </div>
             </div>
             <div className="notif-list">
               {notifications.length === 0 && (
-                <div style={{ color: "#555", fontSize: 13, textAlign: "center", padding: "30px 0" }}>Активных тревог нет</div>
+                <div style={{ color: "var(--text-secondary)", fontSize: 14, fontWeight: 600, textAlign: "center", padding: "30px 0" }}>Активных тревог нет</div>
               )}
               {notifications.map((n, i) => (
                 <NotificationItem key={i} {...n} onAcknowledge={handleAcknowledge}/>

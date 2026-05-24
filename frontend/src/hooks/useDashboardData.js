@@ -145,7 +145,7 @@ export const useDashboardData = () => {
     });
 
     const refreshStructure = () => {
-      if (mountedRef.current) fetchAll();
+      if (mountedRef.current) fetchAll({ silent: true });
     };
 
     const unsubSensorCreated = wsService.on("sensor_created", refreshStructure);

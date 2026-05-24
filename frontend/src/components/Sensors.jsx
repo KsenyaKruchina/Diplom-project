@@ -1,5 +1,5 @@
 // frontend/src/components/Sensors.jsx
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import "./Sensors.css";
 import { apiRequest } from "../services/api";
 import { getLatestForSensors } from "../services/telemetryService";
@@ -47,15 +47,6 @@ const enrichSensorsWithLatestTelemetry = async (sensors) => {
   });
 };
 
-// ─── LocalStorage helpers for location order ──────────────────────────────────
-const LOC_ORDER_KEY = "sensors_location_order";
-const saveLocOrder = (order) => {
-  try { localStorage.setItem(LOC_ORDER_KEY, JSON.stringify(order)); } catch {}
-};
-const loadLocOrder = () => {
-  try { const v = localStorage.getItem(LOC_ORDER_KEY); return v ? JSON.parse(v) : null; } catch { return null; }
-};
-
 // ─── Icons ────────────────────────────────────────────────────────────────────
 const IconSearch    = () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="#929292" strokeWidth="1.8"/><line x1="16.5" y1="16.5" x2="21" y2="21" stroke="#929292" strokeWidth="1.8" strokeLinecap="round"/></svg>;
 const IconClose     = () => <svg width="16" height="16" viewBox="0 0 18 18" fill="none"><line x1="4" y1="4" x2="14" y2="14" stroke="#929292" strokeWidth="1.8" strokeLinecap="round"/><line x1="14" y1="4" x2="4" y2="14" stroke="#929292" strokeWidth="1.8" strokeLinecap="round"/></svg>;
@@ -75,13 +66,39 @@ const IconPlus      = () => <svg width="14" height="14" viewBox="0 0 16 16" fill
 const IconBlock     = () => <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><rect x="1" y="1" width="6" height="6" rx="1.5" stroke="currentColor" strokeWidth="1.5"/><rect x="9" y="1" width="6" height="6" rx="1.5" stroke="currentColor" strokeWidth="1.5"/><rect x="1" y="9" width="6" height="6" rx="1.5" stroke="currentColor" strokeWidth="1.5"/><rect x="9" y="9" width="6" height="6" rx="1.5" stroke="currentColor" strokeWidth="1.5"/></svg>;
 const IconWarn      = () => <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M12 2L2 20h20L12 2z" stroke="#ffd550" strokeWidth="1.8" strokeLinejoin="round"/><line x1="12" y1="9" x2="12" y2="14" stroke="#ffd550" strokeWidth="1.8" strokeLinecap="round"/><circle cx="12" cy="17.5" r="0.8" fill="#ffd550"/></svg>;
 
+const HISTORY_PERIODS = {
+  day:   { label: "День",   query: "24h", limit: 96 },
+  week:  { label: "Неделя", query: "7d",  limit: 168 },
+  month: { label: "Месяц",  query: "30d", limit: 240 },
+};
+
+const formatAxisTime = (timestamp, period) => {
+  if (!timestamp) return "—";
+  const date = new Date(timestamp);
+  if (Number.isNaN(date.getTime())) return "—";
+  if (period === "day") {
+    return date.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
+  }
+  return date.toLocaleDateString("ru-RU", { day: "2-digit", month: "2-digit" });
+};
+
+const getChartStats = (values) => {
+  const nums = (values || []).map(Number).filter(Number.isFinite);
+  if (!nums.length) return null;
+  const min = Math.min(...nums);
+  const max = Math.max(...nums);
+  const avg = nums.reduce((sum, value) => sum + value, 0) / nums.length;
+  return { min, avg, max };
+};
+
 // ─── Sparkline ────────────────────────────────────────────────────────────────
-const Sparkline = ({ color, data, sensor, type }) => {
-  const h = 88, w = 260;
+const Sparkline = ({ color, data, timestamps, sensor, type, period }) => {
+  const h = 98, w = 260;
   const [selectedIndex, setSelectedIndex] = useState(null);
-  const vals = (data || [])
+  const originalVals = (data || [])
     .map(Number)
     .filter(v => Number.isFinite(v));
+  const vals = [...originalVals];
   if (vals.length === 1) vals.push(vals[0]);
 
   useEffect(() => {
@@ -93,7 +110,7 @@ const Sparkline = ({ color, data, sensor, type }) => {
   }, [vals.length]);
 
   if (vals.length < 2) return (
-    <div style={{ height: h, display: "flex", alignItems: "center", justifyContent: "center", color: "#333", fontSize: 10 }}>нет данных</div>
+    <div className="sn-chart-empty" style={{ height: h }}>нет данных</div>
   );
 
   const getLimits = () => {
@@ -111,9 +128,12 @@ const Sparkline = ({ color, data, sensor, type }) => {
   };
 
   const limits = getLimits();
-  const allVals = [...vals, ...limits];
-  const vMin = Math.min(...allVals) - 1.5;
-  const vMax = Math.max(...allVals) + 1.5;
+  const allVals = [...vals, ...limits.map(Number).filter(Number.isFinite)];
+  const rawMin = Math.min(...allVals);
+  const rawMax = Math.max(...allVals);
+  const pad = Math.max((rawMax - rawMin) * 0.12, type === "temp" ? 1 : 3);
+  const vMin = rawMin - pad;
+  const vMax = rawMax + pad;
   const range = vMax - vMin || 1;
   const toY = (v) => h - ((v - vMin) / range) * (h - 10) - 5;
 
@@ -132,6 +152,11 @@ const Sparkline = ({ color, data, sensor, type }) => {
   };
 
   const pts = vals.map((v, i) => `${(i / (vals.length - 1)) * w},${toY(v)}`).join(" ");
+  const axisTimes = [0, Math.floor((vals.length - 1) / 2), vals.length - 1].map((index) =>
+    formatAxisTime(timestamps?.[Math.min(index, (timestamps?.length || 1) - 1)], period)
+  );
+  const unit = type === "temp" ? "°C" : "%";
+  const yLabels = [vMax, vMin + range / 2, vMin].map((value) => `${value.toFixed(1)}${unit}`);
   const handlePointSelect = (event) => {
     const rect = event.currentTarget.getBoundingClientRect();
     const x = ((event.clientX - rect.left) / rect.width) * w;
@@ -148,74 +173,84 @@ const Sparkline = ({ color, data, sensor, type }) => {
         value: vals[selectedIndex],
       }
     : null;
-  const unit = type === "temp" ? "°C" : "%";
 
   return (
-    <div style={{ position: "relative", height: h }}>
-      <svg
-        width="100%"
-        height={h}
-        viewBox={`0 0 ${w} ${h}`}
-        preserveAspectRatio="none"
-        style={{ cursor: "crosshair", display: "block" }}
-        onPointerDown={handlePointSelect}
-      >
-        <defs>
-          <linearGradient id={`sg-${color.replace("#","")}-${type}`} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor={color} stopOpacity="0.25"/>
-            <stop offset="100%" stopColor={color} stopOpacity="0"/>
-          </linearGradient>
-        </defs>
-        {type === "temp" && sensor && <>
-          {renderBand(sensor.normal_min_temp, sensor.normal_max_temp, "#01e676")}
-          {renderBand(sensor.warning_min_temp, sensor.normal_min_temp, "#ffd550")}
-          {renderBand(sensor.normal_max_temp, sensor.warning_max_temp, "#ffd550")}
-        </>}
-        {type === "hum" && sensor && <>
-          {renderBand(sensor.normal_min_hum, sensor.normal_max_hum, "#01e676")}
-          {renderBand(sensor.warning_min_hum, sensor.normal_min_hum, "#ffd550")}
-          {renderBand(sensor.normal_max_hum, sensor.warning_max_hum, "#ffd550")}
-        </>}
-        {type === "temp" && sensor && <>
-          {renderLine(sensor.alarm_max_temp,   "#ff5b5b", "5,3")}
-          {renderLine(sensor.alarm_min_temp,   "#ff5b5b", "5,3")}
-          {renderLine(sensor.warning_max_temp, "#ffd550", "5,3")}
-          {renderLine(sensor.warning_min_temp, "#ffd550", "5,3")}
-          {renderLine(sensor.normal_max_temp,  "#01e676", "3,3")}
-          {renderLine(sensor.normal_min_temp,  "#01e676", "3,3")}
-        </>}
-        {type === "hum" && sensor && <>
-          {renderLine(sensor.alarm_max_hum,   "#ff5b5b", "5,3")}
-          {renderLine(sensor.alarm_min_hum,   "#ff5b5b", "5,3")}
-          {renderLine(sensor.warning_max_hum, "#ffd550", "5,3")}
-          {renderLine(sensor.warning_min_hum, "#ffd550", "5,3")}
-          {renderLine(sensor.normal_max_hum,  "#01e676", "3,3")}
-          {renderLine(sensor.normal_min_hum,  "#01e676", "3,3")}
-        </>}
-        <polygon points={`0,${h} ${pts} ${w},${h}`} fill={`url(#sg-${color.replace("#","")}-${type})`}/>
-        <polyline points={pts} fill="none" stroke={color} strokeWidth="2" strokeLinejoin="round"/>
-        {selectedPoint && (
-          <g pointerEvents="none">
-            <line
-              x1={selectedPoint.x} y1="0" x2={selectedPoint.x} y2={h}
-              stroke={color} strokeWidth="1.2" strokeDasharray="4,3" opacity="0.8"
-            />
-            <circle cx={selectedPoint.x} cy={selectedPoint.y} r="3.8" fill="#101010" stroke={color} strokeWidth="1.8"/>
-          </g>
-        )}
-      </svg>
-      {selectedPoint && (
-        <div
-          className="sn-spark-tooltip"
-          style={{
-            "--spark-color": color,
-            left: `clamp(32px, ${(selectedPoint.x / w) * 100}%, calc(100% - 32px))`,
-            top: `clamp(20px, ${(selectedPoint.y / h) * 100}%, calc(100% - 4px))`,
-          }}
+    <div className="sn-chart-frame">
+      <div className="sn-chart-y-axis">
+        {yLabels.map(label => <span key={label}>{label}</span>)}
+      </div>
+      <div className="sn-chart-plot" style={{ height: h }}>
+        <svg
+          width="100%"
+          height={h}
+          viewBox={`0 0 ${w} ${h}`}
+          preserveAspectRatio="none"
+          style={{ cursor: "crosshair", display: "block" }}
+          onPointerDown={handlePointSelect}
         >
-          {selectedPoint.value.toFixed(1)}{unit}
-        </div>
-      )}
+          <defs>
+            <linearGradient id={`sg-${color.replace("#","")}-${type}`} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor={color} stopOpacity="0.25"/>
+              <stop offset="100%" stopColor={color} stopOpacity="0"/>
+            </linearGradient>
+          </defs>
+          <line x1="0" y1="5" x2={w} y2="5" stroke="rgba(146,146,146,0.18)" strokeWidth="1"/>
+          <line x1="0" y1={h / 2} x2={w} y2={h / 2} stroke="rgba(146,146,146,0.12)" strokeWidth="1"/>
+          <line x1="0" y1={h - 5} x2={w} y2={h - 5} stroke="rgba(146,146,146,0.18)" strokeWidth="1"/>
+          {type === "temp" && sensor && <>
+            {renderBand(sensor.normal_min_temp, sensor.normal_max_temp, "#01e676")}
+            {renderBand(sensor.warning_min_temp, sensor.normal_min_temp, "#ffd550")}
+            {renderBand(sensor.normal_max_temp, sensor.warning_max_temp, "#ffd550")}
+          </>}
+          {type === "hum" && sensor && <>
+            {renderBand(sensor.normal_min_hum, sensor.normal_max_hum, "#01e676")}
+            {renderBand(sensor.warning_min_hum, sensor.normal_min_hum, "#ffd550")}
+            {renderBand(sensor.normal_max_hum, sensor.warning_max_hum, "#ffd550")}
+          </>}
+          {type === "temp" && sensor && <>
+            {renderLine(sensor.alarm_max_temp,   "#ff5b5b", "5,3")}
+            {renderLine(sensor.alarm_min_temp,   "#ff5b5b", "5,3")}
+            {renderLine(sensor.warning_max_temp, "#ffd550", "5,3")}
+            {renderLine(sensor.warning_min_temp, "#ffd550", "5,3")}
+            {renderLine(sensor.normal_max_temp,  "#01e676", "3,3")}
+            {renderLine(sensor.normal_min_temp,  "#01e676", "3,3")}
+          </>}
+          {type === "hum" && sensor && <>
+            {renderLine(sensor.alarm_max_hum,   "#ff5b5b", "5,3")}
+            {renderLine(sensor.alarm_min_hum,   "#ff5b5b", "5,3")}
+            {renderLine(sensor.warning_max_hum, "#ffd550", "5,3")}
+            {renderLine(sensor.warning_min_hum, "#ffd550", "5,3")}
+            {renderLine(sensor.normal_max_hum,  "#01e676", "3,3")}
+            {renderLine(sensor.normal_min_hum,  "#01e676", "3,3")}
+          </>}
+          <polygon points={`0,${h} ${pts} ${w},${h}`} fill={`url(#sg-${color.replace("#","")}-${type})`}/>
+          <polyline points={pts} fill="none" stroke={color} strokeWidth="2" strokeLinejoin="round"/>
+          {selectedPoint && (
+            <g pointerEvents="none">
+              <line
+                x1={selectedPoint.x} y1="0" x2={selectedPoint.x} y2={h}
+                stroke={color} strokeWidth="1.2" strokeDasharray="4,3" opacity="0.8"
+              />
+              <circle cx={selectedPoint.x} cy={selectedPoint.y} r="3.8" fill="var(--bg-card, #101010)" stroke={color} strokeWidth="1.8"/>
+            </g>
+          )}
+        </svg>
+        {selectedPoint && (
+          <div
+            className="sn-spark-tooltip"
+            style={{
+              "--spark-color": color,
+              left: `clamp(32px, ${(selectedPoint.x / w) * 100}%, calc(100% - 32px))`,
+              top: `clamp(20px, ${(selectedPoint.y / h) * 100}%, calc(100% - 4px))`,
+            }}
+          >
+            {selectedPoint.value.toFixed(1)}{unit}
+          </div>
+        )}
+      </div>
+      <div className="sn-chart-x-axis">
+        {axisTimes.map((label, index) => <span key={`${label}-${index}`}>{label}</span>)}
+      </div>
     </div>
   );
 };
@@ -240,10 +275,10 @@ const getSensorStatus = (sensor) => {
 };
 
 const STATUS = {
-  ok:      { color: "#01e676", bg: "#19282b", label: "Норма" },
-  warning: { color: "#ffd550", bg: "#312c1c", label: "Внимание" },
-  alarm:   { color: "#ff5b5b", bg: "#321c1b", label: "Тревога" },
-  offline: { color: "#555",    bg: "#1a1a1a", label: "Офлайн" },
+  ok:      { color: "#01e676", bg: "var(--status-ok-bg, #19282b)", label: "Норма" },
+  warning: { color: "#c68400", bg: "var(--status-warning-bg, #312c1c)", label: "Внимание" },
+  alarm:   { color: "#ff5b5b", bg: "var(--status-error-bg, #321c1b)", label: "Тревога" },
+  offline: { color: "var(--status-muted-text, #555)", bg: "var(--status-muted-bg, #1a1a1a)", label: "Офлайн" },
 };
 
 // ─── useSensorHistory ─────────────────────────────────────────────────────────
@@ -257,16 +292,17 @@ const normalizeTelemetryHistory = (response) => {
   return [];
 };
 
-const useSensorHistory = (sensorId) => {
+const useSensorHistory = (sensorId, periodKey = "day") => {
   const [data, setData] = useState([]);
 
   useEffect(() => {
     if (!sensorId) return;
 
     let cancelled = false;
+    const config = HISTORY_PERIODS[periodKey] ?? HISTORY_PERIODS.day;
 
     const load = () => {
-      apiGet(`/api/v1/telemetry/${sensorId}/history?period=24h&limit=96`)
+      apiGet(`/api/v1/telemetry/${sensorId}/history?period=${config.query}&limit=${config.limit}`)
         .then(response => {
           if (!cancelled) setData(normalizeTelemetryHistory(response));
         })
@@ -282,7 +318,7 @@ const useSensorHistory = (sensorId) => {
       cancelled = true;
       window.clearInterval(intervalId);
     };
-  }, [sensorId]);
+  }, [sensorId, periodKey]);
 
   return data;
 };
@@ -319,6 +355,18 @@ const ChartLegend = ({ sensor, type }) => {
   );
 };
 
+const ChartStats = ({ values, unit }) => {
+  const stats = getChartStats(values);
+  const fmt = (value) => stats ? `${value.toFixed(1)}${unit}` : "—";
+  return (
+    <div className="sn-chart-stats">
+      <span><b>Мин</b>{fmt(stats?.min)}</span>
+      <span><b>Сред</b>{fmt(stats?.avg)}</span>
+      <span><b>Макс</b>{fmt(stats?.max)}</span>
+    </div>
+  );
+};
+
 // ─── ThresholdTable ───────────────────────────────────────────────────────────
 const ThresholdInput = ({ value, onChange, placeholder, color }) => (
   <input
@@ -337,9 +385,9 @@ const ThresholdTable = ({ form, setVal, type }) => {
   const prefix = type === "temp" ? "temp" : "hum";
 
   const levels = [
-    { key: "normal",  color: "#01e676", bg: "#0d2318", label: "🟢 Норма" },
-    { key: "warning", color: "#ffd550", bg: "#29220a", label: "🟡 Внимание" },
-    { key: "alarm",   color: "#ff5b5b", bg: "#2a100f", label: "🔴 Тревога" },
+    { key: "normal",  color: "#01e676", bg: "var(--sn-th-normal-bg, #0d2318)", label: "🟢 Норма" },
+    { key: "warning", color: "#ffd550", bg: "var(--sn-th-warning-bg, #29220a)", label: "🟡 Внимание" },
+    { key: "alarm",   color: "#ff5b5b", bg: "var(--sn-th-alarm-bg, #2a100f)", label: "🔴 Тревога" },
   ];
 
   return (
@@ -365,7 +413,7 @@ const ThresholdTable = ({ form, setVal, type }) => {
               placeholder="—"
               color={color}
             />
-            <span className="sn-th-range-sep" style={{ color: "#444" }}>—</span>
+            <span className="sn-th-range-sep">—</span>
             <ThresholdInput
               value={form[`${key}_max_${prefix}`]}
               onChange={value => setVal(`${key}_max_${prefix}`, value)}
@@ -489,9 +537,9 @@ const DeleteBlockWithSensorsModal = ({ block, attachedSensors, onClose, onDetach
                   alignItems: "center",
                   gap: 10,
                   padding: "8px 12px",
-                  background: "#1a1a1a",
+                  background: "var(--status-muted-bg, #1a1a1a)",
                   borderRadius: 6,
-                  border: "1px solid #252525",
+                  border: "1px solid rgba(16, 24, 40, 0.12)",
                 }}>
                   <span className="sn-sensor-id-tag" style={{ flexShrink: 0 }}>ID {s.id}</span>
                   <span style={{ fontSize: 13, color: "#ccc" }}>{s.name}</span>
@@ -846,13 +894,14 @@ const CreateBlockModal = ({ locations, onClose, onSave }) => {
 
 // ─── Modal: Добавить датчик ─────────────────────────────────
 const AddSensorModal = ({ locations, blocks, defaultBlockId, onClose, onSave }) => {
-  const initialBlockId = blocks.some(b => String(b.id) === String(defaultBlockId))
-    ? defaultBlockId
-    : blocks[0]?.id ?? "";
+  const defaultBlock = blocks.find(b => String(b.id) === String(defaultBlockId));
+  const initialLocationId = defaultBlock?.location_id ?? defaultBlock?.group_id ?? locations[0]?.id ?? "";
   const [form, setForm] = useState({
-    sensor_id: "",
     name: "",
-    control_unit_id: initialBlockId,
+    location_id: initialLocationId,
+    control_unit_id: defaultBlock?.id ?? "",
+    sensor_id: "",
+    alarm_delay_seconds: "300",
     normal_min_temp: "", normal_max_temp: "",
     warning_min_temp: "", warning_max_temp: "",
     alarm_min_temp: "", alarm_max_temp: "",
@@ -866,23 +915,43 @@ const AddSensorModal = ({ locations, blocks, defaultBlockId, onClose, onSave }) 
 
   const setVal = (k, v) => setForm(f => ({ ...f, [k]: v }));
   const parseOpt = v => (v === "" || v == null) ? null : parseFloat(v);
+  const parseIntOpt = v => {
+    const n = parseInt(v, 10);
+    return Number.isFinite(n) && n >= 0 ? n : 0;
+  };
 
+  const locationBlocks = useMemo(
+    () => blocks.filter(b => sameId(b.location_id ?? b.group_id, form.location_id)),
+    [blocks, form.location_id]
+  );
   const selectedBlock = blocks.find(b => String(b.id) === String(form.control_unit_id));
-  const selectedLocationId = selectedBlock?.location_id ?? selectedBlock?.group_id ?? null;
+  const selectedLocation = locations.find(l => sameId(l.id, form.location_id));
+
+  useEffect(() => {
+    if (!form.control_unit_id) return;
+    const blockStillAvailable = locationBlocks.some(b => sameId(b.id, form.control_unit_id));
+    if (!blockStillAvailable) {
+      setForm(f => ({ ...f, control_unit_id: "" }));
+    }
+  }, [form.control_unit_id, locationBlocks]);
 
   const handleSave = async () => {
-    if (!form.sensor_id.trim())     { setErr("Введите ID датчика"); return; }
     if (!form.name.trim())          { setErr("Введите название датчика"); return; }
-    if (!form.control_unit_id)      { setErr("Выберите блок (ЦБУ)"); return; }
+    if (!form.location_id)          { setErr("Выберите локацию"); return; }
+    if (!form.sensor_id.trim())     { setErr("Введите ID датчика"); return; }
     setLoading(true);
     setErr("");
     try {
+      const locationId = Number(form.location_id);
+      const controlUnitId = form.control_unit_id ? Number(form.control_unit_id) : null;
       await onSave({
         sensor_id:        form.sensor_id.trim(),
+        internal_id:      form.sensor_id.trim(),
         name:             form.name.trim(),
-        control_unit_id:  Number(form.control_unit_id),
-        location_id:      selectedLocationId != null ? Number(selectedLocationId) : null,
-        group_id:         selectedLocationId != null ? Number(selectedLocationId) : null,
+        control_unit_id:  controlUnitId,
+        location_id:      locationId,
+        group_id:         locationId,
+        alarm_delay_seconds: parseIntOpt(form.alarm_delay_seconds),
         normal_min_temp:  parseOpt(form.normal_min_temp),
         normal_max_temp:  parseOpt(form.normal_max_temp),
         warning_min_temp: parseOpt(form.warning_min_temp),
@@ -908,7 +977,9 @@ const AddSensorModal = ({ locations, blocks, defaultBlockId, onClose, onSave }) 
           <div>
             <h3 className="sn-modal-title">Добавить датчик</h3>
             <div className="sn-modal-subtitle">
-              {selectedBlock ? `ЦБУ: ${selectedBlock.name} · ID ${selectedBlock.id}` : "Выберите ЦБУ"}
+              {selectedBlock
+                ? `Локация: ${selectedLocation?.name ?? "—"} · ЦБУ: ${selectedBlock.name}`
+                : `Локация: ${selectedLocation?.name ?? "—"} · без блока управления`}
             </div>
           </div>
           <button className="sn-modal-close" onClick={onClose}><IconClose/></button>
@@ -932,35 +1003,27 @@ const AddSensorModal = ({ locations, blocks, defaultBlockId, onClose, onSave }) 
               <div className="sn-cbu-preview sn-cbu-preview--sensor">
                 <div className="sn-cbu-preview-row">
                   <span className="sn-cbu-preview-field">
+                    <span className="sn-cbu-preview-label">Название</span>
+                    <span className="sn-cbu-preview-val">{form.name || "—"}</span>
+                  </span>
+                  <span className="sn-cbu-preview-field">
+                    <span className="sn-cbu-preview-label">Локация</span>
+                    <span className="sn-cbu-preview-val">{selectedLocation?.name ?? "—"}</span>
+                  </span>
+                  <span className="sn-cbu-preview-field">
+                    <span className="sn-cbu-preview-label">Блок управления</span>
+                    <span className="sn-cbu-preview-val">{selectedBlock?.name ?? "Без ЦБУ"}</span>
+                  </span>
+                  <span className="sn-cbu-preview-field">
                     <span className="sn-cbu-preview-label">ID датчика</span>
                     <span className="sn-cbu-preview-val sn-cbu-preview-val--id">
                       {form.sensor_id || "—"}
                     </span>
                   </span>
-                  <span className="sn-cbu-preview-field">
-                    <span className="sn-cbu-preview-label">Название</span>
-                    <span className="sn-cbu-preview-val">{form.name || "—"}</span>
-                  </span>
-                  <span className="sn-cbu-preview-field">
-                    <span className="sn-cbu-preview-label">ЦБУ</span>
-                    <span className="sn-cbu-preview-val">{selectedBlock?.name ?? "—"}</span>
-                  </span>
                 </div>
               </div>
 
               <div className="sn-field-grid" style={{ marginTop: 20 }}>
-                <div className="sn-field">
-                  <label className="sn-field-label">ID датчика <span style={{ color: "#ff5b5b" }}>*</span></label>
-                  <input
-                    className="sn-field-input sn-field-input--mono"
-                    type="text"
-                    placeholder="Напр.: S-001, T42"
-                    value={form.sensor_id}
-                    onChange={e => setVal("sensor_id", e.target.value)}
-                    autoFocus
-                    style={{ width: "100%" }}
-                  />
-                </div>
                 <div className="sn-field">
                   <label className="sn-field-label">Название датчика <span style={{ color: "#ff5b5b" }}>*</span></label>
                   <input
@@ -969,34 +1032,72 @@ const AddSensorModal = ({ locations, blocks, defaultBlockId, onClose, onSave }) 
                     placeholder="Напр.: Стеллаж А1, Зона хранения"
                     value={form.name}
                     onChange={e => setVal("name", e.target.value)}
+                    autoFocus
+                    style={{ width: "100%" }}
+                  />
+                </div>
+                <div className="sn-field">
+                  <label className="sn-field-label">Локация <span style={{ color: "#ff5b5b" }}>*</span></label>
+                  <select
+                    className="sn-field-input sn-field-select"
+                    value={form.location_id}
+                    onChange={e => setVal("location_id", e.target.value)}
+                    style={{ width: "100%" }}
+                  >
+                    {locations.map(loc => (
+                      <option key={loc.id} value={loc.id}>{loc.name}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="sn-field-grid">
+                <div className="sn-field">
+                  <label className="sn-field-label">Блок управления</label>
+                  <select
+                    className="sn-field-input sn-field-select"
+                    value={form.control_unit_id}
+                    onChange={e => setVal("control_unit_id", e.target.value)}
+                    style={{ width: "100%" }}
+                  >
+                    <option value="">Без блока управления</option>
+                    {locationBlocks.map(b => (
+                      <option key={b.id} value={b.id}>
+                        {b.name} (ID: {b.id})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="sn-field">
+                  <label className="sn-field-label">ID датчика <span style={{ color: "#ff5b5b" }}>*</span></label>
+                  <input
+                    className="sn-field-input sn-field-input--mono"
+                    type="text"
+                    placeholder="Напр.: S-001, T42"
+                    value={form.sensor_id}
+                    onChange={e => setVal("sensor_id", e.target.value)}
                     style={{ width: "100%" }}
                   />
                 </div>
               </div>
 
               <div className="sn-field">
-                <label className="sn-field-label">ЦБУ (Центральный блок) <span style={{ color: "#ff5b5b" }}>*</span></label>
-                <select
-                  className="sn-field-input sn-field-select"
-                  value={form.control_unit_id}
-                  onChange={e => setVal("control_unit_id", e.target.value)}
+                <label className="sn-field-label">Задержка тревог, сек.</label>
+                <input
+                  className="sn-field-input"
+                  type="number"
+                  min="0"
+                  step="1"
+                  value={form.alarm_delay_seconds}
+                  onChange={e => setVal("alarm_delay_seconds", e.target.value)}
                   style={{ width: "100%" }}
-                >
-                  {blocks.map(b => {
-                    const loc = locations.find(l => sameId(l.id, b.location_id ?? b.group_id));
-                    return (
-                      <option key={b.id} value={b.id}>
-                        {b.name} (ID: {b.id}){loc ? ` · ${loc.name}` : ""}
-                      </option>
-                    );
-                  })}
-                </select>
+                />
               </div>
 
               <div className="sn-add-info-box">
                 <span style={{ fontSize: 11, color: "#929292", lineHeight: 1.6 }}>
-                  ID берётся с физического устройства. Датчик передаёт: 🌡 Температуру · 💧 Влажность · 🔋 Батарею.
-                  Пороги задаются на вкладках выше — необязательно.
+                  Если блок управления не выбран, датчик будет добавлен напрямую в выбранную локацию и не будет привязан к виртуальному ЦБУ.
+                  Пороговые значения задаются на соседних вкладках.
                 </span>
               </div>
             </>
@@ -1037,13 +1138,18 @@ const SensorMiniCard = ({
   canDeleteSensor,
 }) => {
   const st = STATUS[getSensorStatus(sensor)];
-  const history = useSensorHistory(sensor.id);
-  const tempData = history
-    .map(p => getTelemetryTemp(p))
-    .filter(v => v != null && Number.isFinite(Number(v)));
-  const humData = history
-    .map(p => getTelemetryHum(p))
-    .filter(v => v != null && Number.isFinite(Number(v)));
+  const [historyPeriod, setHistoryPeriod] = useState("day");
+  const history = useSensorHistory(sensor.id, historyPeriod);
+  const tempPoints = history
+    .map(p => ({ value: getTelemetryTemp(p), timestamp: p?.timestamp ?? p?.created_at ?? p?.time }))
+    .filter(p => p.value != null && Number.isFinite(Number(p.value)));
+  const humPoints = history
+    .map(p => ({ value: getTelemetryHum(p), timestamp: p?.timestamp ?? p?.created_at ?? p?.time }))
+    .filter(p => p.value != null && Number.isFinite(Number(p.value)));
+  const tempData = tempPoints.map(p => Number(p.value));
+  const humData = humPoints.map(p => Number(p.value));
+  const tempTimes = tempPoints.map(p => p.timestamp);
+  const humTimes = humPoints.map(p => p.timestamp);
   const battery  = sensor.battery_level ?? null;
   const bc = battery > 50 ? "#01e676" : battery > 20 ? "#ffd550" : "#ff5b5b";
   const [showEdit, setShowEdit] = useState(false);
@@ -1112,22 +1218,38 @@ const SensorMiniCard = ({
         </div>
 
         {!isReorderMode && (
-          <div className="sn-charts-row">
-            <div className="sn-chart-wrap">
-              <div className="sn-chart-label"><IconTherm/> Температура</div>
-              <ChartLegend sensor={sensor} type="temp"/>
-              <div className="sn-chart-box">
-                <Sparkline color="#ffc207" data={tempData} sensor={sensor} type="temp"/>
+          <>
+            <div className="sn-chart-periods" role="group" aria-label="Период графиков">
+              {Object.entries(HISTORY_PERIODS).map(([key, cfg]) => (
+                <button
+                  key={key}
+                  type="button"
+                  className={`sn-chart-period-btn${historyPeriod === key ? " sn-chart-period-btn--active" : ""}`}
+                  onClick={() => setHistoryPeriod(key)}
+                >
+                  {cfg.label}
+                </button>
+              ))}
+            </div>
+            <div className="sn-charts-row">
+              <div className="sn-chart-wrap">
+                <div className="sn-chart-label"><IconTherm/> Температура</div>
+                <ChartLegend sensor={sensor} type="temp"/>
+                <div className="sn-chart-box">
+                  <Sparkline color="#ffc207" data={tempData} timestamps={tempTimes} sensor={sensor} type="temp" period={historyPeriod}/>
+                </div>
+                <ChartStats values={tempData} unit="°C" />
+              </div>
+              <div className="sn-chart-wrap">
+                <div className="sn-chart-label"><IconDrop/> Влажность</div>
+                <ChartLegend sensor={sensor} type="hum"/>
+                <div className="sn-chart-box">
+                  <Sparkline color="#07bcd4" data={humData} timestamps={humTimes} sensor={sensor} type="hum" period={historyPeriod}/>
+                </div>
+                <ChartStats values={humData} unit="%" />
               </div>
             </div>
-            <div className="sn-chart-wrap">
-              <div className="sn-chart-label"><IconDrop/> Влажность</div>
-              <ChartLegend sensor={sensor} type="hum"/>
-              <div className="sn-chart-box">
-                <Sparkline color="#07bcd4" data={humData} sensor={sensor} type="hum"/>
-              </div>
-            </div>
-          </div>
+          </>
         )}
       </div>
 
@@ -1202,12 +1324,11 @@ const BlockCard = ({
     if (isSyntheticBlock) {
       const hasRealBlock = allBlocks.some(b =>
         !String(b.id).startsWith("__synthetic__") &&
-        (sameId(s.control_unit_id, b.id) || sameId(s.group_id, b.id))
+        sameId(s.control_unit_id, b.id)
       );
       return !hasRealBlock && sameId(s.location_id ?? s.group_id, syntheticLocId);
     }
-    return sameId(s.control_unit_id, block.id) ||
-           sameId(s.group_id, block.id);
+    return sameId(s.control_unit_id, block.id);
   });
 
   useEffect(() => {
@@ -1292,15 +1413,15 @@ const BlockCard = ({
           <div className="sn-block-header-left">
             <span className="sn-block-chevron">{expanded ? <IconChevDown/> : <IconChevRight/>}</span>
             <div className="sn-block-name-group">
-              <span className="sn-block-id-tag">ЦБУ #{block.id}</span>
+              <span className="sn-block-id-tag">{isSyntheticBlock ? "Локация" : `ЦБУ #${block.id}`}</span>
               <span className="sn-block-name">{block.name}</span>
               {/* Отображаем sensors_count из API если доступно */}
               {block.sensors_count != null && (
                 <span style={{
                   fontSize: 10,
                   color: block.sensors_count > 0 ? "#ffc207" : "#555",
-                  background: block.sensors_count > 0 ? "#29220a" : "#1a1a1a",
-                  border: `1px solid ${block.sensors_count > 0 ? "#ffc20733" : "#252525"}`,
+                  background: block.sensors_count > 0 ? "rgba(255, 194, 7, 0.12)" : "var(--status-muted-bg, #1a1a1a)",
+                  border: `1px solid ${block.sensors_count > 0 ? "#ffc20733" : "rgba(16, 24, 40, 0.12)"}`,
                   borderRadius: 4,
                   padding: "1px 6px",
                   marginLeft: 4,
@@ -1311,7 +1432,7 @@ const BlockCard = ({
             </div>
           </div>
           <div className="sn-block-header-right" onClick={e => e.stopPropagation()}>
-            <div className="sn-block-indicators">
+            {!isSyntheticBlock && <div className="sn-block-indicators">
               <div className="sn-block-indicator" title={isOnline ? "Питание: Сеть" : "Питание: Офлайн"}>
                 <IconPower on={isOnline}/>
                 <span style={{ color: isOnline ? "#01e676" : "#555", fontSize: 10 }}>{isOnline ? "Сеть" : "Офф"}</span>
@@ -1330,13 +1451,13 @@ const BlockCard = ({
                   <span style={{ fontSize: 10, color: bc }}>{battery}%</span>
                 </div>
               )}
-            </div>
+            </div>}
             <span className="sn-block-sensor-count">{sensorsCount} датч.</span>
 
             {!isReorderMode ? (
               expanded && (
                 <>
-                  {canAddSensor && (
+                  {canAddSensor && !isSyntheticBlock && (
                     <button
                       className="sn-add-sensor-btn"
                       title="Добавить датчик в этот ЦБУ"
@@ -1408,7 +1529,7 @@ const BlockCard = ({
             {orderedSensors.length === 0 && (
               <div className="sn-empty-sensors">
                 <div style={{ marginBottom: 12, color: "#555" }}>Нет датчиков в этом ЦБУ</div>
-                {canAddSensor && (
+                {canAddSensor && !isSyntheticBlock && (
                   <button className="sn-add-sensor-btn-empty" onClick={() => onAddSensor(block)}>
                     <IconPlus/> Добавить датчик
                   </button>
@@ -1484,10 +1605,6 @@ const LocationSection = ({
   onDeleteBlock,
   onDeleteSensor,
   permissions,
-  isReorderLocMode,
-  onLocDragStart,
-  onLocDragOver,
-  onLocDrop,
   isSearching,
 }) => {
   const [expanded, setExpanded] = useState(false);
@@ -1500,26 +1617,17 @@ const LocationSection = ({
   const totalSensors = allSensors.length;
 
   return (
-    <div
-      className={`sn-location-section ${isReorderLocMode ? "sn-location-section--reorder" : ""}`}
-      draggable={isReorderLocMode}
-      onDragStart={isReorderLocMode ? onLocDragStart : undefined}
-      onDragOver={isReorderLocMode ? (e => { e.preventDefault(); onLocDragOver(); }) : undefined}
-      onDrop={isReorderLocMode ? onLocDrop : undefined}
-    >
-      <div className="sn-location-header" onClick={() => !isReorderLocMode && setExpanded(v => !v)}>
+    <div className="sn-location-section">
+      <div className="sn-location-header" onClick={() => setExpanded(v => !v)}>
         <div className="sn-location-header-left">
-          {isReorderLocMode && <span className="sn-drag-handle" style={{ marginRight: 8 }}><IconDrag/></span>}
           <IconMapPin/>
           <span className="sn-location-name">{location.name}</span>
           <span className="sn-location-meta">{locBlocks.length} блок. · {totalSensors} датч.</span>
         </div>
-        {!isReorderLocMode && (
-          <span className="sn-location-chevron">{expanded ? <IconChevDown/> : <IconChevRight/>}</span>
-        )}
+        <span className="sn-location-chevron">{expanded ? <IconChevDown/> : <IconChevRight/>}</span>
       </div>
 
-      {expanded && !isReorderLocMode && (
+      {expanded && (
         <div className="sn-blocks-list">
           {locBlocks.length === 0 && <div className="sn-empty-location">Нет блоков в этой локации</div>}
           {locBlocks.map(block => (
@@ -1567,10 +1675,6 @@ const Sensors = () => {
   const [selectedLocation, setSelectedLocation] = useState(null);
   const [showLocDropdown,  setShowLocDropdown]  = useState(false);
 
-  const [isReorderLocMode, setIsReorderLocMode] = useState(false);
-  const [locOrder,         setLocOrder]         = useState([]);
-  const locDragSrc = useRef(null);
-
   const [showCreateBlock, setShowCreateBlock]   = useState(false);
   const [showAddSensor,   setShowAddSensor]     = useState(false);
   const [addSensorBlock,  setAddSensorBlock]    = useState(null);
@@ -1595,16 +1699,6 @@ const Sensors = () => {
       console.log("🔲 Control units:", JSON.stringify(blks, null, 2));
       console.log("🌡 Sensors:", JSON.stringify(snrs, null, 2));
       console.groupEnd();
-
-      const saved = loadLocOrder();
-      if (saved && saved.length > 0) {
-        const existingIds = locs.map(l => l.id);
-        const filtered = saved.filter(id => existingIds.some(existingId => sameId(existingId, id)));
-        const newIds = existingIds.filter(id => !filtered.some(savedId => sameId(savedId, id)));
-        setLocOrder([...filtered, ...newIds]);
-      } else {
-        setLocOrder(locs.map(l => l.id));
-      }
 
       setError(null);
     } catch (e) {
@@ -1711,39 +1805,11 @@ const Sensors = () => {
     await fetchAll();
   };
 
-  const handleLocDragStart = (locId) => { locDragSrc.current = locId; };
-  const handleLocDragOver  = (targetId) => {
-    if (!locDragSrc.current || locDragSrc.current === targetId) return;
-    setLocOrder(prev => {
-      const arr = [...prev];
-      const from = arr.indexOf(locDragSrc.current);
-      const to   = arr.indexOf(targetId);
-      if (from === -1 || to === -1) return prev;
-      arr.splice(from, 1);
-      arr.splice(to, 0, locDragSrc.current);
-      return arr;
-    });
-  };
-  const handleLocDragEnd = () => { locDragSrc.current = null; };
-
-  const handleSaveLocOrder = async () => {
-    if (!permissions.canReorder) return;
-    saveLocOrder(locOrder);
-    try {
-      await Promise.all(
-        locOrder.map((id, idx) =>
-          apiPatch(`/api/v1/locations/${id}`, { display_order: idx }).catch(() => {})
-        )
-      );
-    } catch (e) { console.error("Не удалось сохранить порядок на сервере:", e); }
-    setIsReorderLocMode(false);
-  };
-
   const q = searchQuery.toLowerCase().trim();
   const isSearching = q.length > 0;
 
   const filteredSensors = sensors.filter(s => {
-    const sBlock = blocks.find(b => String(b.id) === String(s.control_unit_id ?? s.group_id));
+    const sBlock = blocks.find(b => sameId(b.id, s.control_unit_id));
     const loc = sBlock
       ? locations.find(l => sameId(l.id, sBlock.location_id ?? sBlock.group_id))
       : locations.find(l => sameId(l.id, s.location_id ?? s.group_id));
@@ -1759,14 +1825,10 @@ const Sensors = () => {
     return matchSearch && matchLoc;
   });
 
-  const orderedLocations = locOrder.map(id => locations.find(l => sameId(l.id, id))).filter(Boolean);
-
   const getBlocksForLocation = (locId) => {
     const realBlocks = blocks.filter(b => sameId(b.location_id, locId) || sameId(b.group_id, locId));
     const directSensors = sensors.filter(s => {
-      const attachedToBlock = realBlocks.some(b =>
-        sameId(s.control_unit_id, b.id) || sameId(s.group_id, b.id)
-      );
+      const attachedToBlock = realBlocks.some(b => sameId(s.control_unit_id, b.id));
       return !attachedToBlock && sameId(s.location_id ?? s.group_id, locId);
     });
 
@@ -1777,7 +1839,7 @@ const Sensors = () => {
       ...realBlocks,
       {
         id: `__synthetic__${locId}`,
-        name: `${locName} · без ЦБУ`,
+        name: `${locName} · датчики без блока управления`,
         location_id: locId,
         group_id: locId,
         __synthetic: true,
@@ -1793,9 +1855,7 @@ const Sensors = () => {
   const getSensorsForLocation = (locId) => {
     const locBlocks = blocks.filter(b => sameId(b.location_id, locId) || sameId(b.group_id, locId));
     return sensors.filter(s => {
-      const viaBlock = locBlocks.some(b =>
-        sameId(s.control_unit_id, b.id) || sameId(s.group_id, b.id)
-      );
+      const viaBlock = locBlocks.some(b => sameId(s.control_unit_id, b.id));
       return viaBlock || sameId(s.location_id ?? s.group_id, locId);
     });
   };
@@ -1803,7 +1863,7 @@ const Sensors = () => {
   const hasLocationContent = (locId) =>
     getBlocksForLocation(locId).length > 0 || getSensorsForLocation(locId).length > 0;
 
-  const visibleLocations = orderedLocations.filter(loc => hasLocationContent(loc.id));
+  const visibleLocations = locations.filter(loc => hasLocationContent(loc.id));
   const dropdownLocations = locations.filter(loc => hasLocationContent(loc.id));
 
   useEffect(() => {
@@ -1814,12 +1874,6 @@ const Sensors = () => {
   }, [selectedLocation, dropdownLocations]);
 
   const allBlocksForModal = blocks;
-
-  if (loading) return (
-    <div className="sn-container" style={{ display:"flex", alignItems:"center", justifyContent:"center", minHeight:"100vh", color:"#555", fontSize: 14 }}>
-      Загрузка данных...
-    </div>
-  );
 
   if (error) return (
     <div className="sn-container" style={{ display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center", minHeight:"100vh", gap: 16 }}>
@@ -1835,115 +1889,87 @@ const Sensors = () => {
         <div className="sn-page-header">
           <div>
             <h1 className="sn-page-title">Датчики</h1>
-            <p className="sn-page-sub">Мониторинг в реальном времени · {sensors.length} датчиков · {locations.length} локаций</p>
+            <p className="sn-page-sub">
+              <span>Мониторинг в реальном времени</span>
+              <span className="sn-page-meta">{sensors.length} датчиков · {locations.length} локаций</span>
+            </p>
           </div>
-          {(permissions.canReorder || permissions.canCreateSensor || permissions.canCreateControlUnit) && (
-          <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-            {!isReorderLocMode ? (
-              <>
-                {permissions.canReorder && (
-                  <button
-                    className="sn-reorder-loc-btn"
-                    onDoubleClick={() => { setLocOrder(locations.map(l => l.id)); setIsReorderLocMode(true); }}
-                    title="Изменить порядок локаций (двойной клик)"
-                  >
-                    <IconDrag/> Порядок локаций
-                  </button>
-                )}
-                {permissions.canCreateSensor && (
-                  <button
-                    className="sn-add-btn sn-add-btn--secondary"
-                    onClick={() => { setAddSensorBlock(null); setShowAddSensor(true); }}
-                    title="Добавить датчик к существующему ЦБУ"
-                  >
-                    <IconPlus/> Датчик
-                  </button>
-                )}
-                {permissions.canCreateControlUnit && (
-                  <button
-                    className="sn-add-btn"
-                    onClick={() => setShowCreateBlock(true)}
-                  >
-                    <IconBlock/> Создать ЦБУ
-                  </button>
-                )}
-              </>
-            ) : (
-              <>
-                <button
-                  className="sn-btn-cancel"
-                  onClick={() => setIsReorderLocMode(false)}
-                  style={{ height: 38, padding: "0 16px" }}
-                >
-                  Отмена
-                </button>
-                <button
-                  className="sn-btn-save"
-                  onClick={handleSaveLocOrder}
-                  style={{ height: 38, padding: "0 16px" }}
-                >
-                  Сохранить порядок
-                </button>
-              </>
-            )}
-          </div>
-          )}
         </div>
 
-        {!isReorderLocMode && (
-          <div className="sn-controls-row">
-            <div className="sn-search-box">
-              <IconSearch/>
-              <input
-                className="sn-search-input"
-                placeholder="Поиск по ID, названию датчика, ЦБУ, локации..."
-                value={searchQuery}
-                onChange={e => setSearchQuery(e.target.value)}
-              />
-              {searchQuery && (
-                <button className="sn-search-clear" onClick={() => setSearchQuery("")}>
-                  <IconClose/>
+        <div className="sn-controls-row">
+          <div className="sn-search-box">
+            <IconSearch/>
+            <input
+              className="sn-search-input"
+              placeholder="Поиск по центральному блоку, названию датчика или ID"
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+            />
+            {searchQuery && (
+              <button className="sn-search-clear" onClick={() => setSearchQuery("")}>
+                <IconClose/>
+              </button>
+            )}
+          </div>
+
+          {(permissions.canCreateSensor || permissions.canCreateControlUnit) && (
+            <div className="sn-header-actions">
+              {permissions.canCreateControlUnit && (
+                <button
+                  className="sn-add-btn"
+                  onClick={() => setShowCreateBlock(true)}
+                >
+                  <IconBlock/> <span>ЦБУ</span>
+                </button>
+              )}
+              {permissions.canCreateSensor && (
+                <button
+                  className="sn-add-btn sn-add-btn--secondary"
+                  onClick={() => { setAddSensorBlock(null); setShowAddSensor(true); }}
+                  title="Добавить датчик к существующему ЦБУ"
+                >
+                  <IconPlus/> <span>Датчик</span>
                 </button>
               )}
             </div>
+          )}
 
-            <div className="sn-loc-dropdown-wrap" ref={dropdownRef}>
-              <button className="sn-loc-dropdown-btn" onClick={() => setShowLocDropdown(v => !v)}>
-                <IconMapPin/>
-                <span>{selectedLocation ? locations.find(l => sameId(l.id, selectedLocation))?.name : "Все локации"}</span>
-                <IconChevDown/>
-              </button>
-              {showLocDropdown && (
-                <div className="sn-loc-dropdown">
-                  <div
-                    className={`sn-loc-option ${!selectedLocation ? "sn-loc-option--active" : ""}`}
-                    onClick={() => { setSelectedLocation(null); setShowLocDropdown(false); }}
-                  >
-                    Все локации
-                  </div>
-                  {dropdownLocations.map(loc => (
-                    <div
-                      key={loc.id}
-                      className={`sn-loc-option ${sameId(selectedLocation, loc.id) ? "sn-loc-option--active" : ""}`}
-                      onClick={() => { setSelectedLocation(loc.id); setShowLocDropdown(false); }}
-                    >
-                      <IconMapPin/>
-                      {loc.name}
-                      <span className="sn-loc-option-count">
-                        {sensors.filter(s => {
-                          const b = blocks.find(bl => String(bl.id) === String(s.control_unit_id ?? s.group_id));
-                          return b
-                            ? (sameId(b.location_id, loc.id) || sameId(b.group_id, loc.id))
-                            : sameId(s.location_id ?? s.group_id, loc.id);
-                        }).length}
-                      </span>
-                    </div>
-                  ))}
+          <div className="sn-loc-dropdown-wrap" ref={dropdownRef}>
+            <button className="sn-loc-dropdown-btn" onClick={() => setShowLocDropdown(v => !v)}>
+              <IconMapPin/>
+              <span>{selectedLocation ? locations.find(l => sameId(l.id, selectedLocation))?.name : "Все локации"}</span>
+              <IconChevDown/>
+            </button>
+            {showLocDropdown && (
+              <div className="sn-loc-dropdown">
+                <div
+                  className={`sn-loc-option ${!selectedLocation ? "sn-loc-option--active" : ""}`}
+                  onClick={() => { setSelectedLocation(null); setShowLocDropdown(false); }}
+                >
+                  Все локации
                 </div>
-              )}
-            </div>
+                {dropdownLocations.map(loc => (
+                  <div
+                    key={loc.id}
+                    className={`sn-loc-option ${sameId(selectedLocation, loc.id) ? "sn-loc-option--active" : ""}`}
+                    onClick={() => { setSelectedLocation(loc.id); setShowLocDropdown(false); }}
+                  >
+                    <IconMapPin/>
+                    {loc.name}
+                    <span className="sn-loc-option-count">
+                      {sensors.filter(s => {
+                        const b = blocks.find(bl => sameId(bl.id, s.control_unit_id));
+                        return b
+                          ? (sameId(b.location_id, loc.id) || sameId(b.group_id, loc.id))
+                          : sameId(s.location_id ?? s.group_id, loc.id);
+                      }).length}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
-        )}
+        </div>
 
         {isSearching ? (
           <div className="sn-search-results">
@@ -1966,7 +1992,7 @@ const Sensors = () => {
             </div>
           </div>
         ) : (
-          <div className="sn-locations-list" onDragEnd={handleLocDragEnd}>
+          <div className="sn-locations-list">
             {visibleLocations.length === 0 && <div className="sn-empty-state">Нет локаций с ЦБУ</div>}
             {visibleLocations.map(loc => {
               if (selectedLocation && !sameId(loc.id, selectedLocation)) return null;
@@ -1988,10 +2014,6 @@ const Sensors = () => {
                   onDeleteBlock={handleDeleteBlock}
                   onDeleteSensor={handleDeleteSensor}
                   permissions={permissions}
-                  isReorderLocMode={isReorderLocMode}
-                  onLocDragStart={() => handleLocDragStart(loc.id)}
-                  onLocDragOver={() => handleLocDragOver(loc.id)}
-                  onLocDrop={() => {}}
                   isSearching={isSearching}
                 />
               );

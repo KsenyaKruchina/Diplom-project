@@ -90,7 +90,12 @@ body { font-family: "Inter", Helvetica, sans-serif; }
   height: 320px;
   display: flex; align-items: center; justify-content: center;
   position: relative; overflow: hidden;
-  border-radius: var(--radius-md); background: #111;
+  border-radius: var(--radius-md); background: var(--chart-bg);
+}
+
+.floor-plan-wrap--image {
+  display: block;
+  height: auto;
 }
 
 .floor-svg { width: 100%; height: 100%; }
@@ -135,13 +140,10 @@ body { font-family: "Inter", Helvetica, sans-serif; }
   line-height: 1.5;
 }
 
-/* Fix 1: изображение занимает всё пространство блока */
 .floor-image {
-  position: absolute;
-  inset: 0;
   width: 100%;
-  height: 100%;
-  object-fit: fill;
+  height: auto;
+  object-fit: contain;
   display: block;
   pointer-events: none;
   user-select: none;
@@ -180,7 +182,7 @@ body { font-family: "Inter", Helvetica, sans-serif; }
 
 /* ── Legend ──────────────────────────────────────────────────────────────── */
 
-.legend { display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--text-primary); flex-wrap: wrap; }
+.legend { display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--text-primary); flex-wrap: wrap; font-weight: 500; }
 .legend span { display: flex; align-items: center; gap: 6px; }
 .legend-dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; }
 
@@ -237,7 +239,7 @@ body { font-family: "Inter", Helvetica, sans-serif; }
 
 .notif-panel { flex: 1; min-width: 300px; }
 
-.notif-summary { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text-primary); flex-wrap: wrap; }
+.notif-summary { display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--text-primary); flex-wrap: wrap; }
 
 .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; }
 .dot--red    { background-color: var(--red); }
@@ -257,9 +259,9 @@ body { font-family: "Inter", Helvetica, sans-serif; }
 }
 
 .notif-text { flex: 1; min-width: 0; }
-.notif-title { font-size: 14px; font-weight: 600; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.notif-desc  { font-size: 12px; color: var(--text-secondary); margin-top: 3px; }
-.notif-location { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+.notif-title { font-size: 15px; font-weight: 700; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.notif-desc  { font-size: 13px; color: var(--text-secondary); margin-top: 4px; line-height: 1.45; }
+.notif-location { font-size: 12px; color: var(--text-muted); margin-top: 3px; }
 
 /* ── Sensor Card ─────────────────────────────────────────────────────────── */
 
@@ -270,7 +272,7 @@ body { font-family: "Inter", Helvetica, sans-serif; }
 }
 
 .sensor-card-header { display: flex; align-items: center; justify-content: space-between; }
-.sensor-card-title  { font-size: 11px; color: var(--text-secondary); font-weight: 400; }
+.sensor-card-title  { font-size: 14px; color: var(--text-primary); font-weight: 700; }
 
 /* Fix 4: два блока метрик в одной строке с выровненной высотой */
 .sensor-metrics-row {
@@ -289,6 +291,19 @@ body { font-family: "Inter", Helvetica, sans-serif; }
   /* растягиваем нижний блок (график) на всю оставшуюся высоту */
 }
 
+.sensor-metric-label {
+  font-size: 11px;
+  color: var(--text-secondary);
+  font-weight: 700;
+}
+
+.sensor-status-label {
+  font-size: 10px;
+  border-radius: 4px;
+  padding: 2px 5px;
+  font-weight: 700;
+}
+
 .sensor-metric-half > div:last-child {
   flex: 1;
   min-height: 0;
@@ -297,7 +312,7 @@ body { font-family: "Inter", Helvetica, sans-serif; }
 /* ── Mini Chart ──────────────────────────────────────────────────────────── */
 
 .chart-wrap { display: flex; flex-direction: column; gap: 4px; }
-.chart-svg-area { width: 100%; height: 70px; }
+.chart-svg-area { width: 100%; height: 70px; background: var(--chart-bg); border-radius: 7px; }
 .chart-stats { display: flex; justify-content: space-between; font-size: 10px; color: var(--text-secondary); padding: 0 2px; }
 .chart-x-axis { display: flex; justify-content: space-between; padding-top: 2px; }
 .chart-x-axis span { font-size: 10px; color: var(--text-muted); text-align: center; flex: 1; }
@@ -326,7 +341,7 @@ body { font-family: "Inter", Helvetica, sans-serif; }
 .modal-input {
   width: 100%; padding: 10px 12px; border-radius: 8px;
   border: 1px solid rgba(255,255,255,0.15);
-  background: #111; color: var(--text-primary);
+  background: var(--chart-bg); color: var(--text-primary);
   font-size: 14px; font-family: inherit; outline: none;
   transition: border-color 0.15s;
 }
