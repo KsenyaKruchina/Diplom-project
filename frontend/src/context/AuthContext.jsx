@@ -7,7 +7,7 @@
 
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
-import { login as loginService, logout as logoutService, getCurrentUser } from "../services/authService";
+import { login as loginService, logout as logoutService, getCurrentUser, updateCurrentUser } from "../services/authService";
 import { isAuthenticated } from "../services/authService";
 import { wsService } from "../services/websocketService";
 import { getUserLocations } from "../services/api";
@@ -77,6 +77,12 @@ export const AuthProvider = ({ children }) => {
     setUserLocations([]);
   }, []);
 
+  const updateUserProfile = useCallback(async (profileData) => {
+    const updatedUser = await updateCurrentUser(profileData);
+    setUser(updatedUser);
+    return updatedUser;
+  }, []);
+
   const role = user?.role ?? null;
   const isReadOnly = role === "viewer" || role === "reader";
 
@@ -88,6 +94,7 @@ export const AuthProvider = ({ children }) => {
     error,
     login,
     logout,
+    updateUserProfile,
     role,
 
     isAdmin:  role === "admin",

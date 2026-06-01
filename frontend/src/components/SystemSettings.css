@@ -777,6 +777,23 @@
   letter-spacing: -0.1px;
 }
 
+.ss-form-hint,
+.ss-profile-email-note {
+  font-size: 11px;
+  color: #6a6a6a;
+  line-height: 1.5;
+  letter-spacing: -0.1px;
+}
+
+.ss-profile-email-note {
+  margin-top: 16px;
+  padding: 12px 14px;
+  border: 1px solid rgba(255, 194, 7, 0.18);
+  border-radius: 10px;
+  background: rgba(255, 194, 7, 0.07);
+  color: #b8a25c;
+}
+
 .ss-role-selector {
   display: flex;
   gap: 6px;

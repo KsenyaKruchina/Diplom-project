@@ -1,7 +1,7 @@
 // frontend/src/services/authService.js
 // ─── Сервис авторизации ───────────────────────────────────────────────────────
 
-import { apiLogin, apiRequest, setToken, removeToken, getToken } from "./api";
+import { apiLogin, apiPublicRequest, apiRequest, setToken, removeToken, getToken } from "./api";
 
 /**
  * Войти в систему.
@@ -27,6 +27,54 @@ export const logout = () => {
  */
 export const getCurrentUser = async () => {
   return apiRequest("/users/me");
+};
+
+/**
+ * Обновить профиль текущего авторизованного пользователя.
+ * Backend сам определяет пользователя по JWT, user_id с фронта не отправляем.
+ * @param {object} profileData - { full_name?, email? }
+ * @returns {object} User
+ */
+export const updateCurrentUser = async (profileData) => {
+  return apiRequest("/users/me", {
+    method: "PATCH",
+    body: JSON.stringify(profileData),
+  });
+};
+
+const requestWithFallback = async (paths, options) => {
+  let lastError;
+  for (const path of paths) {
+    try {
+      return await apiPublicRequest(path, options);
+    } catch (err) {
+      lastError = err;
+      if (err?.status !== 404 && err?.status !== 405) break;
+    }
+  }
+  throw lastError;
+};
+
+/**
+ * Запросить 6-значный код восстановления пароля.
+ * @param {string} identifier - email или username
+ */
+export const requestPasswordRecovery = async (identifier) => {
+  return requestWithFallback(["/auth/password-recovery", "/password-recovery"], {
+    method: "POST",
+    body: JSON.stringify({ identifier, source: "web" }),
+  });
+};
+
+/**
+ * Подтвердить 6-значный код и задать новый пароль.
+ * token — сырой код из письма, не хэш.
+ */
+export const confirmPasswordReset = async ({ token, new_password }) => {
+  return requestWithFallback(["/auth/reset-password-confirm", "/password-reset/confirm"], {
+    method: "POST",
+    body: JSON.stringify({ token, new_password }),
+  });
 };
 
 /**

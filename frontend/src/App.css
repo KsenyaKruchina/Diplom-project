@@ -556,6 +556,7 @@ body[data-theme="light"] .rp-period-label,
 body[data-theme="light"] .rp-location-trigger-label,
 body[data-theme="light"] .ss-card-header-meta,
 body[data-theme="light"] .ss-theme-subtitle,
+body[data-theme="light"] .ss-form-hint,
 body[data-theme="light"] .ss-users-col-head,
 body[data-theme="light"] .ss-user-username,
 body[data-theme="light"] .ss-history-action,
@@ -889,6 +890,12 @@ body[data-theme="light"] .ss-location-detail-meta {
 
 body[data-theme="light"] .ss-location-stat-divider {
   background: rgba(16, 24, 40, 0.12);
+}
+
+body[data-theme="light"] .ss-profile-email-note {
+  background: rgba(255, 194, 7, 0.14);
+  border-color: rgba(255, 194, 7, 0.32);
+  color: #725200;
 }
 
 body[data-theme="light"] .ss-location-card {

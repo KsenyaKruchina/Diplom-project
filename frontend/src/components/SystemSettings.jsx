@@ -262,19 +262,32 @@ const AddUserModal = ({ onClose, onAdd, currentUser, locations }) => {
 // ── Edit Profile Modal ─────────────────────────────────────────────
 const EditProfileModal = ({ profile, onClose, onSave }) => {
   const [name, setName] = useState(profile?.full_name || "");
+  const [email, setEmail] = useState(profile?.email || "");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
   const handleSave = async () => {
-    if (!name.trim()) return;
+    const trimmedName = name.trim();
+    const trimmedEmail = email.trim();
+
+    if (!trimmedName) {
+      setError("Введите ФИО");
+      return;
+    }
+
+    if (trimmedEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+      setError("Введите корректный email");
+      return;
+    }
+
     setLoading(true);
     setError("");
     try {
-      const updated = await apiRequest(`/users/${profile.id}`, {
-        method: "PATCH",
-        body: JSON.stringify({ full_name: name.trim() }),
+      const updated = await onSave({
+        full_name: trimmedName,
+        email: trimmedEmail || null,
       });
-      onSave(updated || { full_name: name.trim() });
+      if (!updated) throw new Error("Профиль не обновлен");
       onClose();
     } catch (err) {
       setError(err.message || "Ошибка соединения");
@@ -296,9 +309,23 @@ const EditProfileModal = ({ profile, onClose, onSave }) => {
               className={`ss-form-input${error ? " ss-form-input--error" : ""}`}
               type="text" value={name}
               onChange={e => { setName(e.target.value); setError(""); }}
-              onKeyDown={e => e.key === "Enter" && handleSave()}
               autoFocus
             />
+          </div>
+          <div className="ss-form-group">
+            <label className="ss-form-label">Email</label>
+            <input
+              className={`ss-form-input${error ? " ss-form-input--error" : ""}`}
+              type="email"
+              value={email}
+              placeholder="name@example.com"
+              onChange={e => { setEmail(e.target.value); setError(""); }}
+              onKeyDown={e => e.key === "Enter" && handleSave()}
+              autoComplete="email"
+            />
+            <p className="ss-form-hint">
+              Этот email используется для восстановления доступа и email-уведомлений.
+            </p>
             {error && <span className="ss-form-error">{error}</span>}
           </div>
         </div>
@@ -834,7 +861,7 @@ const NoLocationPlaceholder = () => (
 
 // ── Main Component ─────────────────────────────────────────────────
 export const SystemSettings = ({ theme = "dark", onThemeChange = () => {} }) => {
-  const { isViewer, isAdmin, isEditor } = useAuth();
+  const { isViewer, isAdmin, isEditor, updateUserProfile } = useAuth();
 
   const [profile, setProfile]     = useState(null);
   const [locations, setLocations] = useState([]);
@@ -987,11 +1014,9 @@ export const SystemSettings = ({ theme = "dark", onThemeChange = () => {} }) => 
                 <span className="ss-profile-username" style={{ fontSize: 12, color: "#929292" }}>
                   @{profile?.username}
                 </span>
-                {profile?.email && (
-                  <span className="ss-profile-email" style={{ fontSize: 12, color: "#929292" }}>
-                    {profile.email}
-                  </span>
-                )}
+                <span className="ss-profile-email" style={{ fontSize: 12, color: "#929292" }}>
+                  {profile?.email || "Email не указан"}
+                </span>
                 <span className="ss-profile-role-badge" style={{
                   color: ROLE_COLORS[profile?.role],
                   background: `${ROLE_COLORS[profile?.role]}18`,
@@ -1011,6 +1036,9 @@ export const SystemSettings = ({ theme = "dark", onThemeChange = () => {} }) => 
                 Вы можете редактировать своё имя. Для расширенного доступа обратитесь к администратору.
               </div>
             )}
+            <div className="ss-profile-email-note">
+              Email в профиле используется для восстановления доступа и email-уведомлений.
+            </div>
           </div>
 
           <div className="ss-card ss-theme-card">
@@ -1108,7 +1136,11 @@ export const SystemSettings = ({ theme = "dark", onThemeChange = () => {} }) => 
         <EditProfileModal
           profile={profile}
           onClose={() => setShowEditModal(false)}
-          onSave={(updates) => setProfile(p => ({ ...p, ...updates }))}
+          onSave={async (updates) => {
+            const updated = await updateUserProfile(updates);
+            setProfile(updated);
+            return updated;
+          }}
         />
       )}
     </div>

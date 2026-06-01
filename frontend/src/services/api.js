@@ -82,6 +82,40 @@ export const apiRequest = async (path, options = {}) => {
   return response.json();
 };
 
+// ─── Публичные JSON-запросы без редиректа на /login ─────────────────────────
+// Нужны для восстановления пароля, когда пользователь ещё не авторизован.
+export const apiPublicRequest = async (path, options = {}) => {
+  const response = await fetch(`${BASE_URL}${path}`, {
+    ...options,
+    headers: {
+      "Content-Type": "application/json",
+      ...options.headers,
+    },
+  });
+
+  if (!response.ok) {
+    let errorMessage = `Ошибка сервера: ${response.status}`;
+    try {
+      const errorData = await response.json();
+      if (errorData.detail) {
+        errorMessage =
+          typeof errorData.detail === "string"
+            ? errorData.detail
+            : JSON.stringify(errorData.detail);
+      }
+    } catch {
+      // ignore JSON parse error
+    }
+    const error = new Error(errorMessage);
+    error.status = response.status;
+    throw error;
+  }
+
+  if (response.status === 204) return null;
+  const text = await response.text();
+  return text ? JSON.parse(text) : null;
+};
+
 // ─── Специальная функция для multipart/form-data (загрузка файлов) ────────────
 // Для загрузки файлов — НЕ ставим Content-Type, браузер сам добавит boundary.
 export const apiUpload = async (path, formData, method = "POST") => {
