@@ -46,3 +46,5 @@ jobs:
           source: "frontend/dist/*"
           target: /home/deployer/V2/frontend
           strip_components: 2
+          rm: true
+          overwrite: true
