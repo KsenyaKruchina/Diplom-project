@@ -267,8 +267,6 @@ const CHART_POINTS = { day: 24, week: 48, month: 60, year: 52 };
 const API_LIMITS   = { day: 96, week: 336, month: 720, year: 1000 };
 const LIVE_REFRESH_INTERVAL_MS = 5000;
 
-const genFallback = (n) => Array.from({ length: n }, (_, i) => 20 + Math.sin(i / 2) * 5);
-
 // ── Icons ─────────────────────────────────────────────────────────────────────
 
 const IconDownloadArrow = ({ color = "#ffc207" }) => (
@@ -772,12 +770,11 @@ export const Analytics = () => {
 
   // ── Chart data ──
   const labels = getLabels(chartPeriod);
-  const n = CHART_POINTS[chartPeriod] || 30;
 
   const hasActiveFilter = filterSensor || filterLocation || filterControlUnit;
 
-  const displayTemp = chartTemp.length > 0 ? chartTemp : (!hasActiveFilter ? genFallback(n) : []);
-  const displayHum  = chartHum.length  > 0 ? chartHum  : (!hasActiveFilter ? genFallback(n) : []);
+  const displayTemp = hasActiveFilter ? chartTemp : [];
+  const displayHum  = hasActiveFilter ? chartHum : [];
 
   const chartSubLabel = filterSensor
     ? sensorOptions.find(s => s.value === filterSensor)?.label
@@ -785,7 +782,7 @@ export const Analytics = () => {
       ? (controlUnitOptions || []).find(c => c.value === filterControlUnit)?.label
       : filterLocation
         ? locationOptions.find(l => l.value === filterLocation)?.label
-        : "Все датчики (демо)";
+        : "Выберите фильтр";
 
   // ── Render ────────────────────────────────────────────────────────────────────
   return (
@@ -880,11 +877,15 @@ export const Analytics = () => {
                   </button>
                 </div>
               </div>
-              <div className="an-chart-labels">{labels.map(l => <span key={l}>{l}</span>)}</div>
+              {hasActiveFilter && <div className="an-chart-labels">{labels.map(l => <span key={l}>{l}</span>)}</div>}
               <div className="an-chart-area">
                 {histLoading ? (
                   <div style={{height:130,display:"flex",alignItems:"center",justifyContent:"center",color:"#555",fontSize:"13px"}}>
                     Загрузка...
+                  </div>
+                ) : !hasActiveFilter ? (
+                  <div style={{height:130,display:"flex",alignItems:"center",justifyContent:"center",color:"#555",fontSize:"13px",padding:"0 18px",textAlign:"center"}}>
+                    Выберите датчик, локацию или ЦБУ, чтобы построить график
                   </div>
                 ) : data.length === 0 && hasActiveFilter ? (
                   <div style={{height:130,display:"flex",alignItems:"center",justifyContent:"center",color:"#555",fontSize:"13px"}}>

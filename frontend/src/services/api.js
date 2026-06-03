@@ -8,6 +8,11 @@
 // В продакшне nginx делает то же самое.
 // Если нужно переопределить — задай VITE_API_BASE_URL в .env
 export const BASE_URL = import.meta.env.VITE_API_BASE_URL || "/api/v1";
+export const BACKEND_ORIGIN =
+  import.meta.env.VITE_BACKEND_ORIGIN ||
+  (BASE_URL.startsWith("http://") || BASE_URL.startsWith("https://")
+    ? new URL(BASE_URL).origin
+    : "http://157.90.127.202:8000");
 
 // ─── Токен хранится под одним ключом во всём приложении ──────────────────────
 // ВАЖНО: ключ "token" — единственный используемый ключ.

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import "./SystemSettings.css";
 import { apiRequest } from "../services/api";
-import { getCurrentUser, registerUser } from "../services/authService";
+import { getCurrentUser, registerUser, updateUserByAdmin } from "../services/authService";
 import { useAuth } from "../context/AuthContext";
 
 // ── Icons ─────────────────────────────────────────────────────────
@@ -340,11 +340,75 @@ const EditProfileModal = ({ profile, onClose, onSave }) => {
   );
 };
 
+// ── Admin: edit user ───────────────────────────────────────────────
+const EditUserModal = ({ user, onClose, onSave }) => {
+  const [name, setName] = useState(user?.full_name || "");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  const handleSave = async () => {
+    const trimmedName = name.trim();
+
+    if (!trimmedName) {
+      setError("Введите ФИО");
+      return;
+    }
+
+    setLoading(true);
+    setError("");
+    try {
+      await onSave(user.id, { full_name: trimmedName });
+      onClose();
+    } catch (err) {
+      setError(err.message || "Ошибка сохранения");
+    }
+    setLoading(false);
+  };
+
+  return (
+    <div className="ss-modal-overlay" onClick={onClose}>
+      <div className="ss-modal ss-modal--sm" onClick={e => e.stopPropagation()}>
+        <div className="ss-modal-header">
+          <h3 className="ss-modal-title">Редактировать пользователя</h3>
+          <button className="ss-modal-close" onClick={onClose}><IconClose /></button>
+        </div>
+        <div className="ss-modal-body">
+          <div className="ss-form-group">
+            <label className="ss-form-label">ФИО</label>
+            <input
+              className={`ss-form-input${error ? " ss-form-input--error" : ""}`}
+              type="text"
+              value={name}
+              onChange={e => { setName(e.target.value); setError(""); }}
+              onKeyDown={e => e.key === "Enter" && handleSave()}
+              autoFocus
+            />
+            {error && <span className="ss-form-error">{error}</span>}
+          </div>
+          <p className="ss-form-hint">
+            Логин и ID не меняются. Обновление выполняется админским PATCH /users/:id.
+          </p>
+        </div>
+        <div className="ss-modal-footer">
+          <button className="ss-btn-cancel" onClick={onClose}>Отмена</button>
+          <button className="ss-btn-add" onClick={handleSave} disabled={loading}>
+            {loading ? "Сохранение..." : "Сохранить"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // ── Shared: таблица пользователей ─────────────────────────────────
-const UsersTable = ({ users }) => (
+const UsersTable = ({ users, onEditUser }) => {
+  const hasActions = Boolean(onEditUser);
+  const gridClass = hasActions ? "ss-users-col-header--5col" : "ss-users-col-header--4col";
+
+  return (
   <div className="ss-inline-table">
-    <div className="ss-users-col-header ss-users-col-header--4col">
-      {["Пользователь", "Email", "Роль", "Статус"].map(col => (
+    <div className={`ss-users-col-header ${gridClass}`}>
+      {["Пользователь", "Email", "Роль", "Статус", ...(hasActions ? ["Действия"] : [])].map(col => (
         <div key={col} className="ss-users-col-head"><span>{col}</span><IconSort /></div>
       ))}
     </div>
@@ -353,7 +417,7 @@ const UsersTable = ({ users }) => (
       {users.map(user => {
         const st = STATUS_STYLE[user.is_online ? "online" : "offline"];
         return (
-          <div key={user.id} className="ss-users-row ss-users-row--4col">
+          <div key={user.id} className={`ss-users-row ${hasActions ? "ss-users-row--5col" : "ss-users-row--4col"}`}>
             <div className="ss-users-cell ss-user-name-cell">
               <Avatar name={user.full_name} color={getAvatarColor(user.id)} size={26}/>
               <div className="ss-user-name-block">
@@ -375,12 +439,20 @@ const UsersTable = ({ users }) => (
               <span className="ss-status-dot" style={{ background: st.dot }}/>
               <span style={{ color: st.color }}>{st.label}</span>
             </div>
+            {hasActions && (
+              <div className="ss-users-cell">
+                <button className="ss-row-action-btn" onClick={() => onEditUser(user)} title="Редактировать пользователя">
+                  <IconEdit /><span>Изменить</span>
+                </button>
+              </div>
+            )}
           </div>
         );
       })}
     </div>
   </div>
-);
+  );
+};
 
 // ── Shared: лента истории ─────────────────────────────────────────
 const HistoryList = ({ logs, getUserById }) => {
@@ -575,9 +647,10 @@ const MyLocationUsersPanel = ({ myLocation, currentUser, onUserAdded }) => {
 };
 
 // ── Location Detail Panel (только admin) ──────────────────────────
-const LocationDetailPanel = ({ location, allUsers, allAuditLogs, currentUser, onUserAdded, onClose }) => {
+const LocationDetailPanel = ({ location, allUsers, allAuditLogs, currentUser, onUserAdded, onUserUpdated, onClose }) => {
   const [activeTab, setActiveTab] = useState("users");
   const [showAddModal, setShowAddModal] = useState(false);
+  const [editingUser, setEditingUser] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [roleFilter, setRoleFilter] = useState("all");
   const [roleDropdownOpen, setRoleDropdownOpen] = useState(false);
@@ -682,7 +755,7 @@ const LocationDetailPanel = ({ location, allUsers, allAuditLogs, currentUser, on
           )}
         </div>
 
-        {activeTab === "users" && <UsersTable users={filteredUsers} />}
+        {activeTab === "users" && <UsersTable users={filteredUsers} onEditUser={setEditingUser} />}
         {activeTab === "history" && <HistoryList logs={sortedLogs} getUserById={getUserById} />}
 
         {showAddModal && (
@@ -691,6 +764,17 @@ const LocationDetailPanel = ({ location, allUsers, allAuditLogs, currentUser, on
             onAdd={(newUser) => { if (onUserAdded) onUserAdded(newUser); }}
             currentUser={currentUser}
             locations={[location]}
+          />
+        )}
+        {editingUser && (
+          <EditUserModal
+            user={editingUser}
+            onClose={() => setEditingUser(null)}
+            onSave={async (userId, payload) => {
+              const updated = await updateUserByAdmin(userId, payload);
+              if (onUserUpdated) onUserUpdated(updated);
+              return updated;
+            }}
           />
         )}
       </div>
@@ -841,6 +925,9 @@ const LocationsPanel = ({ locations, allUsers, allAuditLogs, currentUser, onUser
           allAuditLogs={allAuditLogs}
           currentUser={currentUser}
           onUserAdded={onUserAdded}
+          onUserUpdated={(updatedUser) => {
+            if (onUserAdded) onUserAdded({ ...updatedUser, location_id: selectedLocation.id });
+          }}
           onClose={() => setSelectedLocation(null)}
         />
       )}

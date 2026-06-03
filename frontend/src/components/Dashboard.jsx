@@ -4,7 +4,7 @@ import "./Dashboard.css";
 import { useAuth } from "../context/AuthContext";
 import { useDashboardData } from "../hooks/useDashboardData";
 import { updateAlarmStatus, alarmToNotification, countAlarms } from "../services/alarmsService";
-import { apiRequest, apiUpload, BASE_URL } from "../services/api";
+import { apiRequest, apiUpload, BACKEND_ORIGIN } from "../services/api";
 import { updateSensorPosition } from "../services/sensorsService";
 
 // ─── API helpers ──────────────────────────────────────────────────────────────
@@ -38,8 +38,7 @@ const imgUrl = (image_url) => {
   if (!image_url) return null;
   if (image_url.startsWith("http://") || image_url.startsWith("https://")) return image_url;
   const path = image_url.startsWith("/") ? image_url : `/${image_url}`;
-  const apiOrigin = new URL(BASE_URL, window.location.origin).origin;
-  return `${apiOrigin}${path}`;
+  return `${BACKEND_ORIGIN}${path}`;
 };
 
 // ─── Icons ────────────────────────────────────────────────────────────────────

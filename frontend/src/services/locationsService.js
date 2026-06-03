@@ -1,11 +1,7 @@
 // frontend/src/services/locationsService.js
 //  Сервис локаций 
 
-import { apiRequest, apiUpload } from "./api";
-
-// Базовый URL бэкенда (для формирования image_url)
-// Если бэкенд на том же домене — оставь пустую строку ""
-export const BACKEND_ORIGIN = "";
+import { apiRequest, apiUpload, BACKEND_ORIGIN } from "./api";
 
 /**
  * Получить список всех локаций (только admin).
@@ -62,5 +58,6 @@ export const uploadLocationPlan = async (locationId, file) => {
 export const getFullImageUrl = (imageUrl) => {
   if (!imageUrl) return null;
   if (imageUrl.startsWith("http")) return imageUrl;
-  return `${BACKEND_ORIGIN}${imageUrl}`;
+  const path = imageUrl.startsWith("/") ? imageUrl : `/${imageUrl}`;
+  return `${BACKEND_ORIGIN}${path}`;
 };

@@ -106,6 +106,19 @@ export const registerUser = async (userData) => {
 };
 
 /**
+ * Обновить пользователя администратором.
+ * @param {number} userId
+ * @param {object} userData - { full_name?, role?, is_active? }
+ * @returns {object} User
+ */
+export const updateUserByAdmin = async (userId, userData) => {
+  return apiRequest(`/users/${userId}`, {
+    method: "PATCH",
+    body: JSON.stringify(userData),
+  });
+};
+
+/**
  * Получить журнал действий.
  * @returns {Array} AuditLog[]
  */

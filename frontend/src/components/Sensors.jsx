@@ -1192,7 +1192,7 @@ const SensorMiniCard = ({
           </div>
         </div>
 
-        <div className="sn-sensor-vals">
+        <div className={`sn-sensor-vals${battery != null ? " sn-sensor-vals--battery" : ""}`}>
           <div className="sn-sensor-val-item">
             <IconTherm/>
             <span className="sn-sensor-val-num" style={{ color: "#ffc207" }}>

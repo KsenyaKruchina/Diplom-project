@@ -495,12 +495,14 @@
   align-items: center;
   justify-content: space-between;
   margin-bottom: 12px;
+  gap: 12px;
 }
 
 .sn-sensor-id-group {
   display: flex;
   align-items: center;
   gap: 10px;
+  min-width: 0;
 }
 
 .sn-drag-handle {
@@ -523,6 +525,8 @@
   font-size: 16px;
   font-weight: 700;
   color: var(--text);
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .sn-status-pill {
@@ -543,33 +547,44 @@
 }
 
 .sn-sensor-vals {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 1px minmax(0, 1fr);
   align-items: center;
   gap: 0;
   background-color: rgba(255,255,255,0.03);
   border-radius: 10px;
   padding: 8px 12px;
   margin-bottom: 12px;
+  min-height: 46px;
+}
+
+.sn-sensor-vals--battery {
+  grid-template-columns: minmax(0, 1fr) 1px minmax(0, 1fr) 1px minmax(80px, 0.65fr);
 }
 
 .sn-sensor-val-item {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
-  flex: 1;
+  min-width: 0;
+  height: 30px;
 }
 
 .sn-sensor-val-div {
   width: 1px;
   height: 24px;
   background-color: rgba(255,255,255,0.08);
-  margin: 0 12px;
+  margin: 0;
 }
 
 .sn-sensor-val-num {
   font-size: 18px;
   font-weight: 700;
   letter-spacing: -0.3px;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 /* ── Charts ──────────────────────────────────────────────────── */
@@ -580,12 +595,14 @@
 }
 
 .sn-chart-wrap {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-rows: 18px 38px auto auto;
   gap: 7px;
+  min-width: 0;
 }
 
 .sn-chart-label {
+  min-height: 18px;
   font-size: 12px;
   color: var(--muted);
   font-weight: 700;
@@ -598,8 +615,12 @@
 .sn-chart-legend {
   display: flex;
   flex-wrap: wrap;
+  align-content: flex-start;
   gap: 6px;
   margin-bottom: 2px;
+  min-height: 38px;
+  max-height: 38px;
+  overflow: hidden;
 }
 
 .sn-chart-legend-item {
@@ -1025,7 +1046,11 @@
   .sn-page-title { font-size: 18px; }
   .sn-page-header { flex-direction: column; }
 
-  .sn-sensor-vals { flex-wrap: wrap; gap: 8px; }
+  .sn-sensor-vals,
+  .sn-sensor-vals--battery {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
   .sn-sensor-val-div { display: none; }
 
   .sn-block-header { flex-direction: column; align-items: flex-start; gap: 12px; }
