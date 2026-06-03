@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 310" role="img">
+  <title>Финальный favicon</title>
+  <g stroke="#FFB800" fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <line x1="15" y1="30" x2="205" y2="30" stroke-width="22"/>
+    <line x1="110" y1="30" x2="110" y2="160" stroke-width="22"/>
+    <polyline points="20,238 54,238 74,168 110,292 146,168 166,238 200,238" stroke-width="16"/>
+  </g>
+</svg>
