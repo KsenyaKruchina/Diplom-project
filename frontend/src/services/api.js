@@ -8,11 +8,48 @@
 // В продакшне nginx делает то же самое.
 // Если нужно переопределить — задай VITE_API_BASE_URL в .env
 export const BASE_URL = import.meta.env.VITE_API_BASE_URL || "/api/v1";
+const FRONTEND_ORIGIN =
+  typeof window !== "undefined" && window.location?.origin
+    ? window.location.origin
+    : "";
+
 export const BACKEND_ORIGIN =
   import.meta.env.VITE_BACKEND_ORIGIN ||
   (BASE_URL.startsWith("http://") || BASE_URL.startsWith("https://")
     ? new URL(BASE_URL).origin
-    : "http://157.90.127.202:8000");
+    : FRONTEND_ORIGIN);
+
+const uniqueUrls = (urls) => [...new Set(urls.filter(Boolean))];
+
+/**
+ * URL для файлов из /uploads должен открываться через текущий origin.
+ * Иначе HTTPS-страница блокирует старые http://IP:8000/uploads/... ссылки.
+ */
+export const getAssetUrlCandidates = (assetUrl) => {
+  if (!assetUrl) return [];
+
+  const frontendOrigin = FRONTEND_ORIGIN || window.location.origin;
+  const parsedUrl = new URL(assetUrl, frontendOrigin);
+  const path = `${parsedUrl.pathname}${parsedUrl.search}${parsedUrl.hash}`;
+
+  if (
+    parsedUrl.pathname.startsWith("/uploads/") &&
+    parsedUrl.protocol === "http:" &&
+    window.location.protocol === "https:"
+  ) {
+    return uniqueUrls([path]);
+  }
+
+  if (parsedUrl.origin === frontendOrigin) {
+    return uniqueUrls([path]);
+  }
+
+  if (!assetUrl.startsWith("http://") && !assetUrl.startsWith("https://")) {
+    return uniqueUrls([path, BACKEND_ORIGIN && `${BACKEND_ORIGIN}${path}`]);
+  }
+
+  return uniqueUrls([parsedUrl.href]);
+};
 
 // ─── Токен хранится под одним ключом во всём приложении ──────────────────────
 // ВАЖНО: ключ "token" — единственный используемый ключ.
