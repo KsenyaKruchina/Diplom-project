@@ -51,6 +51,16 @@ export const getAssetUrlCandidates = (assetUrl) => {
   return uniqueUrls([parsedUrl.href]);
 };
 
+const withTrailingSlash = (url) => {
+  const [base, hash = ""] = url.split("#");
+  const [path, query = ""] = base.split("?");
+  if (path.endsWith("/")) return url;
+  return `${path}/${query ? `?${query}` : ""}${hash ? `#${hash}` : ""}`;
+};
+
+const shouldRetryWithTrailingSlash = (status, url) =>
+  status === 405 && !new URL(url, FRONTEND_ORIGIN || window.location.origin).pathname.endsWith("/");
+
 // ─── Токен хранится под одним ключом во всём приложении ──────────────────────
 // ВАЖНО: ключ "token" — единственный используемый ключ.
 // apiClient.js (старый файл) использовал "access_token" — это была ошибка.
@@ -79,10 +89,17 @@ export const apiRequest = async (path, options = {}) => {
 
   const url = `${BASE_URL}${path}`;
 
-  const response = await fetch(url, {
+  let response = await fetch(url, {
     ...options,
     headers,
   });
+
+  if (shouldRetryWithTrailingSlash(response.status, url)) {
+    response = await fetch(withTrailingSlash(url), {
+      ...options,
+      headers,
+    });
+  }
 
   // Токен истёк или невалидный — выгоняем пользователя
   if (response.status === 401) {
@@ -127,13 +144,24 @@ export const apiRequest = async (path, options = {}) => {
 // ─── Публичные JSON-запросы без редиректа на /login ─────────────────────────
 // Нужны для восстановления пароля, когда пользователь ещё не авторизован.
 export const apiPublicRequest = async (path, options = {}) => {
-  const response = await fetch(`${BASE_URL}${path}`, {
+  const url = `${BASE_URL}${path}`;
+  let response = await fetch(url, {
     ...options,
     headers: {
       "Content-Type": "application/json",
       ...options.headers,
     },
   });
+
+  if (shouldRetryWithTrailingSlash(response.status, url)) {
+    response = await fetch(withTrailingSlash(url), {
+      ...options,
+      headers: {
+        "Content-Type": "application/json",
+        ...options.headers,
+      },
+    });
+  }
 
   if (!response.ok) {
     let errorMessage = `Ошибка сервера: ${response.status}`;
@@ -163,13 +191,24 @@ export const apiPublicRequest = async (path, options = {}) => {
 export const apiUpload = async (path, formData, method = "POST") => {
   const token = getToken();
 
-  const response = await fetch(`${BASE_URL}${path}`, {
+  const url = `${BASE_URL}${path}`;
+  let response = await fetch(url, {
     method,
     headers: {
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
     body: formData,
   });
+
+  if (shouldRetryWithTrailingSlash(response.status, url)) {
+    response = await fetch(withTrailingSlash(url), {
+      method,
+      headers: {
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: formData,
+    });
+  }
 
   if (response.status === 401) {
     removeToken();

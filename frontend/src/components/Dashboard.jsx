@@ -72,7 +72,7 @@ const apiUploadPlan = async (locationId, file) => {
   const uploadFile = await compressPlanImage(file);
   const formData = new FormData();
   formData.append("file", uploadFile);
-  return apiUpload(`/locations/${locationId}/upload-plan`, formData, "POST");
+  return apiUpload(`/locations/${locationId}/upload-plan/`, formData, "POST");
 };
 
 const apiCreateLocation = async (name, file) => {
@@ -469,7 +469,7 @@ const useUserLocation = (role, sensors) => {
           return;
         }
 
-        const loc = await apiGet(`/locations/${locationId}`);
+        const loc = await apiGet(`/locations/${locationId}/`);
         setLocation(loc);
       } catch (e) {
         if (sensors.length > 0 && sensors[0]?.group_id) {
@@ -1335,14 +1335,14 @@ const Dashboard = () => {
   };
 
   const handleEditLocation = async (id, name, file) => {
-    try { await apiPatch(`/locations/${id}`, { name }); }
+    try { await apiPatch(`/locations/${id}/`, { name }); }
     catch (e) { console.warn("PATCH /locations не поддержан:", e.message); }
     if (file) await apiUploadPlan(id, file);
     refetch();
   };
 
   const handleDeleteLocation = async (id) => {
-    await apiDelete(`/locations/${id}`);
+    await apiDelete(`/locations/${id}/`);
     refetch();
   };
 

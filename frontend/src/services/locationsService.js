@@ -16,7 +16,7 @@ export const getLocations = async () => {
  * @returns {object} LocationGroup
  */
 export const getLocation = async (id) => {
-  return apiRequest(`/locations/${id}`);
+  return apiRequest(`/locations/${id}/`);
 };
 
 /**
@@ -45,7 +45,7 @@ export const uploadLocationPlan = async (locationId, file) => {
   const formData = new FormData();
   formData.append("file", file);
 
-  return apiUpload(`/locations/${locationId}/upload-plan`, formData, "POST");
+  return apiUpload(`/locations/${locationId}/upload-plan/`, formData, "POST");
 };
 
 /**
