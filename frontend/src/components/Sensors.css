@@ -632,6 +632,10 @@
   letter-spacing: -0.1px;
 }
 
+.sn-chart-legend-item--muted {
+  opacity: 0.65;
+}
+
 .sn-chart-box {
   background-color: var(--chart-bg);
   border-radius: 8px;

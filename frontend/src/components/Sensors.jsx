@@ -342,11 +342,14 @@ const ChartLegend = ({ sensor, type }) => {
     if (sensor.alarm_min_hum != null || sensor.alarm_max_hum != null)
       items.push({ color: "#ff5b5b", label: `Тревога: ${sensor.alarm_min_hum ?? "—"}…${sensor.alarm_max_hum ?? "—"}%` });
   }
-  if (!items.length) return null;
+  if (!items.length) {
+    items.push({ color: "transparent", label: "Пороги не заданы", muted: true });
+  }
+
   return (
     <div className="sn-chart-legend">
       {items.map((it, i) => (
-        <span key={i} className="sn-chart-legend-item">
+        <span key={i} className={`sn-chart-legend-item${it.muted ? " sn-chart-legend-item--muted" : ""}`}>
           <span style={{ width: 8, height: 2, background: it.color, display: "inline-block", borderRadius: 1 }}/>
           {it.label}
         </span>
