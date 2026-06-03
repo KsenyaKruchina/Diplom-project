@@ -4,7 +4,7 @@ import "./Dashboard.css";
 import { useAuth } from "../context/AuthContext";
 import { useDashboardData } from "../hooks/useDashboardData";
 import { updateAlarmStatus, alarmToNotification, countAlarms } from "../services/alarmsService";
-import { apiRequest, apiUpload, getAssetUrlCandidates } from "../services/api";
+import { apiRequest, apiUpload, BACKEND_ORIGIN } from "../services/api";
 import { updateSensorPosition } from "../services/sensorsService";
 
 // ─── API helpers ──────────────────────────────────────────────────────────────
@@ -85,8 +85,10 @@ const apiCreateLocation = async (name, file) => {
 
 // ─── Построение URL изображения ───────────────────────────────────────────────
 const imageUrlCandidates = (image_url) => {
-  const candidates = getAssetUrlCandidates(image_url);
-  return candidates.length ? candidates : null;
+  if (!image_url) return null;
+  if (image_url.startsWith("http://") || image_url.startsWith("https://")) return [image_url];
+  const path = image_url.startsWith("/") ? image_url : `/${image_url}`;
+  return [path, `${BACKEND_ORIGIN}${path}`];
 };
 
 const imgUrl = (image_url) => imageUrlCandidates(image_url)?.[0] ?? null;

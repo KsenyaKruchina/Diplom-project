@@ -1,7 +1,7 @@
 // frontend/src/services/locationsService.js
 //  Сервис локаций 
 
-import { apiRequest, apiUpload, getAssetUrlCandidates } from "./api";
+import { apiRequest, apiUpload, BACKEND_ORIGIN } from "./api";
 
 /**
  * Получить список всех локаций (только admin).
@@ -50,10 +50,14 @@ export const uploadLocationPlan = async (locationId, file) => {
 
 /**
  * Сформировать полный URL изображения плана.
- * Старые абсолютные http://IP/uploads/... ссылки переводим на текущий HTTPS-origin.
+ * Если image_url уже полный (начинается с http) — возвращаем как есть.
+ * Иначе — добавляем BACKEND_ORIGIN.
  * @param {string|null} imageUrl
  * @returns {string|null}
  */
 export const getFullImageUrl = (imageUrl) => {
-  return getAssetUrlCandidates(imageUrl)[0] || null;
+  if (!imageUrl) return null;
+  if (imageUrl.startsWith("http")) return imageUrl;
+  const path = imageUrl.startsWith("/") ? imageUrl : `/${imageUrl}`;
+  return `${BACKEND_ORIGIN}${path}`;
 };
