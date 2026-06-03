@@ -20,26 +20,78 @@ const apiDelete = async (path) => {
   return true;
 };
 
-const apiUploadPlan = (locationId, file) => {
+const MAX_PLAN_IMAGE_BYTES = 900 * 1024;
+const MAX_PLAN_IMAGE_SIDE = 1800;
+
+const compressPlanImage = async (file) => {
+  if (!file || !file.type?.startsWith("image/") || file.type === "image/svg+xml") {
+    return file;
+  }
+
+  if (file.size <= MAX_PLAN_IMAGE_BYTES) return file;
+
+  const imageUrl = URL.createObjectURL(file);
+  try {
+    const image = await new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = () => reject(new Error("Не удалось прочитать изображение"));
+      img.src = imageUrl;
+    });
+
+    const scale = Math.min(1, MAX_PLAN_IMAGE_SIDE / Math.max(image.width, image.height));
+    const width = Math.max(1, Math.round(image.width * scale));
+    const height = Math.max(1, Math.round(image.height * scale));
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+
+    const ctx = canvas.getContext("2d");
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, width, height);
+    ctx.drawImage(image, 0, 0, width, height);
+
+    let quality = 0.82;
+    let blob = await new Promise(resolve => canvas.toBlob(resolve, "image/jpeg", quality));
+
+    while (blob && blob.size > MAX_PLAN_IMAGE_BYTES && quality > 0.45) {
+      quality -= 0.12;
+      blob = await new Promise(resolve => canvas.toBlob(resolve, "image/jpeg", quality));
+    }
+
+    if (!blob) return file;
+
+    const name = file.name.replace(/\.[^.]+$/, "") || "plan";
+    return new File([blob], `${name}.jpg`, { type: "image/jpeg" });
+  } finally {
+    URL.revokeObjectURL(imageUrl);
+  }
+};
+
+const apiUploadPlan = async (locationId, file) => {
+  const uploadFile = await compressPlanImage(file);
   const formData = new FormData();
-  formData.append("file", file);
+  formData.append("file", uploadFile);
   return apiUpload(`/locations/${locationId}/upload-plan`, formData, "POST");
 };
 
-const apiCreateLocation = (name, file) => {
+const apiCreateLocation = async (name, file) => {
+  const uploadFile = await compressPlanImage(file);
   const formData = new FormData();
   formData.append("name", name);
-  if (file) formData.append("file", file);
+  if (uploadFile) formData.append("file", uploadFile);
   return apiUpload("/locations/", formData, "POST");
 };
 
 // ─── Построение URL изображения ───────────────────────────────────────────────
-const imgUrl = (image_url) => {
+const imageUrlCandidates = (image_url) => {
   if (!image_url) return null;
-  if (image_url.startsWith("http://") || image_url.startsWith("https://")) return image_url;
+  if (image_url.startsWith("http://") || image_url.startsWith("https://")) return [image_url];
   const path = image_url.startsWith("/") ? image_url : `/${image_url}`;
-  return `${BACKEND_ORIGIN}${path}`;
+  return [path, `${BACKEND_ORIGIN}${path}`];
 };
+
+const imgUrl = (image_url) => imageUrlCandidates(image_url)?.[0] ?? null;
 
 // ─── Icons ────────────────────────────────────────────────────────────────────
 const IconError   = ({ color = "#ff5b5b" }) => <svg width="20" height="20" viewBox="0 0 24 24" fill={color}><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>;
@@ -853,7 +905,12 @@ const FloorPlan = ({ activeLoc, locSensors, telemetry, offlineSensorIds, canEdit
     }
   }, [localPositions, onPositionSave, dragAllMode]);
 
-  const planUrl = imgUrl(activeLoc?.image_url);
+  const planUrls = useMemo(() => imageUrlCandidates(activeLoc?.image_url) || [], [activeLoc?.image_url]);
+  const [planSrc, setPlanSrc] = useState(planUrls[0] || null);
+
+  useEffect(() => {
+    setPlanSrc(planUrls[0] || null);
+  }, [planUrls]);
 
   const pinStyle = (s) => {
     const tel    = telemetry.get(s.id);
@@ -869,7 +926,7 @@ const FloorPlan = ({ activeLoc, locSensors, telemetry, offlineSensorIds, canEdit
   return (
     <div
       ref={containerRef}
-      className={`floor-plan-wrap${planUrl ? " floor-plan-wrap--image" : ""}`}
+      className={`floor-plan-wrap${planSrc ? " floor-plan-wrap--image" : ""}`}
       style={{
         cursor: dragging.current ? "grabbing" : (dragAllMode ? "grab" : "default"),
         userSelect: "none",
@@ -879,13 +936,18 @@ const FloorPlan = ({ activeLoc, locSensors, telemetry, offlineSensorIds, canEdit
       onMouseUp={() => endDrag()}
       onMouseLeave={() => { if (dragging.current) dragging.current = null; }}
     >
-      {planUrl ? (
+      {planSrc ? (
         <>
           <img
-            src={planUrl}
+            src={planSrc}
             alt="Floor plan"
             className="floor-image"
             draggable={false}
+            onError={() => {
+              const nextUrl = planUrls.find(url => url !== planSrc);
+              if (nextUrl) setPlanSrc(nextUrl);
+              else setPlanSrc(null);
+            }}
           />
           <div className="floor-image-overlay">
             {locSensors.map(s => {
