@@ -4,7 +4,7 @@ import "./Dashboard.css";
 import { useAuth } from "../context/AuthContext";
 import { useDashboardData } from "../hooks/useDashboardData";
 import { updateAlarmStatus, alarmToNotification, countAlarms } from "../services/alarmsService";
-import { apiRequest, apiUpload, BACKEND_ORIGIN } from "../services/api";
+import { apiRequest, apiUpload, getUploadUrlCandidates } from "../services/api";
 import { updateSensorPosition } from "../services/sensorsService";
 
 // ─── API helpers ──────────────────────────────────────────────────────────────
@@ -85,10 +85,8 @@ const apiCreateLocation = async (name, file) => {
 
 // ─── Построение URL изображения ───────────────────────────────────────────────
 const imageUrlCandidates = (image_url) => {
-  if (!image_url) return null;
-  if (image_url.startsWith("http://") || image_url.startsWith("https://")) return [image_url];
-  const path = image_url.startsWith("/") ? image_url : `/${image_url}`;
-  return [path, `${BACKEND_ORIGIN}${path}`];
+  const candidates = getUploadUrlCandidates(image_url);
+  return candidates.length ? candidates : null;
 };
 
 const imgUrl = (image_url) => imageUrlCandidates(image_url)?.[0] ?? null;
@@ -1336,9 +1334,7 @@ const Dashboard = () => {
     refetch();
   };
 
-  const handleEditLocation = async (id, name, file) => {
-    try { await apiPatch(`/locations/${id}/`, { name }); }
-    catch (e) { console.warn("PATCH /locations не поддержан:", e.message); }
+  const handleEditLocation = async (id, _name, file) => {
     if (file) await apiUploadPlan(id, file);
     refetch();
   };

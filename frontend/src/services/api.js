@@ -8,11 +8,41 @@
 // В продакшне nginx делает то же самое.
 // Если нужно переопределить — задай VITE_API_BASE_URL в .env
 export const BASE_URL = import.meta.env.VITE_API_BASE_URL || "/api/v1";
+const FRONTEND_ORIGIN =
+  typeof window !== "undefined" && window.location?.origin
+    ? window.location.origin
+    : "";
+
 export const BACKEND_ORIGIN =
   import.meta.env.VITE_BACKEND_ORIGIN ||
   (BASE_URL.startsWith("http://") || BASE_URL.startsWith("https://")
     ? new URL(BASE_URL).origin
-    : "http://157.90.127.202:8000");
+    : FRONTEND_ORIGIN);
+
+const uniqueUrls = (urls) => [...new Set(urls.filter(Boolean))];
+
+export const getUploadUrlCandidates = (imageUrl) => {
+  if (!imageUrl) return [];
+
+  const frontendOrigin = FRONTEND_ORIGIN || window.location.origin;
+  const parsedUrl = new URL(imageUrl, frontendOrigin);
+  const path = `${parsedUrl.pathname}${parsedUrl.search}${parsedUrl.hash}`;
+  const isUpload = parsedUrl.pathname.startsWith("/uploads/");
+
+  if (isUpload) {
+    return uniqueUrls([path, `${frontendOrigin}${path}`]);
+  }
+
+  if (parsedUrl.origin === frontendOrigin) {
+    return uniqueUrls([path]);
+  }
+
+  if (!imageUrl.startsWith("http://") && !imageUrl.startsWith("https://")) {
+    return uniqueUrls([path, BACKEND_ORIGIN && `${BACKEND_ORIGIN}${path}`]);
+  }
+
+  return uniqueUrls([parsedUrl.href]);
+};
 
 const withTrailingSlash = (url) => {
   const [base, hash = ""] = url.split("#");
@@ -22,7 +52,7 @@ const withTrailingSlash = (url) => {
 };
 
 const shouldRetryWithTrailingSlash = (status, url) =>
-  status === 405 && !new URL(url, window.location.origin).pathname.endsWith("/");
+  status === 405 && !new URL(url, FRONTEND_ORIGIN || window.location.origin).pathname.endsWith("/");
 
 // ─── Токен хранится под одним ключом во всём приложении ──────────────────────
 // ВАЖНО: ключ "token" — единственный используемый ключ.
