@@ -72,7 +72,7 @@ const apiUploadPlan = async (locationId, file) => {
   const uploadFile = await compressPlanImage(file);
   const formData = new FormData();
   formData.append("file", uploadFile);
-  return apiUpload(`/locations/${locationId}/upload-plan/`, formData, "POST");
+  return apiUpload(`/locations/${locationId}/upload-plan`, formData, "POST");
 };
 
 const apiCreateLocation = async (name, file) => {

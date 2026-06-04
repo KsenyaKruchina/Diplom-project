@@ -51,8 +51,17 @@ const withTrailingSlash = (url) => {
   return `${path}/${query ? `?${query}` : ""}${hash ? `#${hash}` : ""}`;
 };
 
+const withoutTrailingSlash = (url) => {
+  const [base, hash = ""] = url.split("#");
+  const [path, query = ""] = base.split("?");
+  if (!path.endsWith("/") || path === "/") return url;
+  return `${path.slice(0, -1)}${query ? `?${query}` : ""}${hash ? `#${hash}` : ""}`;
+};
+
 const shouldRetryWithTrailingSlash = (status, url) =>
   status === 405 && !new URL(url, FRONTEND_ORIGIN || window.location.origin).pathname.endsWith("/");
+
+const shouldRetryUploadUrl = (status) => status === 404 || status === 405 || status === 307 || status === 308;
 
 // ─── Токен хранится под одним ключом во всём приложении ──────────────────────
 // ВАЖНО: ключ "token" — единственный используемый ключ.
@@ -185,22 +194,28 @@ export const apiUpload = async (path, formData, method = "POST") => {
   const token = getToken();
 
   const url = `${BASE_URL}${path}`;
-  let response = await fetch(url, {
+  const uploadOptions = {
     method,
     headers: {
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
     body: formData,
-  });
+  };
 
-  if (shouldRetryWithTrailingSlash(response.status, url)) {
-    response = await fetch(withTrailingSlash(url), {
-      method,
-      headers: {
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      },
-      body: formData,
-    });
+  let response;
+  try {
+    response = await fetch(url, uploadOptions);
+  } catch (error) {
+    const retryUrl = path.endsWith("/") ? withoutTrailingSlash(url) : withTrailingSlash(url);
+    if (retryUrl === url) throw error;
+    response = await fetch(retryUrl, uploadOptions);
+  }
+
+  if (shouldRetryUploadUrl(response.status)) {
+    const retryUrl = path.endsWith("/") ? withoutTrailingSlash(url) : withTrailingSlash(url);
+    if (retryUrl !== url) {
+      response = await fetch(retryUrl, uploadOptions);
+    }
   }
 
   if (response.status === 401) {

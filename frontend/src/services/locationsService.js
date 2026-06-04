@@ -45,7 +45,7 @@ export const uploadLocationPlan = async (locationId, file) => {
   const formData = new FormData();
   formData.append("file", file);
 
-  return apiUpload(`/locations/${locationId}/upload-plan/`, formData, "POST");
+  return apiUpload(`/locations/${locationId}/upload-plan`, formData, "POST");
 };
 
 /**
