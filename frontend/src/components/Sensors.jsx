@@ -1780,8 +1780,8 @@ const Sensors = () => {
   const handleDeleteBlock = async (blockId, detach = false) => {
     if (!permissions.canManageControlUnits) return;
     const url = detach
-      ? `/api/v1/control-units/${blockId}/?detach_sensors=true`
-      : `/api/v1/control-units/${blockId}/`;
+      ? `/api/v1/control-units/${blockId}?detach_sensors=true`
+      : `/api/v1/control-units/${blockId}`;
     await apiDelete(url);
     await fetchAll();
   };
