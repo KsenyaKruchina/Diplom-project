@@ -1372,25 +1372,13 @@ const BlockCard = ({
   };
 
   // ─── Клик на кнопку "Удалить ЦБУ" ────────────────────────────────────────
-  // Шаг 1: запрашиваем список датчиков с сервера, не доверяем UI
+  // Используем уже загруженные датчики: отдельный endpoint проверки может быть
+  // недоступен на проде и не должен ломать кнопку удаления.
   const handleDeleteClick = async (e) => {
     e.stopPropagation();
     setDeleteCheckErr("");
-    setDeleteState("loading");
-    try {
-      const sensors = await apiGet(`/api/v1/control-units/${block.id}/sensors`);
-      setBlockSensors(Array.isArray(sensors) ? sensors : []);
-      if (!sensors || sensors.length === 0) {
-        // Датчиков нет — переходим к простому подтверждению
-        setDeleteState("confirmEmpty");
-      } else {
-        // Датчики есть — показываем предупреждение с выбором
-        setDeleteState("hasSensors");
-      }
-    } catch (e) {
-      setDeleteCheckErr(e.message);
-      setDeleteState("error");
-    }
+    setBlockSensors(childSensors);
+    setDeleteState(childSensors.length === 0 ? "confirmEmpty" : "hasSensors");
   };
 
   const handleCloseDelete = () => {
@@ -1792,8 +1780,8 @@ const Sensors = () => {
   const handleDeleteBlock = async (blockId, detach = false) => {
     if (!permissions.canManageControlUnits) return;
     const url = detach
-      ? `/api/v1/control-units/${blockId}?detach_sensors=true`
-      : `/api/v1/control-units/${blockId}`;
+      ? `/api/v1/control-units/${blockId}/?detach_sensors=true`
+      : `/api/v1/control-units/${blockId}/`;
     await apiDelete(url);
     await fetchAll();
   };
